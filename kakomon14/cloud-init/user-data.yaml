@@ -1,0 +1,165 @@
+#cloud-config
+write_files:
+- path: /opt/kakomon14/provisioning/lib.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\n# 設定値。環境変数で上書き可能にする\n: \"${ISUREN_USER:=isuren}\"\n: \"${ENABLE_TLS:=false}\"\n\nlog() {\n  echo \"[kakomon14] $*\"\n}\n"
+- path: /opt/kakomon14/provisioning/10-base.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\n# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L1-4\nset_timezone() {\n  if [ \"$(timedatectl show -p Timezone --value)\" != \"UTC\" ]; then\n    timedatectl set-timezone UTC\n    log \"timezone: changed to UTC\"\n  else\n    log \"timezone: already UTC\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L13-20\nset_sysctl_port_range() {\n  local conf=/etc/sysctl.d/99-isuren.conf\n  local content='net.ipv4.ip_local_port_range = 10000 65535'\n  if [ ! -f \"${conf}\" ] || [ \"$(cat \"${conf}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${conf}\"\n    sysctl --system >/dev/null\n    log \"sysctl: changed ${conf}\"\n  else\n    log \"sysctl: already up to date\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L22-33\nset_limits() {\n  local conf=/etc/security/limits.d/99-isuren.conf\n  local content\n  content=$(\n    cat <<'EOD'\n* - nofile 655360\n* - nproc 655360\n* soft memlock unlimited\n* hard memlock unlimited\nEOD\n  )\n  if [ ! -f \"${conf}\" ] || [ \"$(cat \"${conf}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${conf}\"\n    log \"limits: changed ${conf}\"\n  else\n    log \"limits: already up to date\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L35-43\n# ホスト名はxiv.isucon.netではなくxiv.isuren.internalを使う。\n# .internalはICANNが私設ネットワーク専用に予約したTLD(.localと違いmDNSの特殊扱いを受けない)で、\n# webapp/go・frontendにisucon.net依存箇所がないため置き換えても実害がないことを確認済み。\nset_hosts() {\n  local marker='127.0.0.1 isuride.xiv.isuren.internal'\n  if ! grep -qF \"${marker}\" /etc/hosts; then\n    {\n      echo \"\"\n      echo \"# ISURIDE IP for matching requests\"\n      echo \"${marker}\"\n    } >>/etc/hosts\n    log \"hosts: added ${marker}\"\n  else\n    log \"hosts: already present\"\n  fi\n}\n\n# 未対応(意図的に除外): isucon14/provisioning/ansible/roles/base/tasks/main.yml L6-11\n# /etc/ssh/sshd_config.d/pubkey.conf に PubkeyAcceptedAlgorithms=+ssh-rsa を配置するタスク。\n# 旧クライアント互換のための設定で、bastionからの接続は最新クライアント前提のため除外。\n\nset_timezone\nset_sysctl_port_range\nset_limits\nset_hosts\n\nlog \"10-base.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/20-user.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\n# 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L2-8\ncreate_group() {\n  if ! getent group \"${ISUREN_USER}\" >/dev/null 2>&1; then\n    groupadd -g 1100 \"${ISUREN_USER}\"\n    log \"group: created ${ISUREN_USER}(gid=1100)\"\n  else\n    log \"group: already exists\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L10-20\n# password(平文isucon)設定は未対応。bastionはSSHキー/sudo経由の運用でログインパスワード認証を使わないため。\ncreate_user() {\n  if ! id -u \"${ISUREN_USER}\" >/dev/null 2>&1; then\n    useradd -u 1100 -g \"${ISUREN_USER}\" -d \"/home/${ISUREN_USER}\" -m -s /bin/bash \"${ISUREN_USER}\"\n    log \"user: created ${ISUREN_USER}(uid=1100)\"\n  else\n    log \"user: already exists\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L22-26\nchmod_home() {\n  local home=\"/home/${ISUREN_USER}\"\n  if [ \"$(stat -c %a \"${home}\")\" != \"755\" ]; then\n    chmod 0755 \"${home}\"\n    log \"home: chmod 755 ${home}\"\n  else\n    log \"home: already 755\"\n  fi\n}\n\n# 未対応(意図的に除外): isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L28-41\n# .sshディレクトリ作成・authorized_keys削除。bastionのユーザーアクセスモデル(ubuntu/user101経由)とは別物のため。\n\n# 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L43-50\nset_sudoers() {\n  local conf=\"/etc/sudoers.d/99-${ISUREN_USER}-user\"\n  local content=\"${ISUREN_USER}  ALL=(ALL) NOPASSWD:ALL\"\n  if [ ! -f \"${conf}\" ] || [ \"$(cat \"${conf}\")\" != \"${content}\" ]; then\n    local tmp\n    tmp=\"$(mktemp)\"\n    echo \"${content}\" >\"${tmp}\"\n    visudo -cf \"${tmp}\"\n    install -m 0440 -o root -g root \"${tmp}\" \"${conf}\"\n    rm -f \"${tmp}\"\n    log \"sudoers: changed ${conf}\"\n  else\n    log \"sudoers: already up to date\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L52-59, templates/env.sh\nset_env_sh() {\n  local dest=\"/home/${ISUREN_USER}/env.sh\"\n  local content\n  content=$(\n    cat <<'EOD'\nISUCON_DB_HOST=\"127.0.0.1\"\nISUCON_DB_PORT=\"3306\"\nISUCON_DB_USER=\"isucon\"\nISUCON_DB_PASSWORD=\"isucon\"\nISUCON_DB_NAME=\"isuride\"\n\n# マッチング間隔（秒）\nISUCON_MATCHING_INTERVAL=0.5\nEOD\n  )\n  if [ ! -f \"${dest}\" ] || [ \"$(cat \"${dest}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${dest}\"\n    chown \"${ISUREN_USER}:${ISUREN_USER}\" \"${dest}\"\n    chmod 0755 \"${dest}\"\n    log \"env.sh: changed ${dest}\"\n  else\n    log \"env.sh: already up to date\"\n  fi\n}\n\ncreate_group\ncreate_user\nchmod_home\nset_sudoers\nset_env_sh\n\nlog \"20-user.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/30-runtime.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L1-9(git/xbuild導入部分)の代替。\n# xbuildはバージョン固定インストールをするだけのツールなのでmiseに置き換える。\ninstall_mise() {\n  if [ ! -x \"${MISE_BIN}\" ]; then\n    runuser -u \"${ISUREN_USER}\" -- sh -c 'curl -fsSL https://mise.run | sh'\n    log \"mise: installed\"\n  else\n    log \"mise: already installed\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L37-45(.profileへのPATH追加)相当\nset_bashrc() {\n  local bashrc=\"${ISUREN_HOME}/.bashrc\"\n  # shellcheck disable=SC2016 # .bashrcに文字通り書き込むため展開させない\n  local line='eval \"$(~/.local/bin/mise activate bash)\"'\n  if ! grep -qF \"${line}\" \"${bashrc}\" 2>/dev/null; then\n    echo \"${line}\" >>\"${bashrc}\"\n    chown \"${ISUREN_USER}:${ISUREN_USER}\" \"${bashrc}\"\n    log \"bashrc: added mise activate\"\n  else\n    log \"bashrc: already configured\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L27-30(go-install 1.23.2)の代替。\n# バージョンはpreflight-checkの決定(go 1.26.5 / node 24.19.0 / pnpm 11.21.0)に固定。\n# aws-bastionリポジトリのパスを直接参照せず実体をisurenのホームにコピーするのは、\n# /home/ubuntu配下へのisurenからのアクセス権限に依存させないため、および将来cloud-init化した際に\n# aws-bastionリポジトリ自体が存在しない前提でも動くようにするため。\nset_mise_config() {\n  local conf=\"${ISUREN_HOME}/.config/mise/config.toml\"\n  if [ ! -f \"${conf}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.kakomon14.toml\" \"${conf}\" >/dev/null 2>&1; then\n    install -d -m 0755 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"$(dirname \"${conf}\")\"\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.kakomon14.toml\" \"${conf}\"\n    log \"mise config: changed ${conf}\"\n  else\n    log \"mise config: already up to date\"\n  fi\n}\n\n# チェックサムを固定してサプライチェーン改ざん検知・再現性を担保する。\n# linux-arm64のみを対象にしているのはこのAMIがarm64(Graviton)専用のため。\n# `mise lock -g -p linux-arm64`で生成したものをgit管理し、そのまま配置する。\nset_mise_lock() {\n  local lock=\"${ISUREN_HOME}/.config/mise/mise.lock\"\n  if [ ! -f \"${lock}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.kakomon14.lock\" \"${lock}\" >/dev/null 2>&1; then\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.kakomon14.lock\" \"${lock}\"\n    log \"mise lock: changed ${lock}\"\n  else\n    log \"mise lock: already up to date\"\n  fi\n}\n\n# mise install自体が内部で冪等(既にインストール済みのバージョンは再取得しない)なため、\n# ここでは changed/already の判定を自前で行わずmiseに委ねる。\nrun_mise_install() {\n  runuser -u \"${ISUREN_USER}\" -- \"${MISE_BIN}\" install\n  log \"mise install: done\"\n}\n\ninstall_mise\nset_bashrc\nset_mise_config\nset_mise_lock\nrun_mise_install\n\nlog \"30-runtime.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/40-mysql.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\n# 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L1-5\n# 2回目以降にネットワークへ出ないよう、未インストールのときだけapt-get updateする。\ninstall_mysql() {\n  if ! dpkg -s mysql-server >/dev/null 2>&1; then\n    apt-get update\n    apt-get install -y mysql-server\n    log \"mysql-server: installed\"\n  else\n    log \"mysql-server: already installed\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L7-11\nstart_mysql_service() {\n  if systemctl is-active --quiet mysql && systemctl is-enabled --quiet mysql; then\n    log \"mysql service: already enabled and running\"\n  else\n    systemctl enable --now mysql\n    log \"mysql service: enabled and started\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L13-20\n# 元のCREATE USER IF NOT EXISTSだけだと、ユーザーが既に存在する場合パスワードは更新されない。\n# ALTER USERを足すことでパスワードのドリフトも解消されるようにした。\n# CREATE/ALTER/GRANTはMySQL側で既に冪等なため、changed/already の判定は自前で行わずMySQLに委ねる。\nset_isucon_db_user() {\n  mysql -uroot -e \"\n    CREATE USER IF NOT EXISTS 'isucon'@'%' IDENTIFIED BY 'isucon';\n    ALTER USER 'isucon'@'%' IDENTIFIED BY 'isucon';\n    GRANT ALL PRIVILEGES ON *.* TO 'isucon'@'%' WITH GRANT OPTION;\n    FLUSH PRIVILEGES;\n  \"\n  log \"isucon db user: granted\"\n}\n\ninstall_mysql\nstart_mysql_service\nset_isucon_db_user\n\nlog \"40-mysql.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/50-source.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\n# コミットハッシュは/Users/user01/works/github.com/isucon/isucon14(AI参照用ローカルコピー)の\n# HEADに合わせて固定している。isucon14公式リポジトリのmainブランチ、2024-12-13時点。\n: \"${ISUCON14_REPO_URL:=https://github.com/isucon/isucon14.git}\"\n: \"${ISUCON14_COMMIT:=53f8b627e040c30ebec600457c6c97da008b84b0}\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nISUCON14_DIR=\"${ISUREN_HOME}/isucon14\"\nWEBAPP_LINK=\"${ISUREN_HOME}/webapp\"\n\n# 公式のtarball転送方式(webapp.tar.gz)ではなくgit cloneで完結させる。\n# isurenユーザーでcloneするため、所有者は自然にisurenになる。\nclone_isucon14() {\n  if [ ! -d \"${ISUCON14_DIR}/.git\" ]; then\n    runuser -u \"${ISUREN_USER}\" -- git clone \"${ISUCON14_REPO_URL}\" \"${ISUCON14_DIR}\"\n    log \"isucon14: cloned\"\n  else\n    runuser -u \"${ISUREN_USER}\" -- git -C \"${ISUCON14_DIR}\" fetch --quiet\n    log \"isucon14: fetched\"\n  fi\n\n  local current_commit\n  current_commit=\"$(runuser -u \"${ISUREN_USER}\" -- git -C \"${ISUCON14_DIR}\" rev-parse HEAD)\"\n  if [ \"${current_commit}\" != \"${ISUCON14_COMMIT}\" ]; then\n    runuser -u \"${ISUREN_USER}\" -- git -C \"${ISUCON14_DIR}\" checkout --quiet \"${ISUCON14_COMMIT}\"\n    log \"isucon14: checked out ${ISUCON14_COMMIT}\"\n  else\n    log \"isucon14: already at ${ISUCON14_COMMIT}\"\n  fi\n}\n\n# 公式のwebapp.tar.gz展開後のレイアウト(/home/isucon/webapp直下にgo/sqlが並ぶ)を再現する。\n# rsyncコピーではなくシンボリックリンクにしているのは、frontend-buildタスクでwebapp/public配下に\n# ビルド成果物を書き込む際、cloneしたツリーにそのまま反映されるようにするため\n# (rsyncコピーだと別途同期し直す手間が発生する)。\n# シンボリックリンク自体の所有者はchownしない。Linuxではシンボリックリンク自体の\n# パーミッション/所有者はカーネルからほぼ無視され、実際のアクセス制御はリンク先の実体\n# (isuren所有のisucon14/webapp)に対して行われるため、機能的に不要。\nlink_webapp() {\n  if [ -L \"${WEBAPP_LINK}\" ] && [ \"$(readlink \"${WEBAPP_LINK}\")\" = \"${ISUCON14_DIR}/webapp\" ]; then\n    log \"webapp: symlink already up to date\"\n  else\n    ln -sfn \"${ISUCON14_DIR}/webapp\" \"${WEBAPP_LINK}\"\n    log \"webapp: symlink created\"\n  fi\n}\n\nclone_isucon14\nlink_webapp\n\nlog \"50-source.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/60-initdb.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nWEBAPP_SQL_DIR=\"${ISUREN_HOME}/webapp/sql\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/main.yaml L28-33(initilize database)\n# 本番のベンチ実行前リセット(/api/initialize)と同じ「常にDROP&CREATEしなおす」動作が正しい仕様のため、\n# 他のスクリプトと違い2回目以降もchanged/alreadyの判定はせず毎回実行する。\nreset_database() {\n  mysql -uroot -e \"DROP DATABASE IF EXISTS isuride; CREATE DATABASE IF NOT EXISTS isuride;\"\n  log \"database: dropped and recreated\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/main.yaml L34-36(initialize tables)\n# init.shは/home/isucon/env.sh(固定パス)をsourceしようとするが、bastionにはisurenしかいないため\n# 読み込まれない(デフォルト値がenv.shの内容と一致するため実害はないが、タスク方針通り明示exportする)。\nrun_init_sql() {\n  runuser -u \"${ISUREN_USER}\" -- env \\\n    ISUCON_DB_HOST=\"127.0.0.1\" \\\n    ISUCON_DB_PORT=\"3306\" \\\n    ISUCON_DB_USER=\"isucon\" \\\n    ISUCON_DB_PASSWORD=\"isucon\" \\\n    ISUCON_DB_NAME=\"isuride\" \\\n    bash \"${WEBAPP_SQL_DIR}/init.sh\"\n  log \"init.sh: executed\"\n}\n\nreset_database\nrun_init_sql\n\nlog \"60-initdb.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/70-webapp-go.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nWEBAPP_GO_DIR=\"${ISUREN_HOME}/webapp/go\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-go.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/go.yaml L9-15\n# 再ビルドのたびにサービス再起動が必要なため、changed/already判定はせず常にビルドする。\n# runuser経由では.bashrcを経由せずmiseがPATHに乗らないため、mise本体はフルパスで呼ぶ。\nbuild_isuride_go() {\n  # shellcheck disable=SC2016 # env経由で渡したWEBAPP_GO_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env WEBAPP_GO_DIR=\"${WEBAPP_GO_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${WEBAPP_GO_DIR}\" && \"${MISE_BIN}\" exec -- go build -o \"${WEBAPP_GO_DIR}/isuride\" -ldflags \"-s -w\"'\n  log \"isuride-go: built\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-go.service\n# isucon->isurenに読み替え(User/Group/WorkingDirectory/EnvironmentFileのパス)。サービス名・ExecStartは据え置き。\n# WorkingDirectoryは/api/initializeが相対パス../sql/init.shを呼ぶため必須。\nset_systemd_unit() {\n  local content\n  content=$(\n    cat <<EOD\n[Unit]\nDescription=isuride-go\nAfter=syslog.target\nAfter=mysql.service\nRequires=mysql.service\n\n[Service]\nWorkingDirectory=${WEBAPP_GO_DIR}\nEnvironmentFile=${ISUREN_HOME}/env.sh\n\nUser=${ISUREN_USER}\nGroup=${ISUREN_USER}\nExecStart=${WEBAPP_GO_DIR}/isuride\nExecStop=/bin/kill -s QUIT \\$MAINPID\n\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOD\n  )\n  if [ ! -f \"${SYSTEMD_UNIT}\" ] || [ \"$(cat \"${SYSTEMD_UNIT}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${SYSTEMD_UNIT}\"\n    systemctl daemon-reload\n    log \"systemd unit: changed ${SYSTEMD_UNIT}\"\n  else\n    log \"systemd unit: already up to date\"\n  fi\n}\n\n# 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする。\nrestart_service() {\n  systemctl enable isuride-go\n  systemctl restart isuride-go\n  log \"isuride-go service: enabled and restarted\"\n}\n\nbuild_isuride_go\nset_systemd_unit\nrestart_service\n\nlog \"70-webapp-go.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/75-matcher.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-matcher.service\"\nUNIT_CHANGED=0\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-matcher.service\n# isucon->isurenに読み替え。Go版のみに絞る方針のため、他言語(node/perl/php/python/ruby/rust)への\n# Afterは削除しisuride-go.serviceのみ残す。curl先は公式のhttps://isuride.xiv.isucon.net経由(nginx/TLS依存)\n# ではなくhttp://127.0.0.1:8080への直叩きに変更し、nginx/TLSを丸ごとバイパスする。\nset_systemd_unit() {\n  local content\n  content=$(\n    cat <<EOD\n[Unit]\nDescription=isuride-matcher\nAfter=isuride-go.service\n\n[Service]\nUser=${ISUREN_USER}\nGroup=${ISUREN_USER}\nEnvironmentFile=${ISUREN_HOME}/env.sh\n\nExecStart=/bin/sh -c \"while true; do curl -s http://127.0.0.1:8080/api/internal/matching; sleep \\$ISUCON_MATCHING_INTERVAL; done\"\nExecStop=/bin/kill -s QUIT \\$MAINPID\n\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOD\n  )\n  if [ ! -f \"${SYSTEMD_UNIT}\" ] || [ \"$(cat \"${SYSTEMD_UNIT}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${SYSTEMD_UNIT}\"\n    systemctl daemon-reload\n    UNIT_CHANGED=1\n    log \"systemd unit: changed ${SYSTEMD_UNIT}\"\n  else\n    log \"systemd unit: already up to date\"\n  fi\n}\n\n# ユニットファイルが変わった場合は、稼働中でも再起動して新しい内容を反映させる\n# (enable --nowはすでに動作中のサービスに対しては何もしないため)。\nstart_service() {\n  systemctl enable isuride-matcher\n  if [ \"${UNIT_CHANGED}\" = \"1\" ] || ! systemctl is-active --quiet isuride-matcher; then\n    systemctl restart isuride-matcher\n    log \"isuride-matcher service: (re)started\"\n  else\n    log \"isuride-matcher service: already running\"\n  fi\n}\n\nset_systemd_unit\nstart_service\n\nlog \"75-matcher.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/80-frontend.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nFRONTEND_DIR=\"${ISUREN_HOME}/isucon14/frontend\"\nWEBAPP_PUBLIC_DIR=\"${ISUREN_HOME}/webapp/public\"\n\n# pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)。\n# allowBuildsが未設定のまま`pnpm install`すると、esbuildのネイティブバイナリが導入されず\n# ERR_PNPM_IGNORED_BUILDSでexit 1になる(vite buildにesbuildが必須なため実害がある)。\n# pnpm-workspace.kakomon14.yaml(pnpm approve-builds --allで生成した内容をgit管理化したもの)を\n# installより先に配置することで、1回目から承認済みの状態でinstallできるようにする。\nset_pnpm_workspace_yaml() {\n  local dest=\"${FRONTEND_DIR}/pnpm-workspace.yaml\"\n  if [ ! -f \"${dest}\" ] || ! diff -q \"${SCRIPT_DIR}/pnpm-workspace.kakomon14.yaml\" \"${dest}\" >/dev/null 2>&1; then\n    install -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" -m 0644 \"${SCRIPT_DIR}/pnpm-workspace.kakomon14.yaml\" \"${dest}\"\n    log \"pnpm-workspace.yaml: changed ${dest}\"\n  else\n    log \"pnpm-workspace.yaml: already up to date\"\n  fi\n}\n\n# 対応: frontend-buildタスクの「やること」1点目。\n# ビルドのたびに最新化する必要があるため、changed/already判定はせず常に実行する。\n# runuser経由では.bashrcを経由せずmise/pnpmがPATHに乗らないため、mise本体はフルパスで呼ぶ。\nbuild_frontend() {\n  # shellcheck disable=SC2016 # env経由で渡したFRONTEND_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env FRONTEND_DIR=\"${FRONTEND_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${FRONTEND_DIR}\" && \"${MISE_BIN}\" exec -- pnpm install --frozen-lockfile && \"${MISE_BIN}\" exec -- pnpm run build'\n  log \"frontend: built\"\n}\n\n# webapp/publicはisucon14の.gitignoreに入っているため、cloneしたツリー内でビルドしてもツリーは汚れない。\n# rsync --deleteで、前回ビルドの古いファイル(ハッシュ付きファイル名が変わったもの等)を確実に除去する。\n# isurenユーザーで実行し、所有者を揃える(chownでの後追い修正を避ける)。\nsync_public() {\n  # shellcheck disable=SC2016 # env経由で渡したFRONTEND_DIR/WEBAPP_PUBLIC_DIRをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env FRONTEND_DIR=\"${FRONTEND_DIR}\" WEBAPP_PUBLIC_DIR=\"${WEBAPP_PUBLIC_DIR}\" \\\n    sh -c 'mkdir -p \"${WEBAPP_PUBLIC_DIR}\" && rsync -a --delete \"${FRONTEND_DIR}/build/client/\" \"${WEBAPP_PUBLIC_DIR}/\"'\n  log \"webapp/public: synced\"\n}\n\nset_pnpm_workspace_yaml\nbuild_frontend\nsync_public\n\nlog \"80-frontend.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/90-nginx.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nWEBAPP_PUBLIC_DIR=\"${ISUREN_HOME}/webapp/public\"\nSITE_AVAILABLE=\"/etc/nginx/sites-available/isuride.conf\"\nSITE_ENABLED=\"/etc/nginx/sites-enabled/isuride.conf\"\nDEFAULT_ENABLED=\"/etc/nginx/sites-enabled/default\"\nTLS_DIR=\"/etc/nginx/tls\"\nTLS_CERT=\"${TLS_DIR}/_.xiv.isucon.net.crt\"\nTLS_KEY=\"${TLS_DIR}/_.xiv.isucon.net.key\"\n\n# 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「Install package」\n# 2回目以降にネットワークへ出ないよう、未インストールのときだけapt-get updateする。\ninstall_nginx() {\n  if ! dpkg -s nginx >/dev/null 2>&1; then\n    apt-get update\n    apt-get install -y nginx\n    log \"nginx: installed\"\n  else\n    log \"nginx: already installed\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/nginx/files/etc/nginx/tls/_.xiv.isucon.net.{crt,key}\n# 公式証明書は失効済み(2025年2月)のため自己署名で代用する。ベンチはTLS検証をしないため問題ない。\n# 有効期限が近い(30日未満)/存在しない場合のみ再生成する冪等な作りにする。\ngenerate_tls_cert() {\n  if [ \"${ENABLE_TLS}\" != \"true\" ]; then\n    return\n  fi\n  mkdir -p \"${TLS_DIR}\"\n  if [ -f \"${TLS_CERT}\" ] && openssl x509 -checkend 2592000 -noout -in \"${TLS_CERT}\" >/dev/null 2>&1; then\n    log \"nginx tls cert: already valid\"\n  else\n    openssl req -x509 -nodes -newkey rsa:2048 \\\n      -keyout \"${TLS_KEY}\" -out \"${TLS_CERT}\" \\\n      -days 3650 \\\n      -subj \"/CN=*.xiv.isucon.net\" \\\n      -addext \"subjectAltName=DNS:*.xiv.isucon.net,DNS:xiv.isucon.net\"\n    log \"nginx tls cert: generated\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/nginx/files/etc/nginx/sites-available/isuride.conf\n# 公式は443のみでTLS必須の構成だが、まずTLSなしのHTTP版で静的配信+/apiプロキシの経路を通す。\n# ボット避けのデフォルトvhost(公式L1-26)は本番運営向けのセキュリティ対策であり、\n# このbastionでは不要なため省略し、単一のHTTP vhostのみにした。\n# ENABLE_TLS=trueのときのみ、公式L28-56相当の443 vhost(xiv.isucon.net向け)を追加する。\nset_site_config() {\n  local content\n  content=$(\n    cat <<EOD\nserver {\n  listen 80 default_server;\n  server_name _;\n\n  client_max_body_size 10m;\n  root ${WEBAPP_PUBLIC_DIR};\n\n  location / {\n    try_files \\$uri /index.html;\n  }\n\n  location /api/ {\n    proxy_set_header Host \\$host;\n    proxy_pass http://localhost:8080;\n  }\n\n  location /api/internal/ {\n    # localhostからのみアクセスを許可\n    allow 127.0.0.1;\n    deny all;\n    proxy_set_header Host \\$host;\n    proxy_pass http://localhost:8080;\n  }\n}\nEOD\n  )\n  if [ \"${ENABLE_TLS}\" = \"true\" ]; then\n    content=\"${content}\n$(cat <<EOD\n\nserver {\n  listen 443 ssl;\n  server_name xiv.isucon.net;\n  server_name *.xiv.isucon.net;\n\n  ssl_certificate ${TLS_CERT};\n  ssl_certificate_key ${TLS_KEY};\n  ssl_protocols TLSv1.3;\n  ssl_prefer_server_ciphers off;\n\n  client_max_body_size 10m;\n  root ${WEBAPP_PUBLIC_DIR};\n\n  location / {\n    try_files \\$uri /index.html;\n  }\n\n  location /api/ {\n    proxy_set_header Host \\$host;\n    proxy_pass http://localhost:8080;\n  }\n\n  location /api/internal/ {\n    # localhostからのみアクセスを許可\n    allow 127.0.0.1;\n    deny all;\n    proxy_set_header Host \\$host;\n    proxy_pass http://localhost:8080;\n  }\n}\nEOD\n)\"\n  fi\n  if [ ! -f \"${SITE_AVAILABLE}\" ] || [ \"$(cat \"${SITE_AVAILABLE}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${SITE_AVAILABLE}\"\n    log \"nginx site config: changed ${SITE_AVAILABLE}\"\n  else\n    log \"nginx site config: already up to date\"\n  fi\n}\n\nenable_site() {\n  if [ ! -L \"${SITE_ENABLED}\" ] || [ \"$(readlink \"${SITE_ENABLED}\")\" != \"${SITE_AVAILABLE}\" ]; then\n    ln -sfn \"${SITE_AVAILABLE}\" \"${SITE_ENABLED}\"\n    log \"nginx site: enabled\"\n  else\n    log \"nginx site: already enabled\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「Delete default config」\nremove_default_site() {\n  if [ -e \"${DEFAULT_ENABLED}\" ] || [ -L \"${DEFAULT_ENABLED}\" ]; then\n    rm -f \"${DEFAULT_ENABLED}\"\n    log \"nginx default site: removed\"\n  else\n    log \"nginx default site: already removed\"\
+    \n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「check nginx config」「Start nginx」\nreload_nginx() {\n  nginx -t\n  systemctl enable nginx\n  systemctl reload-or-restart nginx\n  log \"nginx: reloaded\"\n}\n\ninstall_nginx\ngenerate_tls_cert\nset_site_config\nenable_site\nremove_default_site\nreload_nginx\n\nlog \"90-nginx.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/95-deploy-helper.sh
+  owner: root:root
+  permissions: '0644'
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nDEPLOY_SCRIPT=\"${ISUREN_HOME}/deploy.sh\"\n\n# チューニング作業中に、コード変更→再ビルド→再起動を1コマンドで回せるようにする。\n# isurenの対話シェル(.bashrcでmise activate済み)からの実行を前提にしており、\n# 70-webapp-go.shのようにmise/goをフルパス指定していない。\nset_deploy_script() {\n  local content\n  content=$(\n    cat <<'EOD'\n#!/usr/bin/env bash\nset -euo pipefail\n\ncd ~/webapp/go\nmise exec -- go build -o isuride -ldflags \"-s -w\"\nsudo systemctl restart isuride-go\necho \"deploy.sh: isuride-go restarted\"\nEOD\n  )\n  if [ ! -f \"${DEPLOY_SCRIPT}\" ] || [ \"$(cat \"${DEPLOY_SCRIPT}\")\" != \"${content}\" ]; then\n    echo \"${content}\" >\"${DEPLOY_SCRIPT}\"\n    chown \"${ISUREN_USER}:${ISUREN_USER}\" \"${DEPLOY_SCRIPT}\"\n    chmod 0755 \"${DEPLOY_SCRIPT}\"\n    log \"deploy.sh: changed ${DEPLOY_SCRIPT}\"\n  else\n    log \"deploy.sh: already up to date\"\n  fi\n}\n\nset_deploy_script\n\nlog \"95-deploy-helper.sh: done\"\n"
+- path: /opt/kakomon14/provisioning/all.sh
+  owner: root:root
+  permissions: '0644'
+  content: '#!/usr/bin/env bash
+
+    set -euo pipefail
+
+
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # shellcheck source=./lib.sh
+
+    source "${SCRIPT_DIR}/lib.sh"
+
+
+    log "start"
+
+
+    bash "${SCRIPT_DIR}/10-base.sh"
+
+    bash "${SCRIPT_DIR}/20-user.sh"
+
+    bash "${SCRIPT_DIR}/30-runtime.sh"
+
+    bash "${SCRIPT_DIR}/40-mysql.sh"
+
+    bash "${SCRIPT_DIR}/50-source.sh"
+
+    bash "${SCRIPT_DIR}/60-initdb.sh"
+
+    bash "${SCRIPT_DIR}/70-webapp-go.sh"
+
+    bash "${SCRIPT_DIR}/75-matcher.sh"
+
+    bash "${SCRIPT_DIR}/80-frontend.sh"
+
+    bash "${SCRIPT_DIR}/90-nginx.sh"
+
+    bash "${SCRIPT_DIR}/95-deploy-helper.sh"
+
+
+    log "all.sh: done"
+
+    '
+- path: /opt/kakomon14/provisioning/mise.kakomon14.toml
+  owner: root:root
+  permissions: '0644'
+  content: '[tools]
+
+    go = "1.26.5"
+
+    node = "24.19.0"
+
+    pnpm = "11.21.0"
+
+    '
+- path: /opt/kakomon14/provisioning/mise.kakomon14.lock
+  owner: root:root
+  permissions: '0644'
+  content: '# @generated - this file is auto-generated by `mise lock` https://mise.jdx.dev/dev-tools/mise-lock.html
+
+
+    [[tools.go]]
+
+    version = "1.26.5"
+
+    backend = "core:go"
+
+
+    [tools.go."platforms.linux-arm64"]
+
+    checksum = "sha256:fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
+
+    url = "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz"
+
+
+    [[tools.node]]
+
+    version = "24.19.0"
+
+    backend = "core:node"
+
+
+    [tools.node."platforms.linux-arm64"]
+
+    checksum = "sha256:d28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f"
+
+    url = "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-arm64.tar.gz"
+
+
+    [[tools.pnpm]]
+
+    version = "11.21.0"
+
+    backend = "aqua:pnpm/pnpm"
+
+
+    [tools.pnpm."platforms.linux-arm64"]
+
+    checksum = "sha256:64eb219b008f7a4c176d81fbce919c20b0b7e093e815cbb669d46e681451f43b"
+
+    url = "https://github.com/pnpm/pnpm/releases/download/v11.21.0/pnpm-linux-arm64.tar.gz"
+
+    url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/507585528"
+
+    provenance = "github-attestations"
+
+    '
+- path: /opt/kakomon14/provisioning/pnpm-workspace.kakomon14.yaml
+  owner: root:root
+  permissions: '0644'
+  content: "allowBuilds:\n  \"@swc/core\": true\n  esbuild: true\n"
+runcmd:
+- env ENABLE_TLS=true bash /opt/kakomon14/provisioning/all.sh
