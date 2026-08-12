@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 過去問Packerビルドで作成したAMIから実際にEC2を起動し、動作確認するための使い捨てスタック
+
+Parameters:
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: 確認したいAMIのID
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: packer-network.yamlが作成したSubnetのID
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+
+Resources:
+  # SSM Session Manager経由の接続のみを想定しているためキーペアは作成しない
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  VerifyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      Tags:
+        - Key: Name
+          Value: ami-verify
+
+Outputs:
+  InstanceId:
+    Description: 起動確認用インスタンスのID
+    Value: !Ref VerifyInstance
