@@ -3,11 +3,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KAKOMON14_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${KAKOMON14_DIR}/.." && pwd)"
 FRONTEND_DIR="${KAKOMON14_DIR}/upstream/isucon14/frontend"
 BENCHRUN_DIR="${KAKOMON14_DIR}/upstream/isucon14/bench/benchrun"
 DIST_DIR="${KAKOMON14_DIR}/dist"
 ARTIFACT="${DIST_DIR}/kakomon14-frontend.tar.gz"
 PNPM_WORKSPACE_YAML="${FRONTEND_DIR}/pnpm-workspace.yaml"
+
+# shellcheck source=../../scripts/lib.sh
+source "${REPO_ROOT}/scripts/lib.sh"
+
+# 後続のscripts/github-release.shが正しいコミットにタグ付けできるよう、時間のかかる
+# pnpmビルドを始める前に「コミット済み」「push済み」を確認しておく(ビルド後に気づくと手戻りが大きい)。
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
 
 export MISE_CONFIG_FILE="${SCRIPT_DIR}/mise.toml"
 

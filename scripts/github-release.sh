@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
 usage() {
   cat <<'EOS'
 Usage: scripts/github-release.sh <tag> <artifact-path>...
@@ -23,12 +27,8 @@ TAG="$1"
 shift
 
 COMMIT="$(git rev-parse HEAD)"
-# gh release create --target実行時にリモートにコミットがないと422/500等の分かりにくいエラーになる
-# ため、事前にgh apiで存在確認する。--silentでレスポンス本体を出力しない(認証情報混入を避ける)。
-if ! gh api "repos/{owner}/{repo}/commits/${COMMIT}" --silent 2>/dev/null; then
-  echo "エラー: コミット ${COMMIT} がリモートに見当たりません。git pushを忘れていませんか?" >&2
-  exit 1
-fi
+require_clean_worktree
+require_pushed_commit "${COMMIT}"
 
 PREFIX="${TAG%%v*}v"
 PREV_TAG="$(gh release list --limit 1000 --json tagName --jq '.[].tagName' \
