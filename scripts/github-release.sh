@@ -31,4 +31,7 @@ if [ -n "${PREV_TAG}" ] && [ "${PREV_TAG}" != "${TAG}" ]; then
   NOTES_ARGS+=(--notes-start-tag "${PREV_TAG}")
 fi
 
-gh release create "${TAG}" "$@" --title "${TAG}" "${NOTES_ARGS[@]}"
+# --targetを指定しないとリモートのデフォルトブランチ最新コミットが使われ、ビルド元と
+# ズレうる。ローカルHEADを明示することで、未pushなら「コミットが見つからない」エラーで
+# 気づける(誤ったコミットにタグが付くより安全)。
+gh release create "${TAG}" "$@" --title "${TAG}" --target "$(git rev-parse HEAD)" "${NOTES_ARGS[@]}"
