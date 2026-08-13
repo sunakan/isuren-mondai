@@ -13,7 +13,7 @@ BENCHRUN_DIR="${ISUREN_HOME}/isucon14/bench/benchrun"
 # (t4g.smallでのpnpm installはOOMを起こしうる上、node/pnpmをAMIに含めずに済む。
 # kakomon14/scripts/build-frontend-release.sh・scripts/github-release.sh参照)。
 : "${FRONTEND_RELEASE_REPO_URL:=https://github.com/sunakan/isuren-mondai}"
-: "${FRONTEND_RELEASE_TAG:=kakomon14-frontend-v1.0.0}"
+: "${FRONTEND_RELEASE_TAG:=kakomon14-frontend-v1.0.1}"
 FRONTEND_RELEASE_BASE_URL="${FRONTEND_RELEASE_REPO_URL}/releases/download/${FRONTEND_RELEASE_TAG}"
 FRONTEND_RELEASE_DIR="${ISUREN_HOME}/.kakomon14-frontend-release"
 
