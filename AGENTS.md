@@ -60,6 +60,25 @@ isucon14公式リポジトリから読み取り専用データを直接取得す
   別々の取得元からシンボリックリンクで束ねる場合、束ねる場所は実ディレクトリの内側に統一する
   (`~/webapp`配下の子要素ごとに個別symlinkを張る方式は相対パス解決を壊すため不採用。
   upstreamツリーの内側に`webapp/sql`へのsymlinkを差し込む方式にした)
+- upstream/配下のディレクトリ構成やパス(`UPSTREAM_SUBPATH`が指す場所)を変更したら、
+  `UPSTREAM_COMMIT`もその変更を含むコミット以降の値に更新すること。更新を忘れると、
+  古いコミット時点にはまだ存在しないパスをsparse-checkoutしようとして何も取得できず、
+  `ln: No such file or directory`のような分かりにくいエラーでPackerビルドが失敗する
+  (vendor→upstreamリネーム後に実際に発生。詳細はcommit 1f5ca68参照)
+
+## mise運用上のハマりどころ
+
+isuren-mondai全体(kakomon14に限らない)でmiseを使う上での注意点。
+
+- `MISE_CONFIG_FILE`は`mise config ls`・`mise install`・`mise exec`には効くが、
+  `mise lock`はディレクトリ探索で「現在のconfig root」を決めるため`MISE_CONFIG_FILE`を無視する。
+  非標準の場所・名前で`mise.*.toml`を運用する場合、lock生成時は`MISE_ENV=<ENV名>`
+  (ファイル名を`mise.<ENV名>.toml`にする)か、そのディレクトリに`cd`して素の`mise.toml`
+  という名前にする必要がある(`kakomon14/scripts/mise.toml`参照)
+- miseはaqua registryのスナップショットをバイナリに焼き込んでおり、"latest"指定の解決は
+  そのスナップショット次第になる。`mise cache clear`やmise本体のアップグレードをしても
+  古いバージョンに解決され続けることがある(pnpmで実際に確認: 本当は最新v11系が存在するのに
+  9.15.4に解決された)。ツールバージョンは明示指定を徹底し、"latest"に頼らない
 
 ## frontendのビルド・配布方針
 
@@ -111,3 +130,8 @@ aws-bastion上での試行錯誤で見つかった、ハマりどころ・Why no
   課金・時間がかかるため、実行前に必ずユーザーに確認する
 - `mise run down-verify-ami`はfzfでの一覧選択が前提でAIからは対話操作できない。
   aws-bastion側と同様、AIはawsコマンドで直接スタック名を指定して操作してよい
+- `mise install`・`mise lock`等、miseのキャッシュ/状態ディレクトリ(`~/.local/state/mise`・
+  `~/Library/Caches/mise`)への書き込みを伴う操作は、AIのサンドボックス(`~/.config/cage/presets.yaml`
+  の許可リスト外)からは実行できない。ユーザーに`!`コマンドでの実行を依頼する
+- `git checkout --`・`git rm --cached`等、未コミット変更を破棄・追跡解除する操作はAIの権限設定で
+  拒否される。ユーザーに実行を依頼する
