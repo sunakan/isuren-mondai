@@ -1,0 +1,37 @@
+name: release-kakomon14-frontend
+
+on:
+  push:
+    tags:
+      # kakomon13等、他の過去問のタグで誤発火しないよう固定文字列にする
+      # (ワークフロー内のパスがkakomon14決め打ちのため)。
+      - "kakomon14-frontend-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # AMIの実行環境(arm64)とビルド環境を揃える。sunakan/isuren-mondaiはpublicリポジトリのため
+    # arm64ランナーは無料。
+    runs-on: ubuntu-24.04-arm
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # checkout直後のmise設定はuntrusted扱いで止まるため。
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # ツール導入(node/pnpm)はkakomon14/scripts/build-frontend-release.shが
+      # MISE_CONFIG_FILE付きで自前で行うため、ここではmise本体のみ用意する。
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+
+      - run: mise run build-frontend-kakomon14
+
+      - run: |
+          scripts/github-release.sh "${GITHUB_REF_NAME}" \
+            kakomon14/dist/kakomon14-frontend.tar.gz \
+            kakomon14/dist/frontend_hashes.json \
+            kakomon14/dist/frontend_files.json

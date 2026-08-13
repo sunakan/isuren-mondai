@@ -73,7 +73,7 @@ TAG="${1:?タグ名を指定してください(例: mise run release-kakomon14 k
 # ではなくここで明示的に順序を制御する。
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
-require_tag_not_taken "$TAG"
+require_tag_absent_or_at_head "$TAG"
 
 mise run build-frontend-kakomon14
 scripts/github-release.sh "$TAG" \

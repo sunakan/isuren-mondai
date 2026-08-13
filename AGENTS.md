@@ -15,9 +15,12 @@ ISUCON過去問(isucon14等)をそれぞれGo実装だけに絞り、Packerで�
 タスク管理(todo/completed)は現状aws-bastion側の`../docs/plans/kakomon14/`で行っている。
 着手中/完了タスクを確認する際はそちらを見る。
 
-## 現在地(2026-08-13時点)
+## 現在地(2026-08-14時点)
 
 bastion上での試行錯誤(`aws-bastion/scripts/kakomon14/`)によるネイティブ構築フェーズは完了済み。
+frontendはAMI上ビルドからGitHub Releaseダウンロード方式へ移行し、実際にPacker→EC2起動→bench実行
+(pass=true)まで確認済み。frontendリリースはタグpush契機のGitHub Actionsで自動化済み
+(下記「frontendのビルド・配布方針」参照)。
 まだこのリポジトリへのスクリプト移設は行っていない
 (`../docs/plans/kakomon14/todo/20260813100000-migrate-scripts-to-isuren-kakomon.md`が最優先タスク)。
 
@@ -90,6 +93,10 @@ frontendはAMI上ではビルドしない。t4g.small(メモリ1.8GiB、swap無�
 - `scripts/github-release.sh`(過去問ごとに使い回せる汎用スクリプト)でGitHub Releaseへ公開する。
   タグは`kakomon14-frontend-v1.0.0`のように過去問+役割を接頭辞にする(1つのリポジトリで複数過去問の
   リリースを扱うため)
+- 正のリリース経路は`.github/workflows/release-kakomon14-frontend.yml`によるタグpush契機のCI
+  (`ubuntu-24.04-arm`。AMIの実行環境と揃える)。`mise run release-kakomon14`はCIが使えない時の
+  緊急用経路として残している。checkout直後のmise設定はuntrusted扱いになるため、CI側では
+  `MISE_TRUSTED_CONFIG_PATHS`を明示している
 - AMI側(`80-frontend.sh`)は`FRONTEND_RELEASE_TAG`で固定したタグ(他の`*_COMMIT`系変数と同じ
   ピン留め方式)からダウンロードするだけ。`sunakan/isuren-mondai`はpublicリポジトリなので認証不要
 - `frontend_hashes.json`・`frontend_files.json`はbenchがfrontendの整合性確認に使うファイルで、

@@ -14,8 +14,18 @@
 
 ## リリース例
 
+kakomon14のfrontendリリースはタグpushを契機にGitHub Actionsが自動でビルド・公開する
+(`.github/workflows/release-kakomon14-frontend.yml`)。
+
 ```shell
-GH_TOKEN=$(ghtkn get *****) mise run release-kakomon14 kakomon14-frontend-v1.0.0
+git tag kakomon14-frontend-v1.0.1
+git push origin kakomon14-frontend-v1.0.1
+```
+
+CIが使えない場合は、ローカルからも直接リリースできる(緊急時用)。
+
+```shell
+GH_TOKEN=$(ghtkn get *****) mise run release-kakomon14 kakomon14-frontend-v1.0.1
 ```
 
 ## 前提
