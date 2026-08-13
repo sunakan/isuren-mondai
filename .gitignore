@@ -3,3 +3,7 @@ tmp/
 kakomon14/cloud-init/user-data.yaml.gz
 # GitHub Releaseにアップロードするビルド成果物置き場(kakomon14/dist、kakomon13/dist等で共通利用)
 dist/
+# frontendビルド(vite.config.tsのgenerateHashesFile plugin)のたびに再生成される、bench用の整合性確認ファイル。
+# 本家はコミット対象にしているが、うちはビルドのたびに必ず変わるためコミット対象から外す(NOTICE.md参照)。
+kakomon14/upstream/isucon14/bench/benchrun/frontend_hashes.json
+kakomon14/upstream/isucon14/bench/benchrun/frontend_files.json

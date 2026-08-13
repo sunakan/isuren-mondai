@@ -31,3 +31,12 @@ js/css/ts等、将来構文が非推奨になった際に自分で保守する�
 
 過去問によって画像等の置き場所は異なる(例: isucon13は`bench/internal/scheduler/images/`配下)ため、
 この取り込まない対象パスは過去問ごとに個別判断する。
+
+## コミット対象から外したもの
+
+- `bench/benchrun/frontend_hashes.json`・`frontend_files.json` — `frontend/vite.config.ts`の
+  `generateHashesFile` pluginがビルドのたびに再生成する、bench用のフロントエンド整合性確認ファイル。
+  本家はコミット対象にしているが、うちは`pnpm run build`を実行するたびに必ず内容が変わるため
+  (実質的にビルド成果物であり、コミットされた値を維持する意味が薄い)、`.gitignore`で対象外にしている。
+  ファイル自体はディスク上に残る(取り込み時点の内容のまま)。GitHub Releaseで配布するビルド成果物には
+  この2ファイルの最新版を含める(`kakomon14/scripts/build-frontend-release.sh`参照)。
