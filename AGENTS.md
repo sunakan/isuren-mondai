@@ -33,6 +33,36 @@ bastion上での試行錯誤(`aws-bastion/scripts/kakomon14/`)によるネイテ
 - `packer/`・`provisioning/`・`cloud-init/`等の完全自作物にはisucon側のLICENSEを適用しない
   (このリポジトリ自体のLICENSEに従う)
 
+## 見逃しがちな注意点(isucon14版)
+
+aws-bastion上での試行錯誤で見つかった、ハマりどころ・Why not集。aws-bastion側の
+`docs/plans/kakomon14/completed/`が将来失われても実装に困らないよう、ここに複製している。
+
+- `bench/Dockerfile`はISUCON運営限定のプライベートECRイメージ(supervisor)に依存しており一般環境では
+  ビルドできない。benchはホストで直接`go run`する
+- `development/compose-go.yml`はfrontendの事前ビルド(`pnpm run build`)が前提。nginxが
+  `frontend/build/client`をマウントするだけでビルドはしない
+- ベンチ実行時の`context deadline exceeded`多発は、インスタンスのリソース不足(CPU)が原因のことがある。
+  アプリのバグかリソース不足かの切り分けが必要
+- `development/compose-go.yml`のコンテナ(特にnginxの8080番ポートマッピング)が起動したままだと、
+  ネイティブの`isuride-go`等とポートが競合し再起動ループになる。ネイティブ構築を進める前に`docker ps`で
+  止まっていることを確認する
+- AMIのベースOS(Ubuntu 26.04 arm64)の`chown`はGNU coreutilsではなくuutils coreutils(Rust実装)で、
+  `-h`/`--no-dereference`がexit 0を返すのに実際にはlchownしないバグがある。シンボリックリンクの
+  所有者変更が必要な場面は要注意(通常ファイルへの`chown`は正常動作)
+- `runuser -u isuren -- <cmd>`は`.bashrc`を経由しないため、mise/pnpm等はフルパス
+  (`/home/isuren/.local/bin/mise`)で呼ぶ必要がある。pnpmはさらにcwdからworkspace定義を探索するため、
+  isurenが読めないディレクトリ(`/home/ubuntu/...`等)をcwdにしたまま実行すると`EACCES`になる。goの場合は
+  `EACCES`ではなく`go.mod file not found`という別症状で現れる。回避策として、isurenのmiseインストール先
+  (`/home/isuren/.local/...`は755で他ユーザーからも実行可)のバイナリをフルパス指定しつつ、実行ユーザーは
+  ubuntuのままにする方法がある
+  (例: `sudo -u ubuntu /home/isuren/.local/share/mise/installs/go/<version>/bin/go run . run ...`)
+- pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)。
+  事前に承認内容を`pnpm-workspace.yaml`に書いておく必要がある
+  (`kakomon14/provisioning/pnpm-workspace.kakomon14.yaml`で管理)
+- t4g.small(メモリ1.8GiB、swap無し)は`pnpm install`のような重いビルドでOOM killerが発動しうる。
+  恒久対応(swap追加等)は未着手
+
 ## コマンド実行の方針
 
 - `packer build`・`aws cloudformation deploy`等、EC2インスタンス起動やAMI作成を伴う操作は
