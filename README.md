@@ -1,7 +1,7 @@
-# isuren-kakomon
+# isuren-mondai
 
 ISUCON過去問をGo実装だけに絞り、Packerで自分用のAMIとして焼いて保守するリポジトリ。
-詳しい方針は [aws-bastion/docs/isuren-kakomon-strategy.md](../docs/isuren-kakomon-strategy.md) を参照。
+詳しい方針は [aws-bastion/docs/isuren-mondai-strategy.md](../docs/isuren-mondai-strategy.md) を参照。
 
 ## 前提
 

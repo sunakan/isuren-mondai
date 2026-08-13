@@ -1,6 +1,6 @@
 [env]
 AWS_REGION = "ap-northeast-1"
-PACKER_NETWORK_STACK_NAME = "isuren-kakomon-packer-network"
+PACKER_NETWORK_STACK_NAME = "isuren-mondai-packer-network"
 
 [tasks.up-packer-network]
 description = "Packerビルド用の永続VPCをデプロイ"

@@ -3,12 +3,12 @@
 ## このリポジトリでやろうとしていること
 
 ISUCON過去問(isucon14等)をそれぞれGo実装だけに絞り、Packerで自分用のAMIとして焼いて保守する。
-詳しい方針は`../docs/isuren-kakomon-strategy.md`(aws-bastionリポジトリ側)を参照。
+詳しい方針は`../docs/isuren-mondai-strategy.md`(aws-bastionリポジトリ側)を参照。
 コマンドの使い方は`README.md`を参照。
 
 ## このリポジトリの位置づけ
 
-`aws-bastion/isuren-kakomon/`に配置されているが、aws-bastionとは別の独立したgitリポジトリ
+`aws-bastion/isuren-mondai/`に配置されているが、aws-bastionとは別の独立したgitリポジトリ
 (aws-bastion側の`.gitignore`で無視されており、aws-bastionのgit操作には一切影響しない)。
 このディレクトリでの変更は、このディレクトリをカレントディレクトリにしてcommitする。
 

@@ -24,7 +24,7 @@ locals {
   name = "kakomon14-${formatdate("YYYYMMDD-hhmm", timestamp())}"
   ami_tags = {
     Name    = local.name
-    Project = "isuren-kakomon"
+    Project = "isuren-mondai"
     Kakomon = "kakomon14"
     OS      = "ubuntu-26.04-resolute-arm64"
     Packer  = "1"
