@@ -22,6 +22,14 @@ fi
 TAG="$1"
 shift
 
+COMMIT="$(git rev-parse HEAD)"
+# gh release create --target実行時にリモートにコミットがないと422/500等の分かりにくいエラーになる
+# ため、事前にgh apiで存在確認する。--silentでレスポンス本体を出力しない(認証情報混入を避ける)。
+if ! gh api "repos/{owner}/{repo}/commits/${COMMIT}" --silent 2>/dev/null; then
+  echo "エラー: コミット ${COMMIT} がリモートに見当たりません。git pushを忘れていませんか?" >&2
+  exit 1
+fi
+
 PREFIX="${TAG%%v*}v"
 PREV_TAG="$(gh release list --limit 1000 --json tagName --jq '.[].tagName' \
   | grep "^${PREFIX}" | head -n1 || true)"
@@ -32,6 +40,5 @@ if [ -n "${PREV_TAG}" ] && [ "${PREV_TAG}" != "${TAG}" ]; then
 fi
 
 # --targetを指定しないとリモートのデフォルトブランチ最新コミットが使われ、ビルド元と
-# ズレうる。ローカルHEADを明示することで、未pushなら「コミットが見つからない」エラーで
-# 気づける(誤ったコミットにタグが付くより安全)。
-gh release create "${TAG}" "$@" --title "${TAG}" --target "$(git rev-parse HEAD)" "${NOTES_ARGS[@]}"
+# ズレうる。ローカルHEADを明示することで、事故で誤ったコミットにタグが付くのを防ぐ。
+gh release create "${TAG}" "$@" --title "${TAG}" --target "${COMMIT}" "${NOTES_ARGS[@]}"
