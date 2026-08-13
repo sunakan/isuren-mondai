@@ -20,11 +20,10 @@ require_pushed_commit "$(git rev-parse HEAD)"
 
 export MISE_CONFIG_FILE="${SCRIPT_DIR}/mise.toml"
 
-# provisioning/80-frontend.shと同じ理由(pnpm 10以降のstrictDepBuilds対策)で必要。
-# 二重管理を避けるため、AMI側と同じファイルをそのまま参照する。
+# pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)ため必要。
 # upstream/を取り込み元の完全なコピーに保つ方針のため、ビルド後(失敗時含む)に削除する。
 trap 'rm -f "${PNPM_WORKSPACE_YAML}"' EXIT
-cp "${KAKOMON14_DIR}/provisioning/pnpm-workspace.kakomon14.yaml" "${PNPM_WORKSPACE_YAML}"
+cp "${SCRIPT_DIR}/pnpm-workspace.kakomon14.yaml" "${PNPM_WORKSPACE_YAML}"
 
 mise install
 (

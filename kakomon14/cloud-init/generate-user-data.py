@@ -34,7 +34,6 @@ FILES = [
     "all.sh",
     "mise.ami.toml",
     "mise.ami.lock",
-    "pnpm-workspace.kakomon14.yaml",
 ]
 
 

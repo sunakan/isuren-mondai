@@ -15,7 +15,7 @@ write_files:
 - path: /opt/kakomon14/provisioning/30-runtime.sh
   owner: root:root
   permissions: '0644'
-  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L1-9(git/xbuild導入部分)の代替。\n# xbuildはバージョン固定インストールをするだけのツールなのでmiseに置き換える。\ninstall_mise() {\n  if [ ! -x \"${MISE_BIN}\" ]; then\n    runuser -u \"${ISUREN_USER}\" -- sh -c 'curl -fsSL https://mise.run | sh'\n    log \"mise: installed\"\n  else\n    log \"mise: already installed\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L37-45(.profileへのPATH追加)相当\nset_bashrc() {\n  local bashrc=\"${ISUREN_HOME}/.bashrc\"\n  # shellcheck disable=SC2016 # .bashrcに文字通り書き込むため展開させない\n  local line='eval \"$(~/.local/bin/mise activate bash)\"'\n  if ! grep -qF \"${line}\" \"${bashrc}\" 2>/dev/null; then\n    echo \"${line}\" >>\"${bashrc}\"\n    chown \"${ISUREN_USER}:${ISUREN_USER}\" \"${bashrc}\"\n    log \"bashrc: added mise activate\"\n  else\n    log \"bashrc: already configured\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L27-30(go-install 1.23.2)の代替。\n# バージョンはpreflight-checkの決定(go 1.26.5 / node 24.19.0 / pnpm 11.21.0)に固定。\n# aws-bastionリポジトリのパスを直接参照せず実体をisurenのホームにコピーするのは、\n# /home/ubuntu配下へのisurenからのアクセス権限に依存させないため、および将来cloud-init化した際に\n# aws-bastionリポジトリ自体が存在しない前提でも動くようにするため。\nset_mise_config() {\n  local conf=\"${ISUREN_HOME}/.config/mise/config.toml\"\n  if [ ! -f \"${conf}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.ami.toml\" \"${conf}\" >/dev/null 2>&1; then\n    install -d -m 0755 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"$(dirname \"${conf}\")\"\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.ami.toml\" \"${conf}\"\n    log \"mise config: changed ${conf}\"\n  else\n    log \"mise config: already up to date\"\n  fi\n}\n\n# チェックサムを固定してサプライチェーン改ざん検知・再現性を担保する。\n# linux-arm64のみを対象にしているのはこのAMIがarm64(Graviton)専用のため。\n# `mise lock -g -p linux-arm64`で生成したものをgit管理し、そのまま配置する。\nset_mise_lock() {\n  local lock=\"${ISUREN_HOME}/.config/mise/mise.lock\"\n  if [ ! -f \"${lock}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.ami.lock\" \"${lock}\" >/dev/null 2>&1; then\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.ami.lock\" \"${lock}\"\n    log \"mise lock: changed ${lock}\"\n  else\n    log \"mise lock: already up to date\"\n  fi\n}\n\n# mise install自体が内部で冪等(既にインストール済みのバージョンは再取得しない)なため、\n# ここでは changed/already の判定を自前で行わずmiseに委ねる。\nrun_mise_install() {\n  runuser -u \"${ISUREN_USER}\" -- \"${MISE_BIN}\" install\n  log \"mise install: done\"\n}\n\ninstall_mise\nset_bashrc\nset_mise_config\nset_mise_lock\nrun_mise_install\n\nlog \"30-runtime.sh: done\"\n"
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L1-9(git/xbuild導入部分)の代替。\n# xbuildはバージョン固定インストールをするだけのツールなのでmiseに置き換える。\ninstall_mise() {\n  if [ ! -x \"${MISE_BIN}\" ]; then\n    runuser -u \"${ISUREN_USER}\" -- sh -c 'curl -fsSL https://mise.run | sh'\n    log \"mise: installed\"\n  else\n    log \"mise: already installed\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L37-45(.profileへのPATH追加)相当\nset_bashrc() {\n  local bashrc=\"${ISUREN_HOME}/.bashrc\"\n  # shellcheck disable=SC2016 # .bashrcに文字通り書き込むため展開させない\n  local line='eval \"$(~/.local/bin/mise activate bash)\"'\n  if ! grep -qF \"${line}\" \"${bashrc}\" 2>/dev/null; then\n    echo \"${line}\" >>\"${bashrc}\"\n    chown \"${ISUREN_USER}:${ISUREN_USER}\" \"${bashrc}\"\n    log \"bashrc: added mise activate\"\n  else\n    log \"bashrc: already configured\"\n  fi\n}\n\n# 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L27-30(go-install 1.23.2)の代替。\n# バージョンはpreflight-checkの決定(go 1.26.5)に固定。frontendはAMI上でビルドしなくなったため\n# node/pnpmは不要(kakomon14/scripts/mise.toml側で管理。80-frontend.sh参照)。\n# aws-bastionリポジトリのパスを直接参照せず実体をisurenのホームにコピーするのは、\n# /home/ubuntu配下へのisurenからのアクセス権限に依存させないため、および将来cloud-init化した際に\n# aws-bastionリポジトリ自体が存在しない前提でも動くようにするため。\nset_mise_config() {\n  local conf=\"${ISUREN_HOME}/.config/mise/config.toml\"\n  if [ ! -f \"${conf}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.ami.toml\" \"${conf}\" >/dev/null 2>&1; then\n    install -d -m 0755 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"$(dirname \"${conf}\")\"\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.ami.toml\" \"${conf}\"\n    log \"mise config: changed ${conf}\"\n  else\n    log \"mise config: already up to date\"\n  fi\n}\n\n# チェックサムを固定してサプライチェーン改ざん検知・再現性を担保する。\n# linux-arm64のみを対象にしているのはこのAMIがarm64(Graviton)専用のため。\n# `mise lock -g -p linux-arm64`で生成したものをgit管理し、そのまま配置する。\nset_mise_lock() {\n  local lock=\"${ISUREN_HOME}/.config/mise/mise.lock\"\n  if [ ! -f \"${lock}\" ] || ! diff -q \"${SCRIPT_DIR}/mise.ami.lock\" \"${lock}\" >/dev/null 2>&1; then\n    install -m 0644 -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" \"${SCRIPT_DIR}/mise.ami.lock\" \"${lock}\"\n    log \"mise lock: changed ${lock}\"\n  else\n    log \"mise lock: already up to date\"\n  fi\n}\n\n# mise install自体が内部で冪等(既にインストール済みのバージョンは再取得しない)なため、\n# ここでは changed/already の判定を自前で行わずmiseに委ねる。\nrun_mise_install() {\n  runuser -u \"${ISUREN_USER}\" -- \"${MISE_BIN}\" install\n  log \"mise install: done\"\n}\n\ninstall_mise\nset_bashrc\nset_mise_config\nset_mise_lock\nrun_mise_install\n\nlog \"30-runtime.sh: done\"\n"
 - path: /opt/kakomon14/provisioning/40-mysql.sh
   owner: root:root
   permissions: '0644'
@@ -40,7 +40,7 @@ write_files:
 - path: /opt/kakomon14/provisioning/80-frontend.sh
   owner: root:root
   permissions: '0644'
-  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nFRONTEND_DIR=\"${ISUREN_HOME}/isucon14/frontend\"\nWEBAPP_PUBLIC_DIR=\"${ISUREN_HOME}/webapp/public\"\n\n# pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)。\n# allowBuildsが未設定のまま`pnpm install`すると、esbuildのネイティブバイナリが導入されず\n# ERR_PNPM_IGNORED_BUILDSでexit 1になる(vite buildにesbuildが必須なため実害がある)。\n# pnpm-workspace.kakomon14.yaml(pnpm approve-builds --allで生成した内容をgit管理化したもの)を\n# installより先に配置することで、1回目から承認済みの状態でinstallできるようにする。\nset_pnpm_workspace_yaml() {\n  local dest=\"${FRONTEND_DIR}/pnpm-workspace.yaml\"\n  if [ ! -f \"${dest}\" ] || ! diff -q \"${SCRIPT_DIR}/pnpm-workspace.kakomon14.yaml\" \"${dest}\" >/dev/null 2>&1; then\n    install -o \"${ISUREN_USER}\" -g \"${ISUREN_USER}\" -m 0644 \"${SCRIPT_DIR}/pnpm-workspace.kakomon14.yaml\" \"${dest}\"\n    log \"pnpm-workspace.yaml: changed ${dest}\"\n  else\n    log \"pnpm-workspace.yaml: already up to date\"\n  fi\n}\n\n# 対応: frontend-buildタスクの「やること」1点目。\n# ビルドのたびに最新化する必要があるため、changed/already判定はせず常に実行する。\n# runuser経由では.bashrcを経由せずmise/pnpmがPATHに乗らないため、mise本体はフルパスで呼ぶ。\nbuild_frontend() {\n  # shellcheck disable=SC2016 # env経由で渡したFRONTEND_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env FRONTEND_DIR=\"${FRONTEND_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${FRONTEND_DIR}\" && \"${MISE_BIN}\" exec -- pnpm install --frozen-lockfile && \"${MISE_BIN}\" exec -- pnpm run build'\n  log \"frontend: built\"\n}\n\n# webapp/publicはisucon14の.gitignoreに入っているため、cloneしたツリー内でビルドしてもツリーは汚れない。\n# rsync --deleteで、前回ビルドの古いファイル(ハッシュ付きファイル名が変わったもの等)を確実に除去する。\n# isurenユーザーで実行し、所有者を揃える(chownでの後追い修正を避ける)。\nsync_public() {\n  # shellcheck disable=SC2016 # env経由で渡したFRONTEND_DIR/WEBAPP_PUBLIC_DIRをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env FRONTEND_DIR=\"${FRONTEND_DIR}\" WEBAPP_PUBLIC_DIR=\"${WEBAPP_PUBLIC_DIR}\" \\\n    sh -c 'mkdir -p \"${WEBAPP_PUBLIC_DIR}\" && rsync -a --delete \"${FRONTEND_DIR}/build/client/\" \"${WEBAPP_PUBLIC_DIR}/\"'\n  log \"webapp/public: synced\"\n}\n\nset_pnpm_workspace_yaml\nbuild_frontend\nsync_public\n\nlog \"80-frontend.sh: done\"\n"
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nWEBAPP_PUBLIC_DIR=\"${ISUREN_HOME}/webapp/public\"\nBENCHRUN_DIR=\"${ISUREN_HOME}/isucon14/bench/benchrun\"\n\n# frontendはAMI上でpnpm buildせず、事前にビルドしGitHub Releaseとして公開したものを取得する\n# (t4g.smallでのpnpm installはOOMを起こしうる上、node/pnpmをAMIに含めずに済む。\n# kakomon14/scripts/build-frontend-release.sh・scripts/github-release.sh参照)。\n: \"${FRONTEND_RELEASE_REPO_URL:=https://github.com/sunakan/isuren-mondai}\"\n: \"${FRONTEND_RELEASE_TAG:=kakomon14-frontend-v1.0.0}\"\nFRONTEND_RELEASE_BASE_URL=\"${FRONTEND_RELEASE_REPO_URL}/releases/download/${FRONTEND_RELEASE_TAG}\"\nFRONTEND_RELEASE_DIR=\"${ISUREN_HOME}/.kakomon14-frontend-release\"\n\n# sunakan/isuren-mondaiはpublicリポジトリのため、認証なしのcurlでダウンロードできる。\ndownload_frontend_release() {\n  runuser -u \"${ISUREN_USER}\" -- mkdir -p \"${FRONTEND_RELEASE_DIR}\"\n  local f\n  for f in kakomon14-frontend.tar.gz frontend_hashes.json frontend_files.json; do\n    runuser -u \"${ISUREN_USER}\" -- curl -fsSL -o \"${FRONTEND_RELEASE_DIR}/${f}\" \"${FRONTEND_RELEASE_BASE_URL}/${f}\"\n  done\n  log \"frontend release: downloaded ${FRONTEND_RELEASE_TAG}\"\n}\n\n# rsync --deleteで、前回分の古いファイル(ハッシュ付きファイル名が変わったもの等)を確実に除去する。\n# isurenユーザーで実行し、所有者を揃える(chownでの後追い修正を避ける)。\ndeploy_public() {\n  local staging=\"${FRONTEND_RELEASE_DIR}/public\"\n  runuser -u \"${ISUREN_USER}\" -- rm -rf \"${staging}\"\n  runuser -u \"${ISUREN_USER}\" -- mkdir -p \"${staging}\" \"${WEBAPP_PUBLIC_DIR}\"\n  runuser -u \"${ISUREN_USER}\" -- tar -xzf \"${FRONTEND_RELEASE_DIR}/kakomon14-frontend.tar.gz\" -C \"${staging}\"\n  runuser -u \"${ISUREN_USER}\" -- rsync -a --delete \"${staging}/\" \"${WEBAPP_PUBLIC_DIR}/\"\n  log \"webapp/public: deployed\"\n}\n\n# frontend_hashes.json/frontend_files.jsonはbenchがfrontendの整合性確認に使うファイル\n# (kakomon14/upstream/isucon14/NOTICE.md「コミット対象から外したもの」参照)。\n# 取り込み時点の古い内容の上に、ダウンロードした最新版を上書きする。\ndeploy_benchrun_manifests() {\n  local f\n  for f in frontend_hashes.json frontend_files.json; do\n    runuser -u \"${ISUREN_USER}\" -- cp \"${FRONTEND_RELEASE_DIR}/${f}\" \"${BENCHRUN_DIR}/${f}\"\n  done\n  log \"bench/benchrun manifests: deployed\"\n}\n\ndownload_frontend_release\ndeploy_public\ndeploy_benchrun_manifests\n\nlog \"80-frontend.sh: done\"\n"
 - path: /opt/kakomon14/provisioning/90-nginx.sh
   owner: root:root
   permissions: '0644'
@@ -101,10 +101,6 @@ write_files:
 
     go = "1.26.5"
 
-    node = "24.19.0"
-
-    pnpm = "11.21.0"
-
     '
 - path: /opt/kakomon14/provisioning/mise.ami.lock
   owner: root:root
@@ -125,42 +121,6 @@ write_files:
 
     url = "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz"
 
-
-    [[tools.node]]
-
-    version = "24.19.0"
-
-    backend = "core:node"
-
-
-    [tools.node."platforms.linux-arm64"]
-
-    checksum = "sha256:d28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f"
-
-    url = "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-arm64.tar.gz"
-
-
-    [[tools.pnpm]]
-
-    version = "11.21.0"
-
-    backend = "aqua:pnpm/pnpm"
-
-
-    [tools.pnpm."platforms.linux-arm64"]
-
-    checksum = "sha256:64eb219b008f7a4c176d81fbce919c20b0b7e093e815cbb669d46e681451f43b"
-
-    url = "https://github.com/pnpm/pnpm/releases/download/v11.21.0/pnpm-linux-arm64.tar.gz"
-
-    url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/507585528"
-
-    provenance = "github-attestations"
-
     '
-- path: /opt/kakomon14/provisioning/pnpm-workspace.kakomon14.yaml
-  owner: root:root
-  permissions: '0644'
-  content: "allowBuilds:\n  \"@swc/core\": true\n  esbuild: true\n"
 runcmd:
 - env ENABLE_TLS=true bash /opt/kakomon14/provisioning/all.sh

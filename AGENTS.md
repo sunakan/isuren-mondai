@@ -61,6 +61,22 @@ isucon14公式リポジトリから読み取り専用データを直接取得す
   (`~/webapp`配下の子要素ごとに個別symlinkを張る方式は相対パス解決を壊すため不採用。
   upstreamツリーの内側に`webapp/sql`へのsymlinkを差し込む方式にした)
 
+## frontendのビルド・配布方針
+
+frontendはAMI上ではビルドしない。t4g.small(メモリ1.8GiB、swap無し)では`pnpm install`のような
+重いビルドでOOM killerが発動しうる上、node/pnpmをAMIに含めずに済む(対象言語をGoのみに絞る方針にも合う)。
+
+- `kakomon14/scripts/build-frontend-release.sh`でローカル/CIビルドし、`kakomon14/dist/`に
+  成果物(`kakomon14-frontend.tar.gz`・`frontend_hashes.json`・`frontend_files.json`)を出力する
+- `scripts/github-release.sh`(過去問ごとに使い回せる汎用スクリプト)でGitHub Releaseへ公開する。
+  タグは`kakomon14-frontend-v1.0.0`のように過去問+役割を接頭辞にする(1つのリポジトリで複数過去問の
+  リリースを扱うため)
+- AMI側(`80-frontend.sh`)は`FRONTEND_RELEASE_TAG`で固定したタグ(他の`*_COMMIT`系変数と同じ
+  ピン留め方式)からダウンロードするだけ。`sunakan/isuren-mondai`はpublicリポジトリなので認証不要
+- `frontend_hashes.json`・`frontend_files.json`はbenchがfrontendの整合性確認に使うファイルで、
+  ビルドのたびに内容が変わるためgit管理していない(`kakomon14/upstream/isucon14/NOTICE.md`参照)。
+  ダウンロードした最新版を`bench/benchrun/`に上書き配置する
+
 ## 見逃しがちな注意点(isucon14版)
 
 aws-bastion上での試行錯誤で見つかった、ハマりどころ・Why not集。aws-bastion側の
@@ -78,18 +94,16 @@ aws-bastion上での試行錯誤で見つかった、ハマりどころ・Why no
 - AMIのベースOS(Ubuntu 26.04 arm64)の`chown`はGNU coreutilsではなくuutils coreutils(Rust実装)で、
   `-h`/`--no-dereference`がexit 0を返すのに実際にはlchownしないバグがある。シンボリックリンクの
   所有者変更が必要な場面は要注意(通常ファイルへの`chown`は正常動作)
-- `runuser -u isuren -- <cmd>`は`.bashrc`を経由しないため、mise/pnpm等はフルパス
-  (`/home/isuren/.local/bin/mise`)で呼ぶ必要がある。pnpmはさらにcwdからworkspace定義を探索するため、
-  isurenが読めないディレクトリ(`/home/ubuntu/...`等)をcwdにしたまま実行すると`EACCES`になる。goの場合は
-  `EACCES`ではなく`go.mod file not found`という別症状で現れる。回避策として、isurenのmiseインストール先
+- `runuser -u isuren -- <cmd>`は`.bashrc`を経由しないため、mise等はフルパス
+  (`/home/isuren/.local/bin/mise`)で呼ぶ必要がある(goのビルドで確認。AMI上ではpnpmは使わなくなった。
+  下記「frontendのビルド・配布方針」参照)。isurenが読めないディレクトリ(`/home/ubuntu/...`等)を
+  cwdにしたまま実行すると`go.mod file not found`になる。回避策として、isurenのmiseインストール先
   (`/home/isuren/.local/...`は755で他ユーザーからも実行可)のバイナリをフルパス指定しつつ、実行ユーザーは
   ubuntuのままにする方法がある
   (例: `sudo -u ubuntu /home/isuren/.local/share/mise/installs/go/<version>/bin/go run . run ...`)
 - pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)。
   事前に承認内容を`pnpm-workspace.yaml`に書いておく必要がある
-  (`kakomon14/provisioning/pnpm-workspace.kakomon14.yaml`で管理)
-- t4g.small(メモリ1.8GiB、swap無し)は`pnpm install`のような重いビルドでOOM killerが発動しうる。
-  恒久対応(swap追加等)は未着手
+  (`kakomon14/scripts/pnpm-workspace.kakomon14.yaml`で管理。frontendビルドはローカル/CI側でのみ発生する)
 
 ## コマンド実行の方針
 

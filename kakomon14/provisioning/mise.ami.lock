@@ -7,21 +7,3 @@ backend = "core:go"
 [tools.go."platforms.linux-arm64"]
 checksum = "sha256:fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
 url = "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz"
-
-[[tools.node]]
-version = "24.19.0"
-backend = "core:node"
-
-[tools.node."platforms.linux-arm64"]
-checksum = "sha256:d28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f"
-url = "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-arm64.tar.gz"
-
-[[tools.pnpm]]
-version = "11.21.0"
-backend = "aqua:pnpm/pnpm"
-
-[tools.pnpm."platforms.linux-arm64"]
-checksum = "sha256:64eb219b008f7a4c176d81fbce919c20b0b7e093e815cbb669d46e681451f43b"
-url = "https://github.com/pnpm/pnpm/releases/download/v11.21.0/pnpm-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/507585528"
-provenance = "github-attestations"
