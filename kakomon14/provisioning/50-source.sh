@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/lib.sh"
 # kakomon14/vendor/isucon14/ (go/frontend/payment_mock/openapi.yaml)を取得元にする
 # (AGENTS.md「過去問コードの取り込み(vendor)方針」)。
 : "${VENDOR_REPO_URL:=https://github.com/sunakan/isuren-mondai.git}"
-: "${VENDOR_COMMIT:=57d212292aeb8a275abb0d31163434647e7438b0}"
+: "${VENDOR_COMMIT:=e7559d9e37be52eb74565708ce5a8200cb37ca7f}"
 VENDOR_SUBPATH="kakomon14/vendor/isucon14"
 
 # webapp/sql(サンプルデータ)とfrontend/public(画像等の静的アセット)は自分で手を加えない
