@@ -1,6 +1,10 @@
 [tools]
 "aqua:mvdan/sh" = "latest"
 "aqua:koalaman/shellcheck" = "latest"
+"aqua:actionlint" = "latest"
+"aqua:zizmor" = "latest"
+"aqua:ghalint" = "latest"
+"aqua:suzuki-shunsuke/pinact" = "latest"
 
 [env]
 AWS_REGION = "ap-northeast-1"
@@ -18,9 +22,25 @@ run = "find . -name '*.sh' -not -path '*/upstream/*' -print0 | xargs -0 shellche
 description = "shellスクリプトをshfmtでフォーマットチェック(取り込んだ本家コードのupstream/配下は対象外)"
 run = "find . -name '*.sh' -not -path '*/upstream/*' -print0 | xargs -0 shfmt -d"
 
+[tasks.actionlint]
+description = "GitHub Actionsワークフローをactionlintで検査"
+run = "actionlint"
+
+[tasks.zizmor]
+description = "GitHub Actionsワークフローをzizmorでセキュリティ監査"
+run = "zizmor .github/workflows"
+
+[tasks.ghalint]
+description = "GitHub Actionsワークフローをghalintでポリシー検査"
+run = "ghalint run"
+
+[tasks.pinact]
+description = "GitHub Actionsのaction参照がSHA pinされているかをpinactで検査(--checkのため書き換えない)"
+run = "pinact run --check"
+
 [tasks.ci]
-description = "shellcheck/shfmtを並行実行する(片方が失敗してももう片方は完走させる)"
-run = "mise run --continue-on-error shellcheck shfmt"
+description = "shellcheck/shfmt/actionlint/zizmor/ghalint/pinactを並行実行する(1つが失敗しても他は完走させる)"
+depends = ["shellcheck", "shfmt", "actionlint", "zizmor", "ghalint", "pinact"]
 
 [tasks.up-packer-network]
 description = "Packerビルド用の永続VPCをデプロイ"
