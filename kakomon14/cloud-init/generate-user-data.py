@@ -28,6 +28,7 @@ FILES = [
     "60-initdb.sh",
     "70-webapp-go.sh",
     "75-matcher.sh",
+    "77-payment-mock.sh",
     "80-frontend.sh",
     "90-nginx.sh",
     "95-deploy-helper.sh",
