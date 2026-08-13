@@ -21,40 +21,45 @@ bastion上での試行錯誤(`aws-bastion/scripts/kakomon14/`)によるネイテ
 まだこのリポジトリへのスクリプト移設は行っていない
 (`../docs/plans/kakomon14/todo/20260813100000-migrate-scripts-to-isuren-kakomon.md`が最優先タスク)。
 
-## 過去問コードの取り込み(vendor)方針
+## 過去問コードの取り込み(upstream)方針
 
-各過去問ディレクトリ(`kakomon14/`等)配下に`vendor/`を置き、取り込み元リポジトリ名でディレクトリを分ける
-(例: `kakomon14/vendor/isucon14/`。将来的に`kakomon14/vendor/isucon14-portal/`等も同様)。
+各過去問ディレクトリ(`kakomon14/`等)配下に`upstream/`を置き、取り込み元リポジトリ名でディレクトリを分ける
+(例: `kakomon14/upstream/isucon14/`。将来的に`kakomon14/upstream/isucon14-portal/`等も同様)。
+GoLandがディレクトリ名`vendor`をGoのvendoring規約として誤認識し除外扱いにするため、`upstream`という
+名前を採用している。
 
-- vendor直下の名前は「isuren側の呼び名(kakomon14等)」ではなく「クローン元リポジトリ名」に揃える
-- 各vendorディレクトリには取り込み元のLICENSEをそのままコピーする。コピーライト行がリポジトリごとに
+- upstream直下の名前は「isuren側の呼び名(kakomon14等)」ではなく「クローン元リポジトリ名」に揃える
+- 各upstreamディレクトリには取り込み元のLICENSEをそのままコピーする。コピーライト行がリポジトリごとに
   異なる(isucon14は「2024 ISUCON14 Contributors」、isucon14-portalは「2022 ISUCON」)ため、
   1つのLICENSEファイルに統合しない
 - `packer/`・`provisioning/`・`cloud-init/`等の完全自作物にはisucon側のLICENSEを適用しない
   (このリポジトリ自体のLICENSEに従う)
 
-## vendor取得(sparse-checkout)の実装上の注意点
+## upstream取得(sparse-checkout)の実装上の注意点
 
-kakomon14のvendor移行(`50-source.sh`)で実際にハマった点。他の過去問を追加する際にも当てはまる。
+kakomon14のupstream移行(`50-source.sh`)で実際にハマった点。他の過去問を追加する際にも当てはまる。
+なお`50-source.sh`内では、isuren-mondai自身が保持するこの取り込み済みコードを`UPSTREAM_*`、
+isucon14公式リポジトリから読み取り専用データを直接取得する側を`ISUCON14_*`と呼び分けている
+(前者のディレクトリ名`upstream`と、後者が指す「本家」概念が別物であるため)。
 
 - cone modeのsparse-checkoutは指定パスだけでなく**リポジトリルート直下のファイルも自動的に含む**。
-  isuren-mondai自身をvendor取得元にする場合、`mise.toml`(Packer/AWSタスク定義)のような
+  isuren-mondai自身を取得元にする場合、`mise.toml`(Packer/AWSタスク定義)のような
   無関係なファイルも一緒に取得されてしまう。`mise.toml`は`~/webapp/go`等でmiseを実行する際に
   ディレクトリ探索へ引っかかり「untrusted config」エラーの原因になるため、取得後に明示的に
-  除去する必要がある(`50-source.sh`の`remove_vendor_root_mise_toml`参照)
+  除去する必要がある(`50-source.sh`の`remove_upstream_root_mise_toml`参照)
 - gitignoreの衝突で、ファイルが`git add`時に**静かに無視される**ことがある。2パターン確認済み
     - グローバルgitignore(macOSの`Icon`ルール等)が、大文字小文字を区別しないファイルシステム上で
       正当なディレクトリ名(`icon/`等)と衝突する
-    - vendorしたディレクトリ自身の`.gitignore`(先頭`/`なしのパターン、例: `bench`)が、
+    - 取り込んだディレクトリ自身の`.gitignore`(先頭`/`なしのパターン、例: `bench`)が、
       同名の無関係なディレクトリ(`services/bench/`等)を意図せず無視する
-    - vendor時は本家ツリーと`comm -23 <(find 本家 ...) <(git ls-tree ...)`のように突き合わせて、
+    - 取り込み時は本家ツリーと`comm -23 <(find 本家 ...) <(git ls-tree ...)`のように突き合わせて、
       欠落ファイルがないか確認する運用にする
 - symlinkの相対パス解決に注意。systemdの`WorkingDirectory=`がシンボリックリンクを指す場合、
   chdir後のプロセスの実体パスはreadlink先になるため、プロセスからの相対パス(`../sql`等)は
   シンボリックリンクの論理的な親ではなく**実体側の親ディレクトリ**で解決される。関連ファイルを
   別々の取得元からシンボリックリンクで束ねる場合、束ねる場所は実ディレクトリの内側に統一する
   (`~/webapp`配下の子要素ごとに個別symlinkを張る方式は相対パス解決を壊すため不採用。
-  vendorツリーの内側に`webapp/sql`へのsymlinkを差し込む方式にした)
+  upstreamツリーの内側に`webapp/sql`へのsymlinkを差し込む方式にした)
 
 ## 見逃しがちな注意点(isucon14版)
 
