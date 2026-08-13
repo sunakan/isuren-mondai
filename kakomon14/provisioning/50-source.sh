@@ -109,8 +109,21 @@ link_frontend_public() {
   fi
 }
 
+# cone modeはリポジトリルート直下のファイルも自動的に含むため、isuren-mondai自身の
+# mise.toml(Packer/AWSタスク定義。kakomon14のgo/nodeとは無関係)も一緒に取得されてしまう。
+# これが~/webapp/go等でmiseを実行する際にディレクトリ探索へ引っかかり、
+# 「untrusted config」としてmiseがエラー終了する原因になるため取り除く。
+remove_vendor_root_mise_toml() {
+  local f="${VENDOR_CHECKOUT_DIR}/mise.toml"
+  if [ -f "${f}" ]; then
+    rm -f "${f}"
+    log "vendor: removed stray ${f}"
+  fi
+}
+
 sparse_checkout_fetch "${VENDOR_CHECKOUT_DIR}" "${VENDOR_REPO_URL}" "${VENDOR_COMMIT}" "${VENDOR_SUBPATH}"
 sparse_checkout_fetch "${UPSTREAM_CHECKOUT_DIR}" "${ISUCON14_REPO_URL}" "${ISUCON14_COMMIT}" "${ISUCON14_UPSTREAM_SUBPATHS[@]}"
+remove_vendor_root_mise_toml
 link_isucon14
 link_webapp
 link_frontend_public

@@ -75,7 +75,9 @@ build {
   # user_dataのcloud-init(write_files+runcmdでall.shを実行)が完了するまで待ってからAMI化する。
   # all.sh側がset -euo pipefailで冪等かつエラー時に非ゼロ終了するため、
   # cloud-init status --waitの終了コードでプロビジョニングの成否がそのまま判定できる。
+  # 失敗時はPackerがインスタンスを即座に破棄してしまいログを見返せなくなるため、
+  # 失敗を検知したらAMI化前にログをbuild出力へ吐いてから非ゼロ終了する。
   provisioner "shell" {
-    inline = ["cloud-init status --wait"]
+    inline = ["sudo cloud-init status --wait || (echo '--- cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)"]
   }
 }
