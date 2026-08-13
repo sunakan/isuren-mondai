@@ -11,7 +11,6 @@
 - `webapp/openapi.yaml`
 - `frontend`
 - `bench`(ベンチマーカー本体。Goのみで完結し自分で保守しうるコードのため持ち込んだ。
-  `bench/Dockerfile`はISUCON運営限定のプライベートECRイメージに依存しビルドできないため未使用で、
   `go run . run --target ... -t 60`のように直接実行する)
 
 ## 対象外にしたもの
@@ -19,6 +18,12 @@
 - `browsercheck/`・`envcheck/` — いずれもISUCON運営側の道具で、参加者側の環境では動作しない
   (詳細はdocs/plans/kakomon14配下の調査メモ、または会話ログ参照)
 - `development/` — 全言語分のDocker Compose定義で、Goのみに絞る方針とは噛み合わない
+- `bench/Dockerfile`・`bench/entrypoint.sh`・`bench/aqua.yaml` — ISUCON運営限定のプライベート
+  ECRイメージ(`supervisor`)・AWS ECSのタスクメタデータAPIに依存しており一般環境では使えない。
+  benchは`go run`で直接実行するためコンテナ化自体が不要
+- `bench/Taskfile.yml` — 本家の開発用ショートカット集。`gen-frontend`は
+  `kakomon14/scripts/build-frontend-release.sh`で代替済み、`build-image`は上記Dockerfile依存、
+  他のタスクも単なる`go run`/`go build`のラッパーで保守する価値が薄い
 
 ## 取り込んでいないもの
 
