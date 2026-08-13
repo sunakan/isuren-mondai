@@ -12,6 +12,12 @@
 |ISUCON14|✅|||||||
 
 
+## リリース例
+
+```shell
+GH_TOKEN=$(ghtkn get *****) mise run release-kakomon14 kakomon14-frontend-v1.0.0
+```
+
 ## 前提
 
 初回のみ、このディレクトリで`mise`の設定ファイルを信頼する。
