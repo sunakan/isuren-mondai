@@ -26,7 +26,7 @@ VENDOR_CHECKOUT_DIR="${ISUREN_HOME}/.isuren-mondai-vendor"
 VENDOR_DIR="${VENDOR_CHECKOUT_DIR}/${VENDOR_SUBPATH}"
 UPSTREAM_CHECKOUT_DIR="${ISUREN_HOME}/.isucon14-upstream"
 ISUCON14_LINK="${ISUREN_HOME}/isucon14"
-WEBAPP_DIR="${ISUREN_HOME}/webapp"
+WEBAPP_LINK="${ISUREN_HOME}/webapp"
 
 # Why not curl+tar: GitHubのcodeload archiveエンドポイントはリポジトリ全体のtarballしか
 # 生成できず、サブパス指定で絞り込めない。過去問を追加するたびリポジトリは肥大化していく
@@ -73,39 +73,35 @@ link_isucon14() {
   fi
 }
 
-# go/payment_mock/openapi.yamlはvendor、sqlは本家と取得元が分かれたため、
-# `~/webapp`は実ディレクトリにして子要素ごとに個別のシンボリックリンクを張る。
+# 70-webapp-go.sh等が`~/webapp`を参照する既存の前提を変えずに済むよう、
+# vendorされた実体を指すシンボリックリンクを張る。
+#
+# Why not `~/webapp`を実ディレクトリにして子要素ごとに個別リンクする方式:
+# 一度その方式で実装したが、systemdのWorkingDirectory=~/webapp/go はシンボリックリンクの
+# 実体側パスにchdirするため、webapp/goプロセスから見た`../sql`は`~/webapp/sql`ではなく
+# vendorツリー内の(存在しない)webapp/sqlに解決されてしまい、/api/initializeが
+# `fork/exec ../sql/init.sh: no such file or directory`で失敗した。
+# sqlのシンボリックリンクをvendorツリーの中(webapp/go と同じ実ディレクトリ)に置けば、
+# `..`の解決先がvendorツリー内で完結するため、`~/webapp`自体は単一リンクで問題ない。
 link_webapp() {
-  mkdir -p "${WEBAPP_DIR}"
-  chown "${ISUREN_USER}:${ISUREN_USER}" "${WEBAPP_DIR}"
-  local name target link
-  for name in go payment_mock openapi.yaml; do
-    target="${VENDOR_DIR}/webapp/${name}"
-    link="${WEBAPP_DIR}/${name}"
-    if [ -L "${link}" ] && [ "$(readlink "${link}")" = "${target}" ]; then
-      log "webapp/${name}: symlink already up to date"
-    else
-      ln -sfn "${target}" "${link}"
-      log "webapp/${name}: symlink created"
-    fi
-  done
-  if [ -L "${WEBAPP_DIR}/sql" ] && [ "$(readlink "${WEBAPP_DIR}/sql")" = "${UPSTREAM_CHECKOUT_DIR}/webapp/sql" ]; then
-    log "webapp/sql: symlink already up to date"
+  if [ -L "${WEBAPP_LINK}" ] && [ "$(readlink "${WEBAPP_LINK}")" = "${VENDOR_DIR}/webapp" ]; then
+    log "webapp: symlink already up to date"
   else
-    ln -sfn "${UPSTREAM_CHECKOUT_DIR}/webapp/sql" "${WEBAPP_DIR}/sql"
-    log "webapp/sql: symlink created"
+    ln -sfn "${VENDOR_DIR}/webapp" "${WEBAPP_LINK}"
+    log "webapp: symlink created"
   fi
 }
 
-# frontend/publicも本家取得のため、vendorされたfrontendツリー内にシンボリックリンクで差し込む。
-link_frontend_public() {
-  local target="${UPSTREAM_CHECKOUT_DIR}/frontend/public"
-  local link="${VENDOR_DIR}/frontend/public"
+# webapp/sqlとfrontend/publicは本家取得のため、vendorされたツリーの内側に
+# シンボリックリンクで差し込む(理由はlink_webapp内のコメント参照)。
+link_upstream_into_vendor() {
+  local target="${UPSTREAM_CHECKOUT_DIR}/$1"
+  local link="${VENDOR_DIR}/$1"
   if [ -L "${link}" ] && [ "$(readlink "${link}")" = "${target}" ]; then
-    log "frontend/public: symlink already up to date"
+    log "$1: symlink already up to date"
   else
     ln -sfn "${target}" "${link}"
-    log "frontend/public: symlink created"
+    log "$1: symlink created"
   fi
 }
 
@@ -126,6 +122,7 @@ sparse_checkout_fetch "${UPSTREAM_CHECKOUT_DIR}" "${ISUCON14_REPO_URL}" "${ISUCO
 remove_vendor_root_mise_toml
 link_isucon14
 link_webapp
-link_frontend_public
+link_upstream_into_vendor "webapp/sql"
+link_upstream_into_vendor "frontend/public"
 
 log "50-source.sh: done"
