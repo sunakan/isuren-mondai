@@ -1,6 +1,26 @@
+[tools]
+"aqua:mvdan/sh" = "latest"
+"aqua:koalaman/shellcheck" = "latest"
+
 [env]
 AWS_REGION = "ap-northeast-1"
 PACKER_NETWORK_STACK_NAME = "isuren-mondai-packer-network"
+
+[tasks.lock-tools]
+description = "mise.tomlのtoolsをlinux-arm64/macos-arm64向けにlock(windows等は含めない)"
+run = "mise lock -p linux-arm64,macos-arm64"
+
+[tasks.shellcheck]
+description = "shellスクリプトをshellcheckで検査(取り込んだ本家コードのupstream/配下は対象外)"
+run = "find . -name '*.sh' -not -path '*/upstream/*' -print0 | xargs -0 shellcheck"
+
+[tasks.shfmt]
+description = "shellスクリプトをshfmtでフォーマットチェック(取り込んだ本家コードのupstream/配下は対象外)"
+run = "find . -name '*.sh' -not -path '*/upstream/*' -print0 | xargs -0 shfmt -d"
+
+[tasks.ci]
+description = "shellcheck/shfmtを並行実行する(片方が失敗してももう片方は完走させる)"
+run = "mise run --continue-on-error shellcheck shfmt"
 
 [tasks.up-packer-network]
 description = "Packerビルド用の永続VPCをデプロイ"
