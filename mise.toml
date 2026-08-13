@@ -65,11 +65,17 @@ run = "kakomon14/scripts/build-frontend-release.sh"
 
 [tasks.release-kakomon14]
 description = "kakomon14のビルド成果物をGitHub Releaseへアップロード(引数: タグ名。例: mise run release-kakomon14 kakomon14-v1.0.0)"
-depends = ["build-frontend-kakomon14"]
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 TAG="${1:?タグ名を指定してください(例: mise run release-kakomon14 kakomon14-v1.0.0)}"
+# 時間のかかるビルドを始める前にタグの重複を検知したいため、depends(常にビルドが先に走る)
+# ではなくここで明示的に順序を制御する。
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_tag_not_taken "$TAG"
+
+mise run build-frontend-kakomon14
 scripts/github-release.sh "$TAG" \
   kakomon14/dist/kakomon14-frontend.tar.gz \
   kakomon14/dist/frontend_hashes.json \
