@@ -84,4 +84,13 @@ build {
   provisioner "shell" {
     inline = ["sudo cloud-init status --wait || (echo '--- cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)"]
   }
+
+  # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest時)が解決した具体的なタグを取得する。
+  # AMIタグ(frontend)への焼き込みはmise.tomlのbuild-kakomon14タスク側で行う
+  # (この時点ではAMI IDがまだ存在しないため、tagsブロックに直接は書けない)。
+  provisioner "file" {
+    source      = "/tmp/kakomon14-frontend-release-tag"
+    destination = "${path.root}/frontend-release-tag.txt"
+    direction   = "download"
+  }
 }

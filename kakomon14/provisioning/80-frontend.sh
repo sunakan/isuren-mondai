@@ -13,16 +13,48 @@ BENCHRUN_DIR="${ISUREN_HOME}/isucon14/bench/benchrun"
 # (t4g.smallでのpnpm installはOOMを起こしうる上、node/pnpmをAMIに含めずに済む。
 # kakomon14/scripts/build-frontend-release.sh・scripts/github-release.sh参照)。
 : "${FRONTEND_RELEASE_REPO_URL:=https://github.com/sunakan/isuren-mondai}"
-: "${FRONTEND_RELEASE_TAG:=kakomon14-frontend-v1.0.1}"
-FRONTEND_RELEASE_BASE_URL="${FRONTEND_RELEASE_REPO_URL}/releases/download/${FRONTEND_RELEASE_TAG}"
+: "${FRONTEND_RELEASE_OWNER_REPO:=sunakan/isuren-mondai}"
+# デフォルトはlatest(起動のたびに最新のkakomon14-frontend-*releaseを解決)。
+# タグを明示指定すればそのバージョンにピン留めできる(例: kakomon14-frontend-v1.0.1)。
+: "${FRONTEND_RELEASE_TAG:=latest}"
 FRONTEND_RELEASE_DIR="${ISUREN_HOME}/.kakomon14-frontend-release"
+# latest解決後の具体的なタグをPacker側(file provisioner)が回収し、AMIタグに記録するための
+# 置き場所。FRONTEND_RELEASE_TAG=latestだとAMIのディスク中身だけでは実際に焼き込まれた
+# バージョンが分からなくなるため。
+RESOLVED_TAG_FILE="/tmp/kakomon14-frontend-release-tag"
+
+# 1つのリポジトリで複数過去問(kakomon13等)のReleaseを扱うため、GitHubの/releases/latest
+# (タグprefixを問わずリポジトリ全体で最新のものを返す)は使えない。releases一覧(作成日時降順)から
+# kakomon14-frontend-プレフィックスの先頭を拾う。
+resolve_frontend_release_tag() {
+  if [ "${FRONTEND_RELEASE_TAG}" != "latest" ]; then
+    return
+  fi
+  local resolved
+  resolved="$(curl -fsSL "https://api.github.com/repos/${FRONTEND_RELEASE_OWNER_REPO}/releases" |
+    grep -o '"tag_name": *"kakomon14-frontend-[^"]*"' | head -n1 |
+    sed -E 's/.*"(kakomon14-frontend-[^"]*)"$/\1/')"
+  if [ -z "${resolved}" ]; then
+    echo "エラー: kakomon14-frontendのReleaseが見つかりませんでした(GitHub API: ${FRONTEND_RELEASE_OWNER_REPO})" >&2
+    exit 1
+  fi
+  FRONTEND_RELEASE_TAG="${resolved}"
+  log "frontend release: latestを${FRONTEND_RELEASE_TAG}に解決"
+}
+
+# root(cloud-init runcmd)実行のためデフォルトumaskで644になり、ssh_username(ubuntu)からの
+# file provisioner(download)で読める。
+persist_resolved_tag() {
+  echo "${FRONTEND_RELEASE_TAG}" >"${RESOLVED_TAG_FILE}"
+}
 
 # sunakan/isuren-mondaiはpublicリポジトリのため、認証なしのcurlでダウンロードできる。
 download_frontend_release() {
+  local base_url="${FRONTEND_RELEASE_REPO_URL}/releases/download/${FRONTEND_RELEASE_TAG}"
   runuser -u "${ISUREN_USER}" -- mkdir -p "${FRONTEND_RELEASE_DIR}"
   local f
   for f in kakomon14-frontend.tar.gz frontend_hashes.json frontend_files.json; do
-    runuser -u "${ISUREN_USER}" -- curl -fsSL -o "${FRONTEND_RELEASE_DIR}/${f}" "${FRONTEND_RELEASE_BASE_URL}/${f}"
+    runuser -u "${ISUREN_USER}" -- curl -fsSL -o "${FRONTEND_RELEASE_DIR}/${f}" "${base_url}/${f}"
   done
   log "frontend release: downloaded ${FRONTEND_RELEASE_TAG}"
 }
@@ -49,6 +81,8 @@ deploy_benchrun_manifests() {
   log "bench/benchrun manifests: deployed"
 }
 
+resolve_frontend_release_tag
+persist_resolved_tag
 download_frontend_release
 deploy_public
 deploy_benchrun_manifests
