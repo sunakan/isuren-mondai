@@ -1,7 +1,16 @@
 # isuren-mondai
 
-ISUCON過去問をGo実装だけに絞り、Packerで自分用のAMIとして焼いて保守するリポジトリ。
-詳しい方針は [aws-bastion/docs/isuren-mondai-strategy.md](../docs/isuren-mondai-strategy.md) を参照。
+- ISUCONの過去問を特定言語に絞り、AMIを作るためのリポジトリ
+- 類似の問題もこのリポジトリで管理予定
+
+※「ISUCON」は、さくらインターネット株式会社の商標または登録商標です。
+
+## 対応問題
+
+||go|java|nodejs|perl|python|ruby|rust|
+|:---|:---:|:----:|:---:|:---:|:---:|:---:|:---:|
+|ISUCON14|✅|||||||
+
 
 ## 前提
 
