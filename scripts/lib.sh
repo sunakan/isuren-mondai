@@ -19,3 +19,18 @@ require_pushed_commit() {
     exit 1
   fi
 }
+
+# gh release createは--targetを指定しても、タグが既に存在する場合は無視して既存タグを
+# そのまま使う(GitHub API仕様)。Releaseだけ削除してタグを消し忘れると、新しい成果物なのに
+# タグは古いコミットを指したまま、という食い違いがエラーなく発生するため事前に検知する。
+require_tag_not_taken() {
+  local tag="$1"
+  if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+    echo "エラー: タグ ${tag} は既にリモートに存在します。" >&2
+    echo "  (gh release createは既存タグの場合--targetを無視するため、そのまま実行すると" >&2
+    echo "   成果物だけ新しくなりタグは古いコミットを指したままになります)" >&2
+    echo "  別のタグ名を使うか、以下でタグ自体を削除してから実行してください。" >&2
+    echo "    git push origin :refs/tags/${tag}" >&2
+    exit 1
+  fi
+}

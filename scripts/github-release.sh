@@ -29,6 +29,7 @@ shift
 COMMIT="$(git rev-parse HEAD)"
 require_clean_worktree
 require_pushed_commit "${COMMIT}"
+require_tag_not_taken "${TAG}"
 
 PREFIX="${TAG%%v*}v"
 PREV_TAG="$(gh release list --limit 1000 --json tagName --jq '.[].tagName' \
