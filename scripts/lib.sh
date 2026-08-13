@@ -10,10 +10,21 @@ require_clean_worktree() {
   fi
 }
 
+# GH_TOKEN未設定/空だとgh apiが認証エラーで失敗し、require_pushed_commitが
+# 「コミットが見当たらない」という紛らわしいエラーを出す(実際は未pushではなく未認証)。
+# トークンの値自体は出力しない(有無だけを見る)。
+require_gh_token() {
+  if [ -z "${GH_TOKEN:-}" ] && [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "エラー: GH_TOKEN(またはGITHUB_TOKEN)が設定されていません。gh CLIの認証に必要です。" >&2
+    exit 1
+  fi
+}
+
 # gh release create --target実行時にリモートにコミットがないと422/500等の分かりにくいエラーに
 # なるため、事前にgh apiで存在確認する。--silentでレスポンス本体を出力しない(認証情報混入を避ける)。
 require_pushed_commit() {
   local commit="$1"
+  require_gh_token
   if ! gh api "repos/{owner}/{repo}/commits/${commit}" --silent 2>/dev/null; then
     echo "エラー: コミット ${commit} がリモートに見当たりません。git pushを忘れていませんか?" >&2
     exit 1

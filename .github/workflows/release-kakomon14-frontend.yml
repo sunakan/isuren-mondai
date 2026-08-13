@@ -34,9 +34,13 @@ jobs:
           install: false
           cache: false
 
+      # build-frontend-release.shはscripts/lib.shのrequire_pushed_commit(gh api呼び出し)を
+      # 経由するため、このstepにもGH_TOKENが要る。
       - run: mise run build-frontend-kakomon14
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-      # GH_TOKENはこのステップだけで使うため、job全体のenvではなくstep envに置く
+      # GH_TOKENは使うstepだけに置き、job全体のenvには置かない
       # (ghalintのjob_secretsポリシー: github.tokenをjob envに置かない)。
       - run: |
           scripts/github-release.sh "${GITHUB_REF_NAME}" \
