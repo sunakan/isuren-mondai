@@ -61,6 +61,10 @@ source "amazon-ebs" "kakomon14" {
   tags          = local.ami_tags
   snapshot_tags = local.ami_tags
 
+  # AWS管理キー(aws/ebs)での暗号化は追加課金なし(https://aws.amazon.com/kms/pricing/)。
+  # kms_key_idを指定しない場合はaws/ebsが使われる。
+  encrypt_boot = true
+
   # bastion実測(mysqlデータ242MB+isucon14リポジトリ427MB+mise本体・モジュールキャッシュ624MB≒計1.3GB)の
   # 3倍以上の余裕を持たせる(docs/plans/kakomon14/completed/20260812182550-cloud-init-handoff-prep.md)
   launch_block_device_mappings {
