@@ -34,18 +34,11 @@ jobs:
           install: false
           cache: false
 
-      # build-frontend-release.shはscripts/lib.shのrequire_pushed_commit(gh api呼び出し)を
-      # 経由するため、このstepにもGH_TOKENが要る。
-      - run: mise run build-frontend-kakomon14
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # GH_TOKENは使うstepだけに置き、job全体のenvには置かない
+      # build+releaseはmise run release-kakomon14がローカル運用と同じ手順で行う
+      # (kakomon14/scripts/build-frontend-release.sh → scripts/github-release.shの順)。
+      # ワークフロー側で2ステップに分けて再実装すると処理が重複するため、既存タスクをそのまま呼ぶ。
+      # GH_TOKENはこのstepだけで使うため、job全体のenvには置かない
       # (ghalintのjob_secretsポリシー: github.tokenをjob envに置かない)。
-      - run: |
-          scripts/github-release.sh "${GITHUB_REF_NAME}" \
-            kakomon14/dist/kakomon14-frontend.tar.gz \
-            kakomon14/dist/frontend_hashes.json \
-            kakomon14/dist/frontend_files.json
+      - run: mise run release-kakomon14 "${GITHUB_REF_NAME}"
         env:
           GH_TOKEN: ${{ github.token }}
