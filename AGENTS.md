@@ -21,6 +21,18 @@ bastion上での試行錯誤(`aws-bastion/scripts/kakomon14/`)によるネイテ
 まだこのリポジトリへのスクリプト移設は行っていない
 (`../docs/plans/kakomon14/todo/20260813100000-migrate-scripts-to-isuren-kakomon.md`が最優先タスク)。
 
+## 過去問コードの取り込み(vendor)方針
+
+各過去問ディレクトリ(`kakomon14/`等)配下に`vendor/`を置き、取り込み元リポジトリ名でディレクトリを分ける
+(例: `kakomon14/vendor/isucon14/`。将来的に`kakomon14/vendor/isucon14-portal/`等も同様)。
+
+- vendor直下の名前は「isuren側の呼び名(kakomon14等)」ではなく「クローン元リポジトリ名」に揃える
+- 各vendorディレクトリには取り込み元のLICENSEをそのままコピーする。コピーライト行がリポジトリごとに
+  異なる(isucon14は「2024 ISUCON14 Contributors」、isucon14-portalは「2022 ISUCON」)ため、
+  1つのLICENSEファイルに統合しない
+- `packer/`・`provisioning/`・`cloud-init/`等の完全自作物にはisucon側のLICENSEを適用しない
+  (このリポジトリ自体のLICENSEに従う)
+
 ## コマンド実行の方針
 
 - `packer build`・`aws cloudformation deploy`等、EC2インスタンス起動やAMI作成を伴う操作は
