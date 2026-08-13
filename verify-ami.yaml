@@ -12,7 +12,7 @@ Parameters:
 
   InstanceType:
     Type: String
-    Default: t4g.small
+    Default: t4g.medium
 
 Resources:
   # SSM Session Manager経由の接続のみを想定しているためキーペアは作成しない

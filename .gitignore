@@ -1,1 +1,3 @@
 tmp/
+# generate-user-data.pyの生成物(provisioning/配下から再生成可能なビルド成果物)
+kakomon14/cloud-init/user-data.yaml.gz

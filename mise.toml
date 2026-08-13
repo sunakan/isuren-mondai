@@ -22,7 +22,7 @@ aws cloudformation wait stack-delete-complete --stack-name "$PACKER_NETWORK_STAC
 '''
 
 [tasks.build-kakomon14]
-description = "kakomon14/packerでpacker buildを実行(疎通確認用の空ビルド)"
+description = "kakomon14/packerでpacker buildを実行(cloud-initでisucon14(Go)をプロビジョニング)"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
@@ -32,6 +32,9 @@ VPC_ID="$(aws cloudformation describe-stacks \
 SUBNET_ID="$(aws cloudformation describe-stacks \
   --stack-name "$PACKER_NETWORK_STACK_NAME" \
   --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+# user-data.yaml.gzはprovisioning/配下から再生成可能なためgit管理していない。
+# ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。
+python3 kakomon14/cloud-init/generate-user-data.py
 cd kakomon14/packer
 packer build -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" empty.pkr.hcl
 '''

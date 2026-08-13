@@ -21,7 +21,7 @@ variable "subnet_id" {
 }
 
 locals {
-  name = "kakomon14-empty-${formatdate("YYYYMMDD-hhmm", timestamp())}"
+  name = "kakomon14-${formatdate("YYYYMMDD-hhmm", timestamp())}"
   ami_tags = {
     Name    = local.name
     Project = "isuren-kakomon"
@@ -31,7 +31,6 @@ locals {
   }
 }
 
-# 疎通確認用: プロビジョニング内容を持たない最小構成
 data "amazon-ami" "ubuntu" {
   filters = {
     name                = "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-arm64-server-*"
@@ -45,27 +44,38 @@ data "amazon-ami" "ubuntu" {
 
 source "amazon-ebs" "kakomon14" {
   ami_name        = local.name
-  ami_description = "kakomon14 packer empty build (smoke test, no provisioning)"
+  ami_description = "kakomon14 isucon14(Go) provisioned by cloud-init"
   region          = var.region
   source_ami      = data.amazon-ami.ubuntu.id
-  instance_type   = "t4g.small"
+  # ISUCON14公式の競技者VM(c5.large: 2vCPU/4GiB)とメモリ量を揃える。
+  # t4g.small(2GiB)ではフロントエンドビルド等でOOMのリスクがあるため避ける。
+  instance_type   = "t4g.medium"
   ssh_username    = "ubuntu"
   vpc_id          = var.vpc_id
   subnet_id       = var.subnet_id
 
+  # cloud-init/generate-user-data.pyが生成したgzip版。
+  # EC2のUser Dataはbase64エンコード後16KBまでのため、生のuser-data.yamlではなくこちらを使う。
+  user_data_file = "${path.root}/../cloud-init/user-data.yaml.gz"
+
   tags          = local.ami_tags
   snapshot_tags = local.ami_tags
 
+  # bastion実測(mysqlデータ242MB+isucon14リポジトリ427MB+mise本体・モジュールキャッシュ624MB≒計1.3GB)の
+  # 3倍以上の余裕を持たせる(docs/plans/kakomon14/completed/20260812182550-cloud-init-handoff-prep.md)
   launch_block_device_mappings {
     device_name = "/dev/sda1"
-    volume_size = 8
+    volume_size = 16
   }
 }
 
 build {
   sources = ["source.amazon-ebs.kakomon14"]
 
+  # user_dataのcloud-init(write_files+runcmdでall.shを実行)が完了するまで待ってからAMI化する。
+  # all.sh側がset -euo pipefailで冪等かつエラー時に非ゼロ終了するため、
+  # cloud-init status --waitの終了コードでプロビジョニングの成否がそのまま判定できる。
   provisioner "shell" {
-    inline = ["echo hello from packer"]
+    inline = ["cloud-init status --wait"]
   }
 }
