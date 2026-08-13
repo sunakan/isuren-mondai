@@ -21,6 +21,8 @@
 - `bench/Dockerfile`・`bench/entrypoint.sh`・`bench/aqua.yaml` — ISUCON運営限定のプライベート
   ECRイメージ(`supervisor`)・AWS ECSのタスクメタデータAPIに依存しており一般環境では使えない。
   benchは`go run`で直接実行するためコンテナ化自体が不要
+- `webapp/payment_mock/Dockerfile` — payment_mockはAMI上ではsystemdユニットからmise経由の
+  `go build`成果物を直接起動する運用のため、コンテナ化自体が不要
 - `bench/Taskfile.yml` — 本家の開発用ショートカット集。`gen-frontend`は
   `kakomon14/scripts/build-frontend-release.sh`で代替済み、`build-image`は上記Dockerfile依存、
   他のタスクも単なる`go run`/`go build`のラッパーで保守する価値が薄い
