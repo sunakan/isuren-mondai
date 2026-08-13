@@ -34,7 +34,9 @@ mise install
 
 mkdir -p "${DIST_DIR}"
 rm -f "${ARTIFACT}"
-tar -C "${FRONTEND_DIR}/build/client" -czf "${ARTIFACT}" .
+# COPYFILE_DISABLE=1: macOSのtarはデフォルトで拡張属性/リソースフォークを`._*`という
+# AppleDoubleファイルとして同梱してしまう(Linux上のtarでは不要だが無害なので常に設定する)。
+COPYFILE_DISABLE=1 tar -C "${FRONTEND_DIR}/build/client" -czf "${ARTIFACT}" .
 cp "${BENCHRUN_DIR}/frontend_hashes.json" "${DIST_DIR}/frontend_hashes.json"
 cp "${BENCHRUN_DIR}/frontend_files.json" "${DIST_DIR}/frontend_files.json"
 
