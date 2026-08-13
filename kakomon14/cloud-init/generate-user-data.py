@@ -32,8 +32,8 @@ FILES = [
     "90-nginx.sh",
     "95-deploy-helper.sh",
     "all.sh",
-    "mise.kakomon14.toml",
-    "mise.kakomon14.lock",
+    "mise.ami.toml",
+    "mise.ami.lock",
     "pnpm-workspace.kakomon14.yaml",
 ]
 

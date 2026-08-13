@@ -1,0 +1,5 @@
+[tools]
+node = "lts"
+# https://github.com/pnpm/pnpm
+# latestにすると9系が入ったりするため、固定
+pnpm = "11.21"

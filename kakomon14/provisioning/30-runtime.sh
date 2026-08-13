@@ -40,9 +40,9 @@ set_bashrc() {
 # aws-bastionリポジトリ自体が存在しない前提でも動くようにするため。
 set_mise_config() {
   local conf="${ISUREN_HOME}/.config/mise/config.toml"
-  if [ ! -f "${conf}" ] || ! diff -q "${SCRIPT_DIR}/mise.kakomon14.toml" "${conf}" >/dev/null 2>&1; then
+  if [ ! -f "${conf}" ] || ! diff -q "${SCRIPT_DIR}/mise.ami.toml" "${conf}" >/dev/null 2>&1; then
     install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "$(dirname "${conf}")"
-    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.kakomon14.toml" "${conf}"
+    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.toml" "${conf}"
     log "mise config: changed ${conf}"
   else
     log "mise config: already up to date"
@@ -54,8 +54,8 @@ set_mise_config() {
 # `mise lock -g -p linux-arm64`で生成したものをgit管理し、そのまま配置する。
 set_mise_lock() {
   local lock="${ISUREN_HOME}/.config/mise/mise.lock"
-  if [ ! -f "${lock}" ] || ! diff -q "${SCRIPT_DIR}/mise.kakomon14.lock" "${lock}" >/dev/null 2>&1; then
-    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.kakomon14.lock" "${lock}"
+  if [ ! -f "${lock}" ] || ! diff -q "${SCRIPT_DIR}/mise.ami.lock" "${lock}" >/dev/null 2>&1; then
+    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.lock" "${lock}"
     log "mise lock: changed ${lock}"
   else
     log "mise lock: already up to date"
