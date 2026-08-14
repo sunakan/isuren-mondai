@@ -33,7 +33,6 @@
 本家(`isucon/isucon14`)から直接sparse-checkoutで取得する(`kakomon14/provisioning/50-source.sh`参照)。
 js/css/ts等、将来構文が非推奨になった際に自分で保守する可能性があるコードとは取得元を分けている。
 
-- `webapp/sql` — サンプルデータ(`3-initial-data.sql.gz`)が将来の過去問追加で肥大化しうるため
 - `frontend/public` — 画像等の静的アセットで、リポジトリを重くするだけで編集対象にならないため
 
 過去問によって画像等の置き場所は異なる(例: isucon13は`bench/internal/scheduler/images/`配下)ため、
@@ -41,9 +40,19 @@ js/css/ts等、将来構文が非推奨になった際に自分で保守する�
 
 ## コミット対象から外したもの
 
+- `webapp/sql` — ローカルでのDBスキーマ確認用に`mise run kakomon14:refresh-upstream`で取り込むが、
+  サンプルデータ(`3-initial-data.sql.gz`)が将来の過去問追加で肥大化しうるため`.gitignore`で
+  コミット対象外にしている。AMI構築時は従来通り本家から直接sparse-checkoutで取得する
+  (`kakomon14/provisioning/50-source.sh`のISUCON14_*参照)ため、この経路は変更していない
 - `bench/benchrun/frontend_hashes.json`・`frontend_files.json` — `frontend/vite.config.ts`の
   `generateHashesFile` pluginがビルドのたびに再生成する、bench用のフロントエンド整合性確認ファイル。
   本家はコミット対象にしているが、うちは`pnpm run build`を実行するたびに必ず内容が変わるため
   (実質的にビルド成果物であり、コミットされた値を維持する意味が薄い)、`.gitignore`で対象外にしている。
   ファイル自体はディスク上に残る(取り込み時点の内容のまま)。GitHub Releaseで配布するビルド成果物には
   この2ファイルの最新版を含める(`kakomon14/scripts/build-frontend-release.sh`参照)。
+
+## upstream/isucon14の更新方法
+
+`mise run kakomon14:refresh-upstream`で`tmp/all-kakomon/isucon14`(なければclone、あれば`git pull`)を
+最新化し、このディレクトリへ`rsync`で反映する。除外対象は上記「対象外にしたもの」の一覧をそのまま
+rsyncの`--exclude`に反映しているため、除外方針を変える場合はこのNOTICE.mdとタスクの両方を更新すること。

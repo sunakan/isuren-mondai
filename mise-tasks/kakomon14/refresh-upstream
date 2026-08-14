@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#MISE description="tmp/all-kakomon/isucon14を最新化し、upstream/isucon14へ反映する(除外リストの根拠はupstream/isucon14/NOTICE.md参照)"
+set -euo pipefail
+
+SRC="tmp/all-kakomon/isucon14"
+DST="upstream/isucon14"
+UPSTREAM_URL="https://github.com/isucon/isucon14.git"
+
+if [ ! -d "${SRC}/.git" ]; then
+  git clone "${UPSTREAM_URL}" "${SRC}"
+else
+  git -C "${SRC}" pull --ff-only
+fi
+
+rsync -a "${SRC}/LICENSE" "${DST}/LICENSE"
+rsync -a "${SRC}/webapp/openapi.yaml" "${DST}/webapp/openapi.yaml"
+rsync -a --delete "${SRC}/webapp/go/" "${DST}/webapp/go/"
+rsync -a --delete --exclude=Dockerfile "${SRC}/webapp/payment_mock/" "${DST}/webapp/payment_mock/"
+# webapp/sqlはローカルでのDB確認用に取り込むが、.gitignoreでコミット対象外にしている
+# (詳細はNOTICE.md「コミット対象から外したもの」参照)。
+rsync -a --delete "${SRC}/webapp/sql/" "${DST}/webapp/sql/"
+# frontend/publicとnode_modulesはNOTICE.md「対象外にしたもの」の方針により取り込まない。
+rsync -a --delete --exclude=public --exclude=node_modules "${SRC}/frontend/" "${DST}/frontend/"
+rsync -a --delete --exclude=Dockerfile --exclude=entrypoint.sh --exclude=aqua.yaml --exclude=Taskfile.yml \
+  "${SRC}/bench/" "${DST}/bench/"
+
+echo "upstream/isucon14: refreshed at $(git -C "${SRC}" rev-parse HEAD)"
