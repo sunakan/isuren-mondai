@@ -54,9 +54,9 @@ source "amazon-ebs" "kakomon14" {
   vpc_id          = var.vpc_id
   subnet_id       = var.subnet_id
 
-  # cloud-init/generate-user-data.pyが生成したgzip版。
-  # EC2のUser Dataはbase64エンコード後16KBまでのため、生のuser-data.yamlではなくこちらを使う。
-  user_data_file = "${path.root}/../cloud-init/user-data.yaml.gz"
+  # cloud-init/generate-user-data.pyが生成したもの。git cloneで実体を取得する構成のため
+  # 内容はごく小さく、EC2 User Dataの16KB制限(base64後)を気にする必要がない。
+  user_data_file = "${path.root}/../cloud-init/user-data.yaml"
 
   tags          = local.ami_tags
   snapshot_tags = local.ami_tags

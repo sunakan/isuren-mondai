@@ -1,53 +1,42 @@
 #!/usr/bin/env python3
-"""kakomon14/provisioning/配下のスクリプトからcloud-config(user-data)を生成する。
+"""kakomon14/provisioning/を実行するcloud-config(user-data)を生成する。
 
-provisioning/側の内容が正になるよう、write_filesの中身は都度この生成物へ反映する
-(user-data.yamlを直接編集しない)。
+provisioning/配下のファイル自体はuser-dataに埋め込まず、EC2起動時にこのリポジトリ自身を
+git clone(HEADのコミットに固定)して取得する。これにより埋め込み対象ファイルの手動管理
+(FILESリスト)やEC2 User Dataの16KB制限回避(gzip)が丸ごと不要になる。
 """
 
-import gzip
 import pathlib
+import subprocess
+
 import yaml
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-PROVISIONING_DIR = SCRIPT_DIR.parent / "provisioning"
+REPO_ROOT = SCRIPT_DIR.parent.parent
 OUTPUT_FILE = SCRIPT_DIR / "user-data.yaml"
-# EC2のUser Dataはbase64エンコード後16KBまでのため、Packerのuser_data_fileには
-# こちらのgzip圧縮版を渡す(EC2/cloud-initはgzipのuser-dataを自動展開する)。
-OUTPUT_FILE_GZ = SCRIPT_DIR / "user-data.yaml.gz"
-REMOTE_DIR = "/opt/kakomon14/provisioning"
-
-# .sh・systemd/*.serviceは自動収集する(新規ファイル追加時にこのリストへの追記を忘れる事故を防ぐ)。
-# READMEはプロビジョニングの実行に不要なので対象外。write_filesの配置順は実行順に影響しない
-# (実行順はall.sh側が握る)ため、ソートのみで十分。
-FILES = (
-    sorted(p.name for p in PROVISIONING_DIR.glob("*.sh"))
-    + sorted(f"systemd/{p.name}" for p in (PROVISIONING_DIR / "systemd").glob("*.service"))
-    + [
-        "goss.yaml",
-        "mise.ami.toml",
-        "mise.ami.lock",
-    ]
-)
+REPO_URL = "https://github.com/sunakan/isuren-mondai.git"
+CLONE_DIR = "/opt/isuren-mondai"
+PROVISIONING_DIR = f"{CLONE_DIR}/kakomon14/provisioning"
 
 
 def build_cloud_config() -> dict:
-    write_files = []
-    for name in FILES:
-        content = (PROVISIONING_DIR / name).read_text()
-        write_files.append(
-            {
-                "path": f"{REMOTE_DIR}/{name}",
-                "owner": "root:root",
-                "permissions": "0644",
-                "content": content,
-            }
-        )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
     return {
-        "write_files": write_files,
-        # ENABLE_TLSは自己署名証明書生成のみでネットワーク到達性を要さないためtrue固定
+        # git init+remote add+fetch <SHA>+checkoutの構成にすることで、shallow(--depth 1)のまま
+        # 任意のコミットを指定できる(50-source.shのsparse_checkout_fetchと同じ考え方)。
+        # ENABLE_TLSは自己署名証明書生成のみでネットワーク到達性を要さないためtrue固定。
         "runcmd": [
-            f"env ENABLE_TLS=true bash {REMOTE_DIR}/all.sh",
+            f"git init --quiet {CLONE_DIR}",
+            f"git -C {CLONE_DIR} remote add origin {REPO_URL}",
+            f"git -C {CLONE_DIR} fetch --quiet --depth 1 origin {commit}",
+            f"git -C {CLONE_DIR} checkout --quiet {commit}",
+            f"env ENABLE_TLS=true bash {PROVISIONING_DIR}/all.sh",
         ],
     }
 
@@ -58,8 +47,6 @@ def main() -> None:
     text = f"#cloud-config\n{body}"
     OUTPUT_FILE.write_text(text)
     print(f"wrote {OUTPUT_FILE}")
-    OUTPUT_FILE_GZ.write_bytes(gzip.compress(text.encode(), compresslevel=9))
-    print(f"wrote {OUTPUT_FILE_GZ}")
 
 
 if __name__ == "__main__":

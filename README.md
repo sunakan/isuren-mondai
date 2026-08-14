@@ -46,7 +46,8 @@ mise run packer:up-network
 
 ## 2. 過去問ごとにPackerビルドする
 
-現状はkakomon14のみ。cloud-init(`kakomon14/cloud-init/user-data.yaml.gz`)経由でisucon14(Go版)をプロビジョニングする。
+現状はkakomon14のみ。cloud-init(`kakomon14/cloud-init/user-data.yaml`)経由でこのリポジトリ自身をgit cloneし、
+isucon14(Go版)をプロビジョニングする。
 
 ```bash
 mise run kakomon14:build

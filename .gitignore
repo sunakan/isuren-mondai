@@ -1,6 +1,7 @@
 tmp/
-# generate-user-data.pyの生成物(provisioning/配下から再生成可能なビルド成果物)
-kakomon14/cloud-init/user-data.yaml.gz
+# generate-user-data.pyの生成物(git cloneするcommit SHAを埋め込むだけの、都度再生成が前提の
+# ビルド成果物。コミットのたびに中身が変わるためコミット対象から外す)
+kakomon14/cloud-init/user-data.yaml
 # GitHub Releaseにアップロードするビルド成果物置き場(kakomon14/dist、kakomon13/dist等で共通利用)
 dist/
 # frontendビルド(vite.config.tsのgenerateHashesFile plugin)のたびに再生成される、bench用の整合性確認ファイル。

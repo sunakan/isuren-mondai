@@ -7,7 +7,15 @@ VPC_ID="$(aws cloudformation describe-stacks \
 SUBNET_ID="$(aws cloudformation describe-stacks \
   --stack-name "$PACKER_NETWORK_STACK_NAME" \
   --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
-# user-data.yaml.gzはprovisioning/配下から再生成可能なためgit管理していない。
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# user-data.yamlはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだと
+# EC2起動時のgit fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため事前に検知する。
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
+
+# user-data.yamlはprovisioning/配下から再生成可能なためgit管理していない。
 # ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。
 python3 kakomon14/cloud-init/generate-user-data.py
 cd kakomon14/packer
