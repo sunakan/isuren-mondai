@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/lib.sh"
 # upstream/isucon14/ (go/frontend/payment_mock/openapi.yaml)を取得元にする
 # (AGENTS.md「過去問コードの取り込み(upstream)方針」)。
 : "${UPSTREAM_REPO_URL:=https://github.com/sunakan/isuren-mondai.git}"
-: "${UPSTREAM_COMMIT:=b75fd72480ab39a83c1a14461b6e1451107c55f4}"
+: "${UPSTREAM_COMMIT:=d9d526895d97a3707dda96c8fa722ec15356ba44}"
 UPSTREAM_SUBPATH="upstream/isucon14"
 
 # webapp/sql(サンプルデータ)とfrontend/public(画像等の静的アセット)は自分で手を加えない
