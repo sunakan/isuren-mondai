@@ -32,8 +32,8 @@ require_pushed_commit "${COMMIT}"
 require_tag_absent_or_at_head "${TAG}"
 
 PREFIX="${TAG%%v*}v"
-PREV_TAG="$(gh release list --limit 1000 --json tagName --jq '.[].tagName' \
-  | grep "^${PREFIX}" | head -n1 || true)"
+PREV_TAG="$(gh release list --limit 1000 --json tagName --jq '.[].tagName' |
+  grep "^${PREFIX}" | head -n1 || true)"
 
 NOTES_ARGS=(--generate-notes)
 if [ -n "${PREV_TAG}" ] && [ "${PREV_TAG}" != "${TAG}" ]; then

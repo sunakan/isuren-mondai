@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="GitHub Actionsワークフローをzizmorでセキュリティ監査"
 set -euo pipefail
-zizmor .github/workflows
+# --offline: このリポジトリではCI上でzizmorを実行しておらずローカル専用のため、
+# ローカルのGITHUB_TOKEN/GH_TOKENが無効な場合にオンライン監査(GitHub API呼び出し)が
+# 401で失敗する問題を避ける(オンライン監査は無効になるトレードオフを許容)。
+zizmor --offline .github/workflows

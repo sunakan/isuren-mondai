@@ -83,7 +83,8 @@ EOD
   )
   if [ "${ENABLE_TLS}" = "true" ]; then
     content="${content}
-$(cat <<EOD
+$(
+      cat <<EOD
 
 server {
   listen 443 ssl;
@@ -116,7 +117,7 @@ server {
   }
 }
 EOD
-)"
+    )"
   fi
   echo "${content}" >"${SITE_AVAILABLE}"
   log "nginx site config: ${SITE_AVAILABLE} set"

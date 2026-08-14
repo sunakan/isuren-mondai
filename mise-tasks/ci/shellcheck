@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="shellスクリプトをshellcheckで検査(取り込んだ本家コードのupstream/配下、参照用clone置き場のtmp/配下は対象外)"
 set -euo pipefail
-find . -name '*.sh' -not -path '*/upstream/*' -not -path '*/tmp/*' -print0 | xargs -0 shellcheck
+# mise-tasks/配下は拡張子なしのbashスクリプトなので、*.shだけでなくパスでも対象に含める。
+# -x -P SCRIPTDIR: 各スクリプトが持つsource=./lib.sh形式のディレクティブを、実行時のcwdではなく
+# ファイル自身のディレクトリ基準で解決させる(これが無いとlib.shが見つからずSC1091が常に出る)。
+find . \( -name '*.sh' -o -path './mise-tasks/*' \) -type f -not -path '*/upstream/*' -not -path '*/tmp/*' -print0 | xargs -0 shellcheck -x -P SCRIPTDIR
