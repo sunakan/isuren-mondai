@@ -28,21 +28,11 @@ start_mysql_service() {
 }
 
 # 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L13-20
-# 元のCREATE USER IF NOT EXISTSだけだと、ユーザーが既に存在する場合パスワードは更新されない。
-# ALTER USERを足すことでパスワードのドリフトも解消されるようにした。
-# CREATE/ALTER/GRANTはMySQL側で既に冪等なため、changed/already の判定は自前で行わずMySQLに委ねる。
-set_isucon_db_user() {
-  mysql -uroot -e "
-    CREATE USER IF NOT EXISTS 'isucon'@'%' IDENTIFIED BY 'isucon';
-    ALTER USER 'isucon'@'%' IDENTIFIED BY 'isucon';
-    GRANT ALL PRIVILEGES ON *.* TO 'isucon'@'%' WITH GRANT OPTION;
-    FLUSH PRIVILEGES;
-  "
-  log "isucon db user: granted"
-}
+# DBユーザー作成はkakomon14/provisioning/60-initdb.shが本家の0-init.sqlを実行することで行う
+# (isucon-user roleが作るisuconユーザーと、本家から取得したenv.shの値を一致させるため。
+# 50-source.shのlink_env_sh参照)。
 
 install_mysql
 start_mysql_service
-set_isucon_db_user
 
 log "40-mysql.sh: done"

@@ -58,35 +58,12 @@ set_sudoers() {
 }
 
 # 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L52-59, templates/env.sh
-set_env_sh() {
-  local dest="/home/${ISUREN_USER}/env.sh"
-  local content
-  content=$(
-    cat <<'EOD'
-ISUCON_DB_HOST="127.0.0.1"
-ISUCON_DB_PORT="3306"
-ISUCON_DB_USER="isucon"
-ISUCON_DB_PASSWORD="isucon"
-ISUCON_DB_NAME="isuride"
-
-# マッチング間隔（秒）
-ISUCON_MATCHING_INTERVAL=0.5
-EOD
-  )
-  if [ ! -f "${dest}" ] || [ "$(cat "${dest}")" != "${content}" ]; then
-    echo "${content}" >"${dest}"
-    chown "${ISUREN_USER}:${ISUREN_USER}" "${dest}"
-    chmod 0755 "${dest}"
-    log "env.sh: changed ${dest}"
-  else
-    log "env.sh: already up to date"
-  fi
-}
+# env.sh自体は本家からsparse-checkoutで取得しシンボリックリンクする(50-source.shのlink_env_sh参照)。
+# ここではまだ~/.isucon14-upstream(50-source.shが取得)が存在しないため設置できない。
 
 create_group
 create_user
 chmod_home
 set_sudoers
-set_env_sh
 
 log "20-user.sh: done"

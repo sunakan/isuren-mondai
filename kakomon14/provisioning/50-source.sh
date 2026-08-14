@@ -12,14 +12,16 @@ source "${SCRIPT_DIR}/lib.sh"
 : "${UPSTREAM_COMMIT:=d9d526895d97a3707dda96c8fa722ec15356ba44}"
 UPSTREAM_SUBPATH="upstream/isucon14"
 
-# webapp/sql(サンプルデータ)とfrontend/public(画像等の静的アセット)は自分で手を加えない
-# 読み取り専用データのため、取り込まず本家から直接sparse-checkoutで取得する
-# (upstream/isucon14/NOTICE.md参照)。
+# webapp/sql(サンプルデータ)・frontend/public(画像等の静的アセット)・env.shテンプレート
+# (DB接続情報。isucon-user roleのtemplates/env.sh)は自分で手を加えない読み取り専用データのため、
+# 取り込まず本家から直接sparse-checkoutで取得する(upstream/isucon14/NOTICE.md参照)。
+# env.shはISUCON_DB_USER/ISUCON_DB_PASSWORD="isucon"を含むが、本家の値をそのまま使う
+# (isucon-user roleが作るDBユーザーとの整合を保つため書き換えない。40-mysql.sh参照)。
 # コミットは/Users/user01/works/github.com/isucon/isucon14のHEADに合わせて固定
 # (isucon14公式リポジトリのmainブランチ、2024-12-13時点)。
 : "${ISUCON14_REPO_URL:=https://github.com/isucon/isucon14.git}"
 : "${ISUCON14_COMMIT:=53f8b627e040c30ebec600457c6c97da008b84b0}"
-ISUCON14_SUBPATHS=("webapp/sql" "frontend/public")
+ISUCON14_SUBPATHS=("webapp/sql" "frontend/public" "provisioning/ansible/roles/isucon-user/templates")
 
 ISUREN_HOME="/home/${ISUREN_USER}"
 UPSTREAM_CHECKOUT_DIR="${ISUREN_HOME}/.isuren-mondai-upstream"
@@ -27,6 +29,7 @@ UPSTREAM_DIR="${UPSTREAM_CHECKOUT_DIR}/${UPSTREAM_SUBPATH}"
 ISUCON14_CHECKOUT_DIR="${ISUREN_HOME}/.isucon14-upstream"
 ISUCON14_LINK="${ISUREN_HOME}/isucon14"
 WEBAPP_LINK="${ISUREN_HOME}/webapp"
+ENV_SH_LINK="${ISUREN_HOME}/env.sh"
 
 # Why not curl+tar: GitHubのcodeload archiveエンドポイントはリポジトリ全体のtarballしか
 # 生成できず、サブパス指定で絞り込めない。過去問を追加するたびリポジトリは肥大化していく
@@ -105,6 +108,17 @@ link_isucon14_into_upstream() {
   fi
 }
 
+# 70-webapp-go.shのsystemdユニットがEnvironmentFile=~/env.shとして参照する。
+link_env_sh() {
+  local target="${ISUCON14_CHECKOUT_DIR}/provisioning/ansible/roles/isucon-user/templates/env.sh"
+  if [ -L "${ENV_SH_LINK}" ] && [ "$(readlink "${ENV_SH_LINK}")" = "${target}" ]; then
+    log "env.sh: symlink already up to date"
+  else
+    ln -sfn "${target}" "${ENV_SH_LINK}"
+    log "env.sh: symlink created"
+  fi
+}
+
 # cone modeはリポジトリルート直下のファイルも自動的に含むため、isuren-mondai自身の
 # mise.toml(Packer/AWSタスク定義。kakomon14のgo/nodeとは無関係)も一緒に取得されてしまう。
 # これが~/webapp/go等でmiseを実行する際にディレクトリ探索へ引っかかり、
@@ -124,5 +138,6 @@ link_isucon14
 link_webapp
 link_isucon14_into_upstream "webapp/sql"
 link_isucon14_into_upstream "frontend/public"
+link_env_sh
 
 log "50-source.sh: done"

@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="shellスクリプトをshfmtでフォーマットチェック(取り込んだ本家コードのupstream/配下は対象外)"
+#MISE description="shellスクリプトをshfmtでフォーマットチェック(取り込んだ本家コードのupstream/配下、参照用clone置き場のtmp/配下は対象外)"
 set -euo pipefail
-find . -name '*.sh' -not -path '*/upstream/*' -print0 | xargs -0 shfmt -d
+find . -name '*.sh' -not -path '*/upstream/*' -not -path '*/tmp/*' -print0 | xargs -0 shfmt -d
