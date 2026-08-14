@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="GitHub Actionsワークフローをghalintでポリシー検査"
+set -euo pipefail
+ghalint run

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="kakomon14のfrontendをビルドし、kakomon14/dist/にビルド成果物を出力"
+set -euo pipefail
+kakomon14/scripts/build-frontend-release.sh

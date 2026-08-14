@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="kakomon14/packerでpacker buildを実行(cloud-initでisucon14(Go)をプロビジョニング)"
+set -euo pipefail
+VPC_ID="$(aws cloudformation describe-stacks \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+# user-data.yaml.gzはprovisioning/配下から再生成可能なためgit管理していない。
+# ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。
+python3 kakomon14/cloud-init/generate-user-data.py
+cd kakomon14/packer
+# ビルドログを画面に出しつつファイルにも残す(AMI ID抽出のため)。pipefailにより
+# packer build自体の終了コードが失われない。
+BUILD_LOG="$(mktemp)"
+trap 'rm -f "$BUILD_LOG" frontend-release-tag.txt' EXIT
+packer build -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" empty.pkr.hcl | tee "$BUILD_LOG"
+AMI_ID="$(grep -oE 'ami-[0-9a-f]+' "$BUILD_LOG" | tail -n1)"
+
+# 80-frontend.sh(FRONTEND_RELEASE_TAG=latest)がPacker側へ渡した、実際に焼き込まれた
+# frontendの具体的なタグ。latestだとディスク中身だけでは追跡できないため、AMIタグに残す。
+RESOLVED_TAG="$(cat frontend-release-tag.txt)"
+aws ec2 create-tags --resources "$AMI_ID" \
+  --tags "Key=frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}"
+echo "AMI tagged: frontend=${RESOLVED_TAG}"

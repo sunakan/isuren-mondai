@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="GitHub Actionsのaction参照がSHA pinされているかをpinactで検査(--checkのため書き換えない)"
+set -euo pipefail
+pinact run --check

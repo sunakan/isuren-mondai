@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Packerビルド用の永続VPCを削除"
+set -euo pipefail
+aws cloudformation delete-stack --stack-name "$PACKER_NETWORK_STACK_NAME"
+aws cloudformation wait stack-delete-complete --stack-name "$PACKER_NETWORK_STACK_NAME"

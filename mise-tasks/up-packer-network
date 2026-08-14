@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Packerビルド用の永続VPCをデプロイ"
+set -euo pipefail
+aws cloudformation deploy \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --template-file packer-network.yaml

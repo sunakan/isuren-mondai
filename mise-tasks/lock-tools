@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="mise.tomlのtoolsをlinux-arm64/macos-arm64向けにlock(windows等は含めない)"
+set -euo pipefail
+mise lock -p linux-arm64,macos-arm64

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#MISE description="AMI_IDを指定してEC2を起動し、起動確認する(使い捨て)"
+set -euo pipefail
+AMI_ID="${1:?AMI_IDを指定してください(例: mise run verify-ami ami-xxxxx)}"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+aws cloudformation deploy \
+  --stack-name "verify-ami-${AMI_ID}" \
+  --template-file verify-ami.yaml \
+  --parameter-overrides AmiId="$AMI_ID" SubnetId="$SUBNET_ID" \
+  --capabilities CAPABILITY_IAM

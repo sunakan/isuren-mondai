@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#MISE description="verify-ami stackを一覧から選んで削除"
+#MISE interactive=true
+set -euo pipefail
+STACK_NAME="$(aws cloudformation describe-stacks \
+  --query "Stacks[?starts_with(StackName, 'verify-ami-')].StackName" --output text | tr '\t' '\n' | fzf)"
+if [ -z "$STACK_NAME" ]; then
+  echo "選択されませんでした" >&2
+  exit 1
+fi
+aws cloudformation delete-stack --stack-name "$STACK_NAME"
+aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
