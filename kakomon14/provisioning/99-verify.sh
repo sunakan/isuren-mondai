@@ -26,7 +26,14 @@ runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
 GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/goss"
 # isuride-go/payment_mockはsystemctl restart直後にport listenまで届いていないことがあり、
 # リトライ無しだとタイミング次第でport checkがfalse negativeになる(実機で確認済み)。
-"${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation --retry-timeout 30s --sleep 1s
+# それでも30秒のリトライ内に安定してリッスンしない事例が実機で確認されており(原因未特定)、
+# Packerは失敗するとインスタンスを即座に破棄するため、失敗時にジャーナルログをここで
+# ビルドログに残しておかないと次回以降も原因調査ができない。
+if ! "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation --retry-timeout 30s --sleep 1s; then
+  log "99-verify.sh: goss validate failed, dumping isuride-go/isuride-payment_mock journal"
+  journalctl -u isuride-go -u isuride-payment_mock --no-pager -n 100 || true
+  exit 1
+fi
 log "99-verify.sh: goss validate end"
 
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" uninstall "goss@${GOSS_VERSION}"
