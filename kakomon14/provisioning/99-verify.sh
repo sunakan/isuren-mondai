@@ -21,11 +21,9 @@ GOSS_VERSION="0.4.10"
 # ログをtailしないため、成功時に「本当に全項目を検証できたか」を確認する手段がここ以外に無い。
 log "99-verify.sh: goss validate start"
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
-GOSS_DIR="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")"
-GOSS_BIN="${GOSS_DIR}/bin/goss"
-# DEBUG: gossバイナリがNo such file or directoryになる原因調査用の一時ログ。原因判明後に削除する。
-log "99-verify.sh: DEBUG GOSS_DIR=${GOSS_DIR}"
-find "${GOSS_DIR}" -maxdepth 4 2>&1 || log "99-verify.sh: DEBUG find failed"
+# aqua経由のgossは他のmiseツールと異なりbin/配下ではなくインストールディレクトリ直下に
+# バイナリが展開される(実機のcloud-init-output.logで確認済み)。
+GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/goss"
 "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation
 log "99-verify.sh: goss validate end"
 
