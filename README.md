@@ -41,7 +41,7 @@ mise trust
 過去問間で共有する永続VPC。一度デプロイしたら基本的に消さない。
 
 ```bash
-mise packer:up-network
+mise run packer:up-network
 ```
 
 ## 2. 過去問ごとにPackerビルドする
@@ -49,7 +49,7 @@ mise packer:up-network
 現状はkakomon14のみ。cloud-init(`kakomon14/cloud-init/user-data.yaml.gz`)経由でisucon14(Go版)をプロビジョニングする。
 
 ```bash
-mise kakomon14:build
+mise run kakomon14:build
 ```
 
 成功すると末尾に `AMIs were created: ap-northeast-1: ami-xxxxxxxx` のようにAMI IDが出力される。
@@ -57,7 +57,7 @@ mise kakomon14:build
 ## 3. 作ったAMIから実際にEC2を起動して確認する
 
 ```bash
-mise verify-ami ami-xxxxxxxx
+mise run verify-ami ami-xxxxxxxx
 ```
 
 SSM経由で疎通確認する場合:
@@ -80,7 +80,7 @@ aws ssm get-command-invocation --region ap-northeast-1 \
 ## 4. 確認用インスタンスを片付ける
 
 ```bash
-mise down-verify-ami
+mise run down-verify-ami
 ```
 
 fzfでの一覧選択が使えない場合(AIエージェント等)は、直接スタック名を指定して削除する。
@@ -105,5 +105,5 @@ aws ec2 delete-snapshot --region ap-northeast-1 --snapshot-id "$SNAPSHOT_ID"
 ## Packerビルド用VPCを片付ける(基本不要)
 
 ```bash
-mise packer:down-network
+mise run packer:down-network
 ```
