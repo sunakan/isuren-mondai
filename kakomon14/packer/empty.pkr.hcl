@@ -93,7 +93,9 @@ source "amazon-ebs" "kakomon14" {
 
   # AWS管理キー(aws/ebs)での暗号化は追加課金なし(https://aws.amazon.com/kms/pricing/)。
   # kms_key_idを指定しない場合はaws/ebsが使われる。
-  encrypt_boot = true
+  # DEBUG: AMIスナップショット肥大化(8GiBボリュームなのにブロック使用率100%)の原因が
+  # 暗号化コピー(Copying/Encrypting AMI ...)によるものか切り分けるため、一時的にfalseにして検証する。
+  encrypt_boot = false
 
   # 実機のAMI検証(verify-ami)でdu -x /を実測したところ実データは3.2GBだった。EBSスナップショットは
   # 使用済みブロックを差分記録する仕組みのため、削除済みファイルの残骸ブロック(TRIM/discard未対応の
