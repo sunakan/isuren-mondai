@@ -93,9 +93,7 @@ source "amazon-ebs" "kakomon14" {
 
   # AWS管理キー(aws/ebs)での暗号化は追加課金なし(https://aws.amazon.com/kms/pricing/)。
   # kms_key_idを指定しない場合はaws/ebsが使われる。
-  # DEBUG: AMIスナップショット肥大化(8GiBボリュームなのにブロック使用率100%)の原因が
-  # 暗号化コピー(Copying/Encrypting AMI ...)によるものか切り分けるため、一時的にfalseにして検証する。
-  encrypt_boot = false
+  encrypt_boot = true
 
   # 実機のAMI検証(verify-ami)でdu -x /を実測したところ実データは3.2GBだった。EBSスナップショットは
   # 使用済みブロックを差分記録する仕組みのため、削除済みファイルの残骸ブロック(TRIM/discard未対応の
@@ -131,11 +129,6 @@ build {
       # このビルドログからstep/provisioning.allの開始終了時刻・ディスク使用量を抜き出しspan化する。
       "echo '--- span data ---'",
       "sudo sed -n '/\\[kakomon14\\] spans: begin/,/\\[kakomon14\\] spans: end/p' /var/log/cloud-init-output.log",
-      # DEBUG: AMIスナップショット肥大化(8GiBボリュームなのにブロック使用率100%)の原因切り分け用。
-      # EBSスナップショットは削除済みファイルの残骸ブロックをTRIM/discardしない限り解放済み扱いに
-      # ならないため、AMI化直前にfstrimでどれだけ解放されるか確認する。
-      "echo '--- fstrim ---'",
-      "sudo fstrim -v /",
     ]
   }
 
