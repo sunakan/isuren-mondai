@@ -31,12 +31,15 @@ def build_cloud_config() -> dict:
         # git init+remote add+fetch <SHA>+checkoutの構成にすることで、shallow(--depth 1)のまま
         # 任意のコミットを指定できる(50-source.shのsparse_checkout_fetchと同じ考え方)。
         # ENABLE_TLSは自己署名証明書生成のみでネットワーク到達性を要さないためtrue固定。
+        # 本番AMIでは1回きりのプロビジョニングのため、clone自体も実行後に削除する
+        # (50-source.shのcleanup_checkoutsと同じ理由: ディスク使用量・古い設定混入リスクを避ける)。
         "runcmd": [
             f"git init --quiet {CLONE_DIR}",
             f"git -C {CLONE_DIR} remote add origin {REPO_URL}",
             f"git -C {CLONE_DIR} fetch --quiet --depth 1 origin {commit}",
             f"git -C {CLONE_DIR} checkout --quiet {commit}",
             f"env ENABLE_TLS=true bash {PROVISIONING_DIR}/all.sh",
+            f"rm -rf {CLONE_DIR}",
         ],
     }
 

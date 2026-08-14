@@ -7,12 +7,3 @@ backend = "core:go"
 [tools.go."platforms.linux-arm64"]
 checksum = "sha256:fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
 url = "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz"
-
-[[tools.goss]]
-version = "0.4.10"
-backend = "aqua:goss-org/goss"
-
-[tools.goss."platforms.linux-arm64"]
-checksum = "sha256:90a59612b4d67d9f1a9038634c000790136bb82526a69de1e81ac075c2f6d2c6"
-url = "https://github.com/goss-org/goss/releases/download/v0.4.10/goss_0.4.10_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/goss-org/goss/releases/assets/490586444"

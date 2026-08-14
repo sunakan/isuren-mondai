@@ -7,14 +7,20 @@ source "${SCRIPT_DIR}/lib.sh"
 
 ISUREN_HOME="/home/${ISUREN_USER}"
 MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
+# gossはビルド時の検証にしか使わず、goと違い本番稼働中(チューニング中の再ビルド等)には一切
+# 使わないため、mise.ami.tomlには加えず、ここで一時的に取得し確認後に削除する
+# (goss.yaml自体は/opt/isuren-mondaiごと削除される。generate-user-data.py参照)。
+GOSS_VERSION="0.4.10"
 
 # provisioning各スクリプトが冪等コマンドの無条件実行(if判定なし)に簡略化されたため、
 # 「実際に意図通りの状態になったか」の確認はここに一本化する(goss.yaml参照)。
-# gossはisurenのmise管理下にインストールされるが、mysql -uroot等root権限が必要なチェックを
-# 含むため、フルパスを解決した上でroot(このスクリプト自体の実行ユーザー)として実行する
-# (30-runtime.sh・70-webapp-go.shと同じ「isurenのmiseでフルパス解決し、実行ユーザーは変える」パターン)。
-GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" which goss)"
+# mysql -uroot等root権限が必要なチェックを含むため、isurenのmiseでフルパス解決した上で
+# root(このスクリプト自体の実行ユーザー)として実行する(30-runtime.sh・70-webapp-go.shと同じパターン)。
+runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
+GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/bin/goss"
 
 "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation
+
+runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" uninstall "goss@${GOSS_VERSION}"
 
 log "99-verify.sh: done"
