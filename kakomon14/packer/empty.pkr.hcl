@@ -108,7 +108,13 @@ build {
   # 失敗時はPackerがインスタンスを即座に破棄してしまいログを見返せなくなるため、
   # 失敗を検知したらAMI化前にログをbuild出力へ吐いてから非ゼロ終了する。
   provisioner "shell" {
-    inline = ["sudo cloud-init status --wait || (echo '--- cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)"]
+    inline = [
+      "sudo cloud-init status --wait || (echo '--- cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)",
+      # 成功時はcloud-init-output.log全体をtailしないため、goss validateの結果だけが
+      # ビルドログから一切見えなくなる(99-verify.shが仕込むマーカー行で範囲を抜き出す)。
+      "echo '--- goss validate output ---'",
+      "sudo sed -n '/\\[kakomon14\\] 99-verify.sh: goss validate start/,/\\[kakomon14\\] 99-verify.sh: goss validate end/p' /var/log/cloud-init-output.log",
+    ]
   }
 
   # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest時)が解決した具体的なタグを取得する。

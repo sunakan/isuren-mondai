@@ -14,11 +14,18 @@ source scripts/lib.sh
 # EC2起動時のgit fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため事前に検知する。
 require_clean_worktree
 PROJECT_COMMIT="$(git rev-parse HEAD)"
+export PROJECT_COMMIT
 require_pushed_commit "${PROJECT_COMMIT}"
 
 # AMIタグ(Base)用。50-source.shのISUCON14_COMMIT(取り込み元isucon/isucon14のコミット)を
 # デフォルト値定義行から抽出する(この値を上書きしている箇所はリポジトリ内に無い)。
 ISUCON14_COMMIT="$(sed -nE 's/.*ISUCON14_COMMIT:=([0-9a-f]+).*/\1/p' kakomon14/provisioning/50-source.sh)"
+# 50-source.sh側の変数定義の書き方が変わってsedのパターンにマッチしなくなると空文字になり、
+# Baseタグが壊れた値のままビルドが成功してしまう(気づけない)ため、抽出結果を検証する。
+if [ -z "${ISUCON14_COMMIT}" ]; then
+  echo "エラー: kakomon14/provisioning/50-source.shからISUCON14_COMMITを抽出できませんでした。" >&2
+  exit 1
+fi
 
 # user-data.yamlはprovisioning/配下から再生成可能なためgit管理していない。
 # ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。

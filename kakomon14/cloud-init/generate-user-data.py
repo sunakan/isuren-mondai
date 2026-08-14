@@ -4,15 +4,18 @@
 provisioning/配下のファイル自体はuser-dataに埋め込まず、EC2起動時にこのリポジトリ自身を
 git clone(HEADのコミットに固定)して取得する。これにより埋め込み対象ファイルの手動管理
 (FILESリスト)やEC2 User Dataの16KB制限回避(gzip)が丸ごと不要になる。
+
+git cloneするコミットは呼び出し元(mise-tasks/kakomon14/build)が計算したPROJECT_COMMITを
+環境変数で受け取る。ここで独自にgit rev-parse HEADを再計算すると、AMIタグ(Project)が指す
+コミットと実際にcloneされるコミットが理論上ズレうる。
 """
 
+import os
 import pathlib
-import subprocess
 
 import yaml
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent
 OUTPUT_FILE = SCRIPT_DIR / "user-data.yaml"
 REPO_URL = "https://github.com/sunakan/isuren-mondai.git"
 CLONE_DIR = "/opt/isuren-mondai"
@@ -20,13 +23,7 @@ PROVISIONING_DIR = f"{CLONE_DIR}/kakomon14/provisioning"
 
 
 def build_cloud_config() -> dict:
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
+    commit = os.environ["PROJECT_COMMIT"]
     return {
         # git init+remote add+fetch <SHA>+checkoutの構成にすることで、shallow(--depth 1)のまま
         # 任意のコミットを指定できる(50-source.shのsparse_checkout_fetchと同じ考え方)。

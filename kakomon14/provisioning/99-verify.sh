@@ -19,7 +19,12 @@ GOSS_VERSION="0.4.10"
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
 GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/bin/goss"
 
+# ビルド成功時、Packer側(empty.pkr.hcl)がこの開始/終了ログをマーカーにcloud-init-output.logから
+# goss validateの出力だけを抜き出してビルドログに出す。cloud-init status --waitは失敗時しか
+# ログをtailしないため、成功時に「本当に全項目を検証できたか」を確認する手段がここ以外に無い。
+log "99-verify.sh: goss validate start"
 "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation
+log "99-verify.sh: goss validate end"
 
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" uninstall "goss@${GOSS_VERSION}"
 
