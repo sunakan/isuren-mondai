@@ -7,13 +7,43 @@ source "${SCRIPT_DIR}/lib.sh"
 
 log "start"
 
-# AMIスナップショット肥大化(実データ3.2GBに対し9GiB超)の原因調査用に、各ステップの前後で
-# ディスク使用量を記録する。
+# Mac側がPacker build完了後に$BUILD_LOGからこのマーカーで囲まれた範囲を抜き出し、各stepの
+# 開始/終了時刻・ディスク使用量・exit statusからspanを事後生成する(99-verify.shのgoss出力
+# 抽出と同じパターン)。empty.pkr.hclはprovisioning成功時(マーカーファイル検出時)のみこの範囲を
+# sed抽出してビルドログに出すため、"spans: end"は必ずtrap側(下記)で出す必要がある
+# (成功時にscript本体の最後にログ出力しても、$BUILD_LOGにはこの範囲外の行が一切載らないため)。
+log "spans: begin"
+log "provisioning.all: disk_total_bytes=$(disk_total_bytes)"
+# Mac側(mise-tasks/kakomon14/build)がPacker build前に生成したTRACEPARENTが、cloud-init経由で
+# 本当にここまで伝播したかをログから検証できるようにする(Mac側は生成した値を無条件に信じず、
+# このログ行から抽出した値と突き合わせる)。disk_beforeは全step実行前(=provisioning全体としての
+# 開始時点)のディスク使用量で、各stepのdisk_before/disk_afterとは別に全体の増分を見るためのもの。
+log "provisioning.all: start_ns=$(now_ns) disk_before=$(disk_used_bytes) traceparent=${TRACEPARENT:-<unset>}"
+
+# provisioning.all span(全stepをまとめてEC2側全体を表すspan)の終了記録・"spans: end"は、
+# 途中のstepが失敗してset -eによりall.shが中断されても確実に出力されるよう、EXIT trapで保証する。
+# $?を最初の行で捕まえてから使う(traps内でも通常の関数同様、localの前に他のコマンドを挟むと
+# $?が上書きされる)。
+record_provisioning_all_end() {
+  local status=$?
+  log "provisioning.all: end_ns=$(now_ns) disk_after=$(disk_used_bytes) exit_status=${status}"
+  log "spans: end"
+}
+trap record_provisioning_all_end EXIT
+
 run_step() {
   local script="$1"
-  log "disk usage before ${script}: $(df -h / | awk 'NR==2{print $3}')"
-  bash "${SCRIPT_DIR}/${script}"
-  log "disk usage after ${script}: $(df -h / | awk 'NR==2{print $3}')"
+  local start_ns
+  start_ns="$(now_ns)"
+  local disk_before
+  disk_before="$(disk_used_bytes)"
+  # bash "${SCRIPT_DIR}/${script}"を裸のトップレベルコマンドのまま置くと、失敗時にset -eが
+  # ここで即座にall.shを打ち切ってしまい、以降のlog行(end_ns/disk_after/exit_status)に
+  # 到達できない。||で失敗を捕まえてから使うことで最後まで到達させる。
+  local status=0
+  bash "${SCRIPT_DIR}/${script}" || status=$?
+  log "step: script=${script} start_ns=${start_ns} end_ns=$(now_ns) disk_before=${disk_before} disk_after=$(disk_used_bytes) exit_status=${status}"
+  return "$status"
 }
 
 run_step 10-base.sh

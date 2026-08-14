@@ -13,12 +13,23 @@ IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
 
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
 # user-data.yamlはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだと
 # EC2起動時のgit fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため事前に検知する。
 require_clean_worktree
 PROJECT_COMMIT="$(git rev-parse HEAD)"
 export PROJECT_COMMIT
 require_pushed_commit "${PROJECT_COMMIT}"
+
+# OTel trace化用。EC2側(all.sh)はこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信は
+# 一切行わない(APIキーをEC2/AMIへ渡さないための設計。詳細はscripts/otel.sh参照)。
+# tracing無効時(OTEL_EXPORTER_OTLP_ENDPOINT未設定)でも生成自体は行う(コストが無視できるほど
+# 小さいため、if分岐で複雑にするより常に生成した方がシンプル)。
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export TRACEPARENT
 
 # AMIタグ(Base)用。50-source.shのISUCON14_COMMIT(取り込み元isucon/isucon14のコミット)を
 # デフォルト値定義行から抽出する(この値を上書きしている箇所はリポジトリ内に無い)。
@@ -34,22 +45,63 @@ fi
 # ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。
 python3 kakomon14/cloud-init/generate-user-data.py
 cd kakomon14/packer
-# ビルドログを画面に出しつつファイルにも残す(AMI ID抽出のため)。pipefailにより
-# packer build自体の終了コードが失われない。
+# ビルドログを画面に出しつつファイルにも残す(AMI ID抽出・span化のため)。
 BUILD_LOG="$(mktemp)"
 trap 'rm -f "$BUILD_LOG" frontend-release-tag.txt' EXIT
+
+# packer buildのexit codeをotel送信のために明示的に捕まえた上でスクリプトを継続させる。
+# BUILD_EXITが非ゼロの場合、以降のAMI ID抽出・タグ付けは実行しない(下のif分岐参照)。
+# 誤って"if ! packer build ... ; then BUILD_EXIT=$?; fi"のように書くと、$?がif !自体の結果に
+# なり常に0になってしまうので注意。
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
 packer build \
   -var "vpc_id=$VPC_ID" \
   -var "subnet_id=$SUBNET_ID" \
   -var "iam_instance_profile=$IAM_INSTANCE_PROFILE" \
   -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
   -var "base_url=https://github.com/isucon/isucon14/commit/${ISUCON14_COMMIT}" \
-  empty.pkr.hcl | tee "$BUILD_LOG"
-AMI_ID="$(grep -oE 'ami-[0-9a-f]+' "$BUILD_LOG" | tail -n1)"
+  empty.pkr.hcl | tee "$BUILD_LOG" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
 
-# 80-frontend.sh(FRONTEND_RELEASE_TAG=latest)がPacker側へ渡した、実際に焼き込まれた
-# frontendの具体的なタグ。latestだとディスク中身だけでは追跡できないため、AMIタグに残す。
-RESOLVED_TAG="$(cat frontend-release-tag.txt)"
-aws ec2 create-tags --resources "$AMI_ID" \
-  --tags "Key=Frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}"
-echo "AMI tagged: Frontend=${RESOLVED_TAG}"
+# 従来はset -eがpacker build失敗時に即座にスクリプトを打ち切っていたため、以降のAMI ID抽出・
+# タグ付けに到達しないことが安全装置になっていた。BUILD_EXITを捕まえて処理を継続させる以上、
+# この安全装置をここで明示的に再現する必要がある(失敗時にgrepが無関係なAMI ID、例えば
+# data.amazon-amiが解決したUbuntu AMI IDを誤って拾い、他人のAMIへタグ付けする事故を防ぐ)。
+if [ "$BUILD_EXIT" -eq 0 ]; then
+  AMI_ID="$(grep -oE 'ami-[0-9a-f]+' "$BUILD_LOG" | tail -n1)"
+
+  # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest)がPacker側へ渡した、実際に焼き込まれた
+  # frontendの具体的なタグ。latestだとディスク中身だけでは追跡できないため、AMIタグに残す。
+  RESOLVED_TAG="$(cat frontend-release-tag.txt)"
+  aws ec2 create-tags --resources "$AMI_ID" \
+    --tags "Key=Frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}"
+  echo "AMI tagged: Frontend=${RESOLVED_TAG}"
+fi
+
+# trace送信はここまでの処理(AMI ID抽出・タグ付け)の後、スクリプトの最後に行う。送信の成否は
+# BUILD_EXITに一切影響しない(otel_span/otel_emit_provisioning_spansは失敗しても呼び出し元を
+# 落とさない設計。scripts/otel.sh参照)。
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE="ok"
+  if [ "$BUILD_EXIT" -ne 0 ]; then
+    ROOT_STATUS_CODE="error"
+  fi
+  # kindはinternalではなくserverにする。MackerelのAPMトレース一覧は、root spanがserver kindの
+  # トレースしか一覧に出さない仕様(未文書化。実際に検証して判明した)。子span(provisioning.all・
+  # 各step)は実態通りinternalのままでよい(一覧表示にはroot spanのkindだけが影響する)。
+  otel_span \
+    --service "${OTEL_SERVICE_NAME:-kakomon14-ami-build}" \
+    --name "packer.build" \
+    --kind server \
+    --force-trace-id "$TRACE_ID" \
+    --force-span-id "$ROOT_SPAN_ID" \
+    --start "$BUILD_START_EPOCH" \
+    --end "$BUILD_END_EPOCH" \
+    --status-code "$ROOT_STATUS_CODE"
+  otel_emit_provisioning_spans "$BUILD_LOG" "$TRACE_ID" "$ROOT_SPAN_ID"
+fi
+
+# 最後に実行されたコマンド(otel_span等)がexit 0で終わるため、これが無いと packer build自体が
+# 失敗していてもmiseタスクとしては成功扱いになってしまう。
+exit "$BUILD_EXIT"

@@ -127,6 +127,10 @@ build {
       # ビルドログから一切見えなくなる(99-verify.shが仕込むマーカー行で範囲を抜き出す)。
       "echo '--- goss validate output ---'",
       "sudo sed -n '/\\[kakomon14\\] 99-verify.sh: goss validate start/,/\\[kakomon14\\] 99-verify.sh: goss validate end/p' /var/log/cloud-init-output.log",
+      # OTel trace化用の生データ(all.sh参照)。mise-tasks/kakomon14/buildがpacker build完了後に
+      # このビルドログからstep/provisioning.allの開始終了時刻・ディスク使用量を抜き出しspan化する。
+      "echo '--- span data ---'",
+      "sudo sed -n '/\\[kakomon14\\] spans: begin/,/\\[kakomon14\\] spans: end/p' /var/log/cloud-init-output.log",
     ]
   }
 

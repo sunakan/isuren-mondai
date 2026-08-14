@@ -12,6 +12,8 @@ config_roots = ["kakomon14/scripts"]
 "aqua:zizmor" = "latest"
 "aqua:ghalint" = "latest"
 "aqua:suzuki-shunsuke/pinact" = "latest"
+# kakomon14:buildがPacker AMIビルドのOTel trace送信に使う(Mac側のみ。EC2側には入れない)。
+"aqua:equinix-labs/otel-cli" = "latest"
 
 [env]
 AWS_REGION = "ap-northeast-1"

@@ -24,6 +24,10 @@ PROVISIONING_DIR = f"{CLONE_DIR}/kakomon14/provisioning"
 
 def build_cloud_config() -> dict:
     commit = os.environ["PROJECT_COMMIT"]
+    # OTel trace化用(mise-tasks/kakomon14/buildが生成)。未設定(単体実行時等)は空文字を許容する。
+    # all.shはこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信はEC2側では一切行わない
+    # (APIキーをEC2/AMIへ渡さない設計。scripts/otel.sh参照)。
+    traceparent = os.environ.get("TRACEPARENT", "")
     return {
         # git init+remote add+fetch <SHA>+checkoutの構成にすることで、shallow(--depth 1)のまま
         # 任意のコミットを指定できる(50-source.shのsparse_checkout_fetchと同じ考え方)。
@@ -35,7 +39,7 @@ def build_cloud_config() -> dict:
             f"git -C {CLONE_DIR} remote add origin {REPO_URL}",
             f"git -C {CLONE_DIR} fetch --quiet --depth 1 origin {commit}",
             f"git -C {CLONE_DIR} checkout --quiet {commit}",
-            f"env ENABLE_TLS=true bash {PROVISIONING_DIR}/all.sh",
+            f"env ENABLE_TLS=true TRACEPARENT={traceparent} bash {PROVISIONING_DIR}/all.sh",
             f"rm -rf {CLONE_DIR}",
         ],
     }
