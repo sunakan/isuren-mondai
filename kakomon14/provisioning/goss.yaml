@@ -104,9 +104,15 @@ service:
 port:
   tcp:80:
     listening: true
-  tcp:8080:
+  # 70-webapp-go.sh / 77-payment-mock.sh: 本家コード(http.ListenAndServe(":8080", ...)等)が
+  # アドレス省略のため、Ubuntu 26.04ではIPv6ソケットとして待受される(IPv4接続はdual-stackで
+  # 透過的に受け付ける。実際に127.0.0.1からの接続を処理できることを確認済み)。
+  # goss(既知バグ: https://github.com/goss-org/goss/issues/1006)はプレフィックス無しの
+  # tcp:や明示的なtcp4:だとdual-stack環境でfalse negativeになる(実機で確認済み)ため、
+  # tcp6:を明示する。
+  tcp6:8080:
     listening: true
-  tcp:12345:
+  tcp6:12345:
     listening: true
 
 command:
