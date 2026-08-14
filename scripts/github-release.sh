@@ -9,7 +9,7 @@ usage() {
   cat <<'EOS'
 Usage: scripts/github-release.sh <tag> <artifact-path>...
 
-  <tag>            リリースタグ(例: kakomon14-v1.0.0)
+  <tag>            リリースタグ(例: kakomon14-frontend-v1.0.0)
   <artifact-path>  Releaseに添付するファイル(複数指定可)
 
 過去問ごとに再利用できるよう、タグ以外はハードコードしていない。
