@@ -32,6 +32,8 @@ FILES = [
     "80-frontend.sh",
     "90-nginx.sh",
     "95-deploy-helper.sh",
+    "99-verify.sh",
+    "goss.yaml",
     "all.sh",
     "mise.ami.toml",
     "mise.ami.lock",

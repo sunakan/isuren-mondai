@@ -19,5 +19,6 @@ bash "${SCRIPT_DIR}/77-payment-mock.sh"
 bash "${SCRIPT_DIR}/80-frontend.sh"
 bash "${SCRIPT_DIR}/90-nginx.sh"
 bash "${SCRIPT_DIR}/95-deploy-helper.sh"
+bash "${SCRIPT_DIR}/99-verify.sh"
 
 log "all.sh: done"

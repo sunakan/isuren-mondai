@@ -1,0 +1,142 @@
+# provisioning完了後のAMI状態を検証するgoss spec。
+# 各provisioningスクリプトのifを冪等コマンドの無条件実行に簡略化した(commit 2c309af)ため、
+# 「実際に意図通りの状態になったか」の確認はここに一本化する(99-verify.sh参照)。
+
+file:
+  # 10-base.sh
+  /etc/security/limits.d/99-isuren.conf:
+    exists: true
+  /etc/hosts:
+    exists: true
+    contains:
+      - "127.0.0.1 isuride.xiv.isuren.internal"
+
+  # 20-user.sh
+  /home/isuren:
+    exists: true
+    filetype: directory
+    mode: "0755"
+  /etc/sudoers.d/99-isuren-user:
+    exists: true
+    owner: root
+    group: root
+    mode: "0440"
+
+  # 50-source.sh: シンボリックリンクではなく実ファイルとしてデプロイされていること
+  # (systemdのWorkingDirectory罠を避けるための方式変更。実際に反映されたかは今まで未検証だった)
+  /home/isuren/isucon14:
+    exists: true
+    filetype: directory
+  /home/isuren/webapp:
+    exists: true
+    filetype: directory
+  /home/isuren/env.sh:
+    exists: true
+    filetype: file
+  # 50-source.sh: 取得用の一時ディレクトリはデプロイ後に削除されている
+  /home/isuren/.isuren-mondai-upstream:
+    exists: false
+  /home/isuren/.isucon14-upstream:
+    exists: false
+
+  # 70-webapp-go.sh / 77-payment-mock.sh: ビルド成果物
+  /home/isuren/webapp/go/isuride:
+    exists: true
+    filetype: file
+  /home/isuren/webapp/payment_mock/payment_mock:
+    exists: true
+    filetype: file
+
+  # 80-frontend.sh
+  /home/isuren/webapp/public:
+    exists: true
+    filetype: directory
+
+  # 90-nginx.sh
+  /etc/nginx/sites-enabled/isuride.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /etc/nginx/sites-available/isuride.conf
+  /etc/nginx/sites-enabled/default:
+    exists: false
+
+  # 95-deploy-helper.sh
+  /home/isuren/deploy.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+
+group:
+  isuren:
+    exists: true
+    gid: 1100
+
+user:
+  isuren:
+    exists: true
+    uid: 1100
+    groups:
+      - isuren
+
+package:
+  mysql-server:
+    installed: true
+  nginx:
+    installed: true
+
+service:
+  mysql:
+    enabled: true
+    running: true
+  nginx:
+    enabled: true
+    running: true
+  isuride-go:
+    enabled: true
+    running: true
+  isuride-matcher:
+    enabled: true
+    running: true
+  isuride-payment_mock:
+    enabled: true
+    running: true
+
+port:
+  tcp:80:
+    listening: true
+  tcp:8080:
+    listening: true
+  tcp:12345:
+    listening: true
+
+command:
+  # 10-base.sh
+  timezone:
+    exec: "timedatectl show -p Timezone --value"
+    stdout:
+      - "UTC"
+    exit-status: 0
+  sysctl-port-range:
+    exec: "sysctl -n net.ipv4.ip_local_port_range"
+    stdout:
+      - "10000"
+      - "65535"
+    exit-status: 0
+
+  # 40-mysql.sh / 60-initdb.sh: 本家0-init.sqlが作るisucon@'%'ユーザーのみ存在し、
+  # isuren-mondai側で自作のisurenユーザーは存在しないこと(AGENTS.md「ISUCON商標対応」参照)
+  mysql-isucon-user-exists:
+    exec: "mysql -uroot -N -e \"SELECT COUNT(*) FROM mysql.user WHERE User='isucon'\""
+    stdout:
+      - "1"
+    exit-status: 0
+  mysql-isuren-user-absent:
+    exec: "mysql -uroot -N -e \"SELECT COUNT(*) FROM mysql.user WHERE User='isuren'\""
+    stdout:
+      - "0"
+    exit-status: 0
+  mysql-isuride-database-exists:
+    exec: "mysql -uroot -N -e \"SHOW DATABASES LIKE 'isuride'\""
+    stdout:
+      - "isuride"
+    exit-status: 0

@@ -1,2 +1,8 @@
 [tools]
 go = "1.26.5"
+# gossはprovisioning検証専用ツール(アプリの実行に関与しない)のため、goのような厳密なバージョン
+# 固定はせずlatestにする。実際の再現性・改ざん検知はmise.ami.lockのチェックサム固定で担保する
+# (30-runtime.shのset_mise_lock参照)。ただしmiseのaqua registryスナップショットにより
+# "latest"が本当の最新から古いバージョンに解決されることがある(mise運用上のハマりどころ参照)ため、
+# mise lock再生成時は解決されたバージョンが極端に古くないか目視確認すること。
+goss = "latest"
