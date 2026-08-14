@@ -33,13 +33,17 @@ variable "base_url" {
 }
 
 locals {
+  # timestamp()は呼び出すたびに評価され値が変わりうる(公式ドキュメントに明記)ため、
+  # Name/Timestampタグで別々に呼ぶと評価タイミングのズレで秒単位の不一致が起こりうる。
+  # 1回だけ呼んでlocalに固定し、両方から共有する。
+  build_time = timestamp()
   # AMI Nameは文字種制限(+・:が使えない)があるため、ISO8601のUTC基本形式(Z表記)にする。
-  name = "isuren/kakomon14-${formatdate("YYYYMMDD'T'hhmmss", timestamp())}Z"
+  name = "isuren/kakomon14-${formatdate("YYYYMMDD'T'hhmmss", local.build_time)}Z"
   # NameとことなりタグのValueには文字種制限が無いため、こちらはISO8601拡張形式でJSTの
   # 正しいオフセット表記(+09:00)にする。timeaddでUTC瞬間を+9hずらしてからformatdateしているのは
   # HCLにタイムゾーン変換関数が無いため(実際にタイムゾーン変換しているわけではなく、
   # 表示上のJST値を作るための数値加算。付与する+09:00はこの値に対応する文字列)。
-  timestamp_jst = "${formatdate("YYYY-MM-DD'T'hh:mm:ss", timeadd(timestamp(), "9h"))}+09:00"
+  timestamp_jst = "${formatdate("YYYY-MM-DD'T'hh:mm:ss", timeadd(local.build_time, "9h"))}+09:00"
   ami_tags = {
     Name      = local.name
     Project   = var.project_url
