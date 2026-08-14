@@ -131,6 +131,11 @@ build {
       # このビルドログからstep/provisioning.allの開始終了時刻・ディスク使用量を抜き出しspan化する。
       "echo '--- span data ---'",
       "sudo sed -n '/\\[kakomon14\\] spans: begin/,/\\[kakomon14\\] spans: end/p' /var/log/cloud-init-output.log",
+      # DEBUG: AMIスナップショット肥大化(8GiBボリュームなのにブロック使用率100%)の原因切り分け用。
+      # EBSスナップショットは削除済みファイルの残骸ブロックをTRIM/discardしない限り解放済み扱いに
+      # ならないため、AMI化直前にfstrimでどれだけ解放されるか確認する。
+      "echo '--- fstrim ---'",
+      "sudo fstrim -v /",
     ]
   }
 
