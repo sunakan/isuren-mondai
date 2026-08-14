@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="tmp/all-kakomon/isucon14とupstream/isucon14のgo・sqlをunified diffで比較する"
+set -euo pipefail
+
+SRC="tmp/all-kakomon/isucon14"
+DST="upstream/isucon14"
+
+if [ ! -d "${SRC}" ]; then
+  echo "エラー: ${SRC} が存在しません。先に mise run kakomon14:refresh-upstream を実行してください。" >&2
+  exit 1
+fi
+
+# diffは差分があると終了コード1を返す(エラーではない)ため、set -eで途中終了しないよう
+# 各呼び出しに || trueを付ける。
+diff -ru "${DST}/webapp/go" "${SRC}/webapp/go" || true
+diff -ru "${DST}/webapp/sql" "${SRC}/webapp/sql" || true
