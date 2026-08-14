@@ -17,14 +17,18 @@ OUTPUT_FILE = SCRIPT_DIR / "user-data.yaml"
 OUTPUT_FILE_GZ = SCRIPT_DIR / "user-data.yaml.gz"
 REMOTE_DIR = "/opt/kakomon14/provisioning"
 
-# .shは自動収集する(新規スクリプト追加時にこのリストへの追記を忘れる事故を防ぐ)。
+# .sh・systemd/*.serviceは自動収集する(新規ファイル追加時にこのリストへの追記を忘れる事故を防ぐ)。
 # READMEはプロビジョニングの実行に不要なので対象外。write_filesの配置順は実行順に影響しない
 # (実行順はall.sh側が握る)ため、ソートのみで十分。
-FILES = sorted(p.name for p in PROVISIONING_DIR.glob("*.sh")) + [
-    "goss.yaml",
-    "mise.ami.toml",
-    "mise.ami.lock",
-]
+FILES = (
+    sorted(p.name for p in PROVISIONING_DIR.glob("*.sh"))
+    + sorted(f"systemd/{p.name}" for p in (PROVISIONING_DIR / "systemd").glob("*.service"))
+    + [
+        "goss.yaml",
+        "mise.ami.toml",
+        "mise.ami.lock",
+    ]
+)
 
 
 def build_cloud_config() -> dict:

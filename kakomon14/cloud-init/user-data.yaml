@@ -28,15 +28,15 @@ write_files:
 - path: /opt/kakomon14/provisioning/70-webapp-go.sh
   owner: root:root
   permissions: '0644'
-  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nWEBAPP_GO_DIR=\"${ISUREN_HOME}/webapp/go\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-go.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/go.yaml L9-15\n# 再ビルドのたびにサービス再起動が必要なため、changed/already判定はせず常にビルドする。\n# runuser経由では.bashrcを経由せずmiseがPATHに乗らないため、mise本体はフルパスで呼ぶ。\nbuild_isuride_go() {\n  # shellcheck disable=SC2016 # env経由で渡したWEBAPP_GO_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env WEBAPP_GO_DIR=\"${WEBAPP_GO_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${WEBAPP_GO_DIR}\" && \"${MISE_BIN}\" exec -- go build -o \"${WEBAPP_GO_DIR}/isuride\" -ldflags \"-s -w\"'\n  log \"isuride-go: built\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-go.service\n# isucon->isurenに読み替え(User/Group/WorkingDirectory/EnvironmentFileのパス)。サービス名・ExecStartは据え置き。\n# WorkingDirectoryは/api/initializeが相対パス../sql/init.shを呼ぶため必須。\nset_systemd_unit() {\n  local content\n  content=$(\n    cat <<EOD\n[Unit]\nDescription=isuride-go\nAfter=syslog.target\nAfter=mysql.service\nRequires=mysql.service\n\n[Service]\nWorkingDirectory=${WEBAPP_GO_DIR}\nEnvironmentFile=${ISUREN_HOME}/env.sh\n\nUser=${ISUREN_USER}\nGroup=${ISUREN_USER}\nExecStart=${WEBAPP_GO_DIR}/isuride\nExecStop=/bin/kill -s QUIT \\$MAINPID\n\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOD\n  )\n  echo \"${content}\" >\"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする。\nrestart_service() {\n  systemctl enable isuride-go\n  systemctl restart isuride-go\n  log \"isuride-go service: enabled and restarted\"\n}\n\nbuild_isuride_go\nset_systemd_unit\nrestart_service\n\nlog \"70-webapp-go.sh: done\"\n"
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nWEBAPP_GO_DIR=\"${ISUREN_HOME}/webapp/go\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-go.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/go.yaml L9-15\n# 再ビルドのたびにサービス再起動が必要なため、changed/already判定はせず常にビルドする。\n# runuser経由では.bashrcを経由せずmiseがPATHに乗らないため、mise本体はフルパスで呼ぶ。\nbuild_isuride_go() {\n  # shellcheck disable=SC2016 # env経由で渡したWEBAPP_GO_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env WEBAPP_GO_DIR=\"${WEBAPP_GO_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${WEBAPP_GO_DIR}\" && \"${MISE_BIN}\" exec -- go build -o \"${WEBAPP_GO_DIR}/isuride\" -ldflags \"-s -w\"'\n  log \"isuride-go: built\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-go.service\n# isucon->isurenに読み替え(User/Group/WorkingDirectory/EnvironmentFileのパス)。サービス名・ExecStartは据え置き。\n# WorkingDirectoryは/api/initializeが相対パス../sql/init.shを呼ぶため必須。\n# ISUREN_USERは実際にはisuren固定でしか使われない(上書きされている箇所がリポジトリ内に無い)ため、\n# 展開済みの静的ファイルとして持つ(systemd/参照。原本のisuride-go.serviceも静的ファイル)。\nset_systemd_unit() {\n  install -m 0644 \"${SCRIPT_DIR}/systemd/isuride-go.service\" \"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする。\nrestart_service() {\n  systemctl enable isuride-go\n  systemctl restart isuride-go\n  log \"isuride-go service: enabled and restarted\"\n}\n\nbuild_isuride_go\nset_systemd_unit\nrestart_service\n\nlog \"70-webapp-go.sh: done\"\n"
 - path: /opt/kakomon14/provisioning/75-matcher.sh
   owner: root:root
   permissions: '0644'
-  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-matcher.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-matcher.service\n# isucon->isurenに読み替え。Go版のみに絞る方針のため、他言語(node/perl/php/python/ruby/rust)への\n# Afterは削除しisuride-go.serviceのみ残す。curl先は公式のhttps://isuride.xiv.isucon.net経由(nginx/TLS依存)\n# ではなくhttp://127.0.0.1:8080への直叩きに変更し、nginx/TLSを丸ごとバイパスする。\nset_systemd_unit() {\n  local content\n  content=$(\n    cat <<EOD\n[Unit]\nDescription=isuride-matcher\nAfter=isuride-go.service\n\n[Service]\nUser=${ISUREN_USER}\nGroup=${ISUREN_USER}\nEnvironmentFile=${ISUREN_HOME}/env.sh\n\nExecStart=/bin/sh -c \"while true; do curl -s http://127.0.0.1:8080/api/internal/matching; sleep \\$ISUCON_MATCHING_INTERVAL; done\"\nExecStop=/bin/kill -s QUIT \\$MAINPID\n\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOD\n  )\n  echo \"${content}\" >\"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しい内容を反映させるため、changed/already判定はせず常にrestartする(70-webapp-go.shと同じ方針)。\nstart_service() {\n  systemctl enable isuride-matcher\n  systemctl restart isuride-matcher\n  log \"isuride-matcher service: enabled and restarted\"\n}\n\nset_systemd_unit\nstart_service\n\nlog \"75-matcher.sh: done\"\n"
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-matcher.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-matcher.service\n# isucon->isurenに読み替え。Go版のみに絞る方針のため、他言語(node/perl/php/python/ruby/rust)への\n# Afterは削除しisuride-go.serviceのみ残す。curl先は公式のhttps://isuride.xiv.isucon.net経由(nginx/TLS依存)\n# ではなくhttp://127.0.0.1:8080への直叩きに変更し、nginx/TLSを丸ごとバイパスする。\n# ISUREN_USERは実際にはisuren固定でしか使われない(上書きされている箇所がリポジトリ内に無い)ため、\n# 展開済みの静的ファイルとして持つ(systemd/参照。原本のisuride-matcher.serviceも静的ファイル)。\nset_systemd_unit() {\n  install -m 0644 \"${SCRIPT_DIR}/systemd/isuride-matcher.service\" \"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しい内容を反映させるため、changed/already判定はせず常にrestartする(70-webapp-go.shと同じ方針)。\nstart_service() {\n  systemctl enable isuride-matcher\n  systemctl restart isuride-matcher\n  log \"isuride-matcher service: enabled and restarted\"\n}\n\nset_systemd_unit\nstart_service\n\nlog \"75-matcher.sh: done\"\n"
 - path: /opt/kakomon14/provisioning/77-payment-mock.sh
   owner: root:root
   permissions: '0644'
-  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nPAYMENT_MOCK_DIR=\"${ISUREN_HOME}/webapp/payment_mock\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-payment_mock.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/payment_mock.yaml\n# webappと同じ考え方(70-webapp-go.sh)でrunuser経由でもmiseがPATHに乗るようフルパスで呼ぶ。\nbuild_payment_mock() {\n  # shellcheck disable=SC2016 # env経由で渡したPAYMENT_MOCK_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env PAYMENT_MOCK_DIR=\"${PAYMENT_MOCK_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${PAYMENT_MOCK_DIR}\" && \"${MISE_BIN}\" exec -- go build -o \"${PAYMENT_MOCK_DIR}/payment_mock\" -ldflags \"-s -w\"'\n  log \"payment_mock: built\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-payment_mock.service\n# isucon->isurenに読み替え。payment_mock(main.go)はDBを一切使わない(決済履歴はプロセス内メモリのmapで\n# 保持するのみ)ため、本家unitにあるAfter=mysql.service/Requires=mysql.serviceは含めない。\n# 本家はwebapp配置候補の全サーバーにこれを常駐させ:12345固定で待ち受けさせる方式\n# (docs/ISURIDE.md「決済マイクロサービスのモックについて」)。分離サーバー構成を見据え、\n# 単一AMI構成の現状でもwebappと同様に常駐させておく。\nset_systemd_unit() {\n  local content\n  content=$(\n    cat <<EOD\n[Unit]\nDescription=isuride-payment_mock\nAfter=syslog.target\n\n[Service]\nWorkingDirectory=${PAYMENT_MOCK_DIR}\n\nUser=${ISUREN_USER}\nGroup=${ISUREN_USER}\nExecStart=${PAYMENT_MOCK_DIR}/payment_mock\nExecStop=/bin/kill -s QUIT \\$MAINPID\n\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOD\n  )\n  echo \"${content}\" >\"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする(70-webapp-go.shと同じ方針)。\nrestart_service() {\n  systemctl enable isuride-payment_mock\n  systemctl restart isuride-payment_mock\n  log \"isuride-payment_mock service: enabled and restarted\"\n}\n\nbuild_payment_mock\nset_systemd_unit\nrestart_service\n\nlog \"77-payment-mock.sh: done\"\n"
+  content: "#!/usr/bin/env bash\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n# shellcheck source=./lib.sh\nsource \"${SCRIPT_DIR}/lib.sh\"\n\nISUREN_HOME=\"/home/${ISUREN_USER}\"\nMISE_BIN=\"${ISUREN_HOME}/.local/bin/mise\"\nPAYMENT_MOCK_DIR=\"${ISUREN_HOME}/webapp/payment_mock\"\nSYSTEMD_UNIT=\"/etc/systemd/system/isuride-payment_mock.service\"\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/tasks/payment_mock.yaml\n# webappと同じ考え方(70-webapp-go.sh)でrunuser経由でもmiseがPATHに乗るようフルパスで呼ぶ。\nbuild_payment_mock() {\n  # shellcheck disable=SC2016 # env経由で渡したPAYMENT_MOCK_DIR/MISE_BINをsh -c内で展開させる\n  runuser -u \"${ISUREN_USER}\" -- env PAYMENT_MOCK_DIR=\"${PAYMENT_MOCK_DIR}\" MISE_BIN=\"${MISE_BIN}\" \\\n    sh -c 'cd \"${PAYMENT_MOCK_DIR}\" && \"${MISE_BIN}\" exec -- go build -o \"${PAYMENT_MOCK_DIR}/payment_mock\" -ldflags \"-s -w\"'\n  log \"payment_mock: built\"\n}\n\n# 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-payment_mock.service\n# isucon->isurenに読み替え。payment_mock(main.go)はDBを一切使わない(決済履歴はプロセス内メモリのmapで\n# 保持するのみ)ため、本家unitにあるAfter=mysql.service/Requires=mysql.serviceは含めない。\n# 本家はwebapp配置候補の全サーバーにこれを常駐させ:12345固定で待ち受けさせる方式\n# (docs/ISURIDE.md「決済マイクロサービスのモックについて」)。分離サーバー構成を見据え、\n# 単一AMI構成の現状でもwebappと同様に常駐させておく。\n# ISUREN_USERは実際にはisuren固定でしか使われない(上書きされている箇所がリポジトリ内に無い)ため、\n# 展開済みの静的ファイルとして持つ(systemd/参照。原本のisuride-payment_mock.serviceも静的ファイル)。\nset_systemd_unit() {\n  install -m 0644 \"${SCRIPT_DIR}/systemd/isuride-payment_mock.service\" \"${SYSTEMD_UNIT}\"\n  systemctl daemon-reload\n  log \"systemd unit: ${SYSTEMD_UNIT} set\"\n}\n\n# 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする(70-webapp-go.shと同じ方針)。\nrestart_service() {\n  systemctl enable isuride-payment_mock\n  systemctl restart isuride-payment_mock\n  log \"isuride-payment_mock service: enabled and restarted\"\n}\n\nbuild_payment_mock\nset_systemd_unit\nrestart_service\n\nlog \"77-payment-mock.sh: done\"\n"
 - path: /opt/kakomon14/provisioning/80-frontend.sh
   owner: root:root
   permissions: '0644'
@@ -140,6 +140,114 @@ write_files:
   owner: root:root
   permissions: '0644'
   content: "#!/usr/bin/env bash\nset -euo pipefail\n\n# 設定値。環境変数で上書き可能にする\n: \"${ISUREN_USER:=isuren}\"\n: \"${ENABLE_TLS:=false}\"\n\nlog() {\n  echo \"[kakomon14] $*\"\n}\n"
+- path: /opt/kakomon14/provisioning/systemd/isuride-go.service
+  owner: root:root
+  permissions: '0644'
+  content: '[Unit]
+
+    Description=isuride-go
+
+    After=syslog.target
+
+    After=mysql.service
+
+    Requires=mysql.service
+
+
+    [Service]
+
+    WorkingDirectory=/home/isuren/webapp/go
+
+    EnvironmentFile=/home/isuren/env.sh
+
+
+    User=isuren
+
+    Group=isuren
+
+    ExecStart=/home/isuren/webapp/go/isuride
+
+    ExecStop=/bin/kill -s QUIT $MAINPID
+
+
+    Restart=on-failure
+
+    RestartSec=5
+
+
+    [Install]
+
+    WantedBy=multi-user.target
+
+    '
+- path: /opt/kakomon14/provisioning/systemd/isuride-matcher.service
+  owner: root:root
+  permissions: '0644'
+  content: '[Unit]
+
+    Description=isuride-matcher
+
+    After=isuride-go.service
+
+
+    [Service]
+
+    User=isuren
+
+    Group=isuren
+
+    EnvironmentFile=/home/isuren/env.sh
+
+
+    ExecStart=/bin/sh -c "while true; do curl -s http://127.0.0.1:8080/api/internal/matching; sleep $ISUCON_MATCHING_INTERVAL; done"
+
+    ExecStop=/bin/kill -s QUIT $MAINPID
+
+
+    Restart=on-failure
+
+    RestartSec=5
+
+
+    [Install]
+
+    WantedBy=multi-user.target
+
+    '
+- path: /opt/kakomon14/provisioning/systemd/isuride-payment_mock.service
+  owner: root:root
+  permissions: '0644'
+  content: '[Unit]
+
+    Description=isuride-payment_mock
+
+    After=syslog.target
+
+
+    [Service]
+
+    WorkingDirectory=/home/isuren/webapp/payment_mock
+
+
+    User=isuren
+
+    Group=isuren
+
+    ExecStart=/home/isuren/webapp/payment_mock/payment_mock
+
+    ExecStop=/bin/kill -s QUIT $MAINPID
+
+
+    Restart=on-failure
+
+    RestartSec=5
+
+
+    [Install]
+
+    WantedBy=multi-user.target
+
+    '
 - path: /opt/kakomon14/provisioning/goss.yaml
   owner: root:root
   permissions: '0644'

@@ -25,30 +25,10 @@ build_payment_mock() {
 # 本家はwebapp配置候補の全サーバーにこれを常駐させ:12345固定で待ち受けさせる方式
 # (docs/ISURIDE.md「決済マイクロサービスのモックについて」)。分離サーバー構成を見据え、
 # 単一AMI構成の現状でもwebappと同様に常駐させておく。
+# ISUREN_USERは実際にはisuren固定でしか使われない(上書きされている箇所がリポジトリ内に無い)ため、
+# 展開済みの静的ファイルとして持つ(systemd/参照。原本のisuride-payment_mock.serviceも静的ファイル)。
 set_systemd_unit() {
-  local content
-  content=$(
-    cat <<EOD
-[Unit]
-Description=isuride-payment_mock
-After=syslog.target
-
-[Service]
-WorkingDirectory=${PAYMENT_MOCK_DIR}
-
-User=${ISUREN_USER}
-Group=${ISUREN_USER}
-ExecStart=${PAYMENT_MOCK_DIR}/payment_mock
-ExecStop=/bin/kill -s QUIT \$MAINPID
-
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOD
-  )
-  echo "${content}" >"${SYSTEMD_UNIT}"
+  install -m 0644 "${SCRIPT_DIR}/systemd/isuride-payment_mock.service" "${SYSTEMD_UNIT}"
   systemctl daemon-reload
   log "systemd unit: ${SYSTEMD_UNIT} set"
 }

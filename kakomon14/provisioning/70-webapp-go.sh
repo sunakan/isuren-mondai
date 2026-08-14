@@ -23,33 +23,10 @@ build_isuride_go() {
 # 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-go.service
 # isucon->isurenに読み替え(User/Group/WorkingDirectory/EnvironmentFileのパス)。サービス名・ExecStartは据え置き。
 # WorkingDirectoryは/api/initializeが相対パス../sql/init.shを呼ぶため必須。
+# ISUREN_USERは実際にはisuren固定でしか使われない(上書きされている箇所がリポジトリ内に無い)ため、
+# 展開済みの静的ファイルとして持つ(systemd/参照。原本のisuride-go.serviceも静的ファイル)。
 set_systemd_unit() {
-  local content
-  content=$(
-    cat <<EOD
-[Unit]
-Description=isuride-go
-After=syslog.target
-After=mysql.service
-Requires=mysql.service
-
-[Service]
-WorkingDirectory=${WEBAPP_GO_DIR}
-EnvironmentFile=${ISUREN_HOME}/env.sh
-
-User=${ISUREN_USER}
-Group=${ISUREN_USER}
-ExecStart=${WEBAPP_GO_DIR}/isuride
-ExecStop=/bin/kill -s QUIT \$MAINPID
-
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOD
-  )
-  echo "${content}" >"${SYSTEMD_UNIT}"
+  install -m 0644 "${SCRIPT_DIR}/systemd/isuride-go.service" "${SYSTEMD_UNIT}"
   systemctl daemon-reload
   log "systemd unit: ${SYSTEMD_UNIT} set"
 }
