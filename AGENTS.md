@@ -15,15 +15,6 @@ ISUCON過去問(isucon14等)をそれぞれGo実装だけに絞り、Packerで�
 タスク管理(todo/completed)は現状aws-bastion側の`../docs/plans/kakomon14/`で行っている。
 着手中/完了タスクを確認する際はそちらを見る。
 
-## 現在地(2026-08-14時点)
-
-bastion上での試行錯誤(`aws-bastion/scripts/kakomon14/`)によるネイティブ構築フェーズ、および
-このリポジトリへのスクリプト移設は完了済み。frontendはAMI上ビルドからGitHub Releaseダウンロード
-方式へ移行し、実際にPacker→EC2起動→bench実行(pass=true)まで確認済み。frontendリリースはタグpush
-契機のGitHub Actionsで自動化済み(下記「frontendのビルド・配布方針」参照)。
-upstream/isucon14のディレクトリ移動・取得方式変更(symlink→実ファイルデプロイ)・mise-tasks移行を
-行ったが、変更後の構成でのAMIビルド・bench実行による動作確認はまだ行っていない。
-
 ## 過去問コードの取り込み(upstream)方針
 
 リポジトリルート直下に`upstream/`を置き、取り込み元リポジトリ名でディレクトリを分ける
@@ -111,55 +102,50 @@ isuren-mondai全体(kakomon14に限らない)でmiseを使う上での注意点�
 
 ## frontendのビルド・配布方針
 
-frontendはAMI上ではビルドしない。t4g.small(メモリ1.8GiB、swap無し)では`pnpm install`のような
-重いビルドでOOM killerが発動しうる上、node/pnpmをAMIに含めずに済む(対象言語をGoのみに絞る方針にも合う)。
+frontendはローカル/CIでビルドしGitHub Releaseで配布する(AMI上ではビルドしない)。
+詳細は`kakomon14/scripts/build-frontend-release.sh`・
+`.github/workflows/release-kakomon14-frontend.yml`・`upstream/isucon14/NOTICE.md`参照。
 
-- `kakomon14/scripts/build-frontend-release.sh`でローカル/CIビルドし、`kakomon14/dist/`に
-  成果物(`kakomon14-frontend.tar.gz`・`frontend_hashes.json`・`frontend_files.json`)を出力する
-- `scripts/github-release.sh`(過去問ごとに使い回せる汎用スクリプト)でGitHub Releaseへ公開する。
-  タグは`kakomon14-frontend-v1.0.0`のように過去問+役割を接頭辞にする(1つのリポジトリで複数過去問の
-  リリースを扱うため)
-- 正のリリース経路は`.github/workflows/release-kakomon14-frontend.yml`によるタグpush契機のCI
-  (`ubuntu-24.04-arm`。AMIの実行環境と揃える)。`mise run kakomon14:release`はCIが使えない時の
-  緊急用経路として残している。checkout直後のmise設定はuntrusted扱いになるため、CI側では
-  `MISE_TRUSTED_CONFIG_PATHS`を明示している
-- AMI側(`80-frontend.sh`)は`FRONTEND_RELEASE_TAG`で固定したタグ(他の`*_COMMIT`系変数と同じ
-  ピン留め方式)からダウンロードするだけ。`sunakan/isuren-mondai`はpublicリポジトリなので認証不要
-- `frontend_hashes.json`・`frontend_files.json`はbenchがfrontendの整合性確認に使うファイルで、
-  ビルドのたびに内容が変わるためgit管理していない(`upstream/isucon14/NOTICE.md`参照)。
-  ダウンロードした最新版を`bench/benchrun/`に上書き配置する
+- タグ命名は過去問+役割を接頭辞にする(例: `kakomon14-frontend-v1.0.0`)。1つのリポジトリで
+  複数過去問のリリースを扱うため、`scripts/github-release.sh`(過去問間で共有する汎用スクリプト)の
+  前回リリース差分検出がタグの接頭辞一致で他過去問の履歴と混ざらないようにしている
 
 ## 見逃しがちな注意点(isucon14版)
 
-aws-bastion上での試行錯誤で見つかった、ハマりどころ・Why not集。aws-bastion側の
-`docs/plans/kakomon14/completed/`が将来失われても実装に困らないよう、ここに複製している。
+aws-bastion上での試行錯誤・今回のセッションで見つかった、ハマりどころ・Why not集。
+個別スクリプトのコメントに書いてあるものは重複させず、ここには「特定のファイルを読むだけでは
+気づけないもの」「ツール自体の一般的な罠」を残す。
 
-- `webapp/go/main.go`の`POST /api/initialize`は`../sql/init.sh`(1-schema.sql/2-master-data.sql/
-  3-initial-data.sql.gz)だけを実行し、DB・ユーザー作成を行う`webapp/sql/0-init.sql`は呼ばない。
-  `0-init.sql`は本家の`docs/manual.md`によると環境構築時に別途手動実行する想定のファイルで、
-  `60-initdb.sh`はAMIプロビジョニング時にこれを模して実行している
 - `bench/Dockerfile`はISUCON運営限定のプライベートECRイメージ(supervisor)に依存しており一般環境では
   ビルドできない。benchはホストで直接`go run`する
-- `development/compose-go.yml`はfrontendの事前ビルド(`pnpm run build`)が前提。nginxが
-  `frontend/build/client`をマウントするだけでビルドはしない
+- `development/compose-go.yml`は`frontend/build/client`をマウントするだけでfrontend自体はビルドしない。
+  事前に`pnpm run build`しておく必要がある。同じくこのコンテナ(特にnginxの8080番ポート)が
+  起動したままだと、ネイティブの`isuride-go`等とポートが競合し再起動ループになる。ネイティブ構築を
+  進める前に`docker ps`で止まっていることを確認する
 - ベンチ実行時の`context deadline exceeded`多発は、インスタンスのリソース不足(CPU)が原因のことがある。
   アプリのバグかリソース不足かの切り分けが必要
-- `development/compose-go.yml`のコンテナ(特にnginxの8080番ポートマッピング)が起動したままだと、
-  ネイティブの`isuride-go`等とポートが競合し再起動ループになる。ネイティブ構築を進める前に`docker ps`で
-  止まっていることを確認する
 - AMIのベースOS(Ubuntu 26.04 arm64)の`chown`はGNU coreutilsではなくuutils coreutils(Rust実装)で、
   `-h`/`--no-dereference`がexit 0を返すのに実際にはlchownしないバグがある。シンボリックリンクの
   所有者変更が必要な場面は要注意(通常ファイルへの`chown`は正常動作)
-- `runuser -u isuren -- <cmd>`は`.bashrc`を経由しないため、mise等はフルパス
-  (`/home/isuren/.local/bin/mise`)で呼ぶ必要がある(goのビルドで確認。AMI上ではpnpmは使わなくなった。
-  下記「frontendのビルド・配布方針」参照)。isurenが読めないディレクトリ(`/home/ubuntu/...`等)を
-  cwdにしたまま実行すると`go.mod file not found`になる。回避策として、isurenのmiseインストール先
-  (`/home/isuren/.local/...`は755で他ユーザーからも実行可)のバイナリをフルパス指定しつつ、実行ユーザーは
-  ubuntuのままにする方法がある
+- `runuser -u isuren -- <cmd>`は`.bashrc`を経由しないため、mise等はフルパスで呼ぶ必要がある。
+  さらにisurenが読めないディレクトリ(`/home/ubuntu/...`等)をcwdにしたまま実行すると
+  `go.mod file not found`という分かりにくい症状になる(`EACCES`にはならない)。回避策として、
+  isurenのmiseインストール先(`/home/isuren/.local/...`は755で他ユーザーからも実行可)のバイナリを
+  フルパス指定しつつ、実行ユーザーはubuntuのままにする方法がある
   (例: `sudo -u ubuntu /home/isuren/.local/share/mise/installs/go/<version>/bin/go run . run ...`)
-- pnpm 10以降はesbuild/@swc/core等のpostinstallスクリプトをデフォルトでブロックする(strictDepBuilds)。
-  事前に承認内容を`pnpm-workspace.yaml`に書いておく必要がある
-  (`kakomon14/scripts/pnpm-workspace.kakomon14.yaml`で管理。frontendビルドはローカル/CI側でのみ発生する)
+- Packerの`launch_block_device_mappings`は`delete_on_termination`のデフォルトが**false**
+  (公式ドキュメントに明記)。明示的にtrueにしないと、一時ビルドインスタンス終了後もルート
+  ボリュームが削除されずビルドのたびに蓄積する。実際に17個・240GBの未アタッチボリュームが
+  蓄積していたのを発見し削除した経緯がある
+- Packerの`timestamp()`は呼び出すたびに評価され値が変わりうる(公式ドキュメントに明記)。
+  同じビルド内で複数箇所から時刻を使いたい場合は、1箇所(local)にまとめて共有すること。
+  別々に呼ぶと評価タイミングのズレで秒単位の不一致が起こりうる
+- AWSのAMIは**登録後に名前を変更できない**(リネーム不可)。「特定の固定名を使い回して
+  最新版を指す」運用はできないので、バージョン管理をしたい場合はタグ(Stage等)で状態を表現する
+  必要がある
+- `cloud-init status --wait`は失敗時のみログをtailする設計にしているため、goss(`99-verify.sh`)の
+  検証詳細はビルド成功時にはPackerのビルドログに一切出ない。成功/失敗の二値以上の情報が
+  ビルドログからは得られない
 
 ## 過去問リポジトリの参照(tmp/all-kakomon/)
 
