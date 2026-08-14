@@ -24,12 +24,15 @@ UPSTREAM_SUBPATH="upstream/isucon14"
 ISUCON14_SUBPATHS=("webapp/sql" "frontend/public" "provisioning/ansible/roles/isucon-user/templates")
 
 ISUREN_HOME="/home/${ISUREN_USER}"
+# sparse-checkoutの一時的な取得先。デプロイ完了後にcleanup_checkoutsで削除する
+# (本番AMIではPackerビルド時に1回きりのプロビジョニングのため、取得後も残しておく必要がない。
+# 残すとディスクを圧迫する上、mise実行時のディレクトリ探索に古いmise.tomlが引っかかる懸念もある)。
 UPSTREAM_CHECKOUT_DIR="${ISUREN_HOME}/.isuren-mondai-upstream"
 UPSTREAM_DIR="${UPSTREAM_CHECKOUT_DIR}/${UPSTREAM_SUBPATH}"
 ISUCON14_CHECKOUT_DIR="${ISUREN_HOME}/.isucon14-upstream"
-ISUCON14_LINK="${ISUREN_HOME}/isucon14"
-WEBAPP_LINK="${ISUREN_HOME}/webapp"
-ENV_SH_LINK="${ISUREN_HOME}/env.sh"
+ISUCON14_DIR="${ISUREN_HOME}/isucon14"
+WEBAPP_DIR="${ISUREN_HOME}/webapp"
+ENV_SH_DEST="${ISUREN_HOME}/env.sh"
 
 # Why not curl+tar: GitHubのcodeload archiveエンドポイントはリポジトリ全体のtarballしか
 # 生成できず、サブパス指定で絞り込めない。過去問を追加するたびリポジトリは肥大化していく
@@ -65,79 +68,55 @@ sparse_checkout_fetch() {
   fi
 }
 
-# 80-frontend.shが`~/isucon14/frontend`を参照する既存の前提を変えずに済むよう、
-# 取り込んだ実体を指すシンボリックリンクを張る。
-link_isucon14() {
-  if [ -L "${ISUCON14_LINK}" ] && [ "$(readlink "${ISUCON14_LINK}")" = "${UPSTREAM_DIR}" ]; then
-    log "isucon14: symlink already up to date"
-  else
-    ln -sfn "${UPSTREAM_DIR}" "${ISUCON14_LINK}"
-    log "isucon14: symlink created"
-  fi
+# 80-frontend.shが`~/isucon14/bench/benchrun`を参照する既存の前提を変えずに済むよう、
+# 取り込んだ実体を~/isucon14へ実ファイルとしてデプロイする(rsyncはroot実行でもsrcの所有者
+# (isuren、sparse_checkout_fetchがrunuser -u isurenで取得したもの)を保持する)。
+#
+# Why not シンボリックリンク: 以前はここをシンボリックリンクにしていたが、
+# systemdのWorkingDirectory=~/webapp/go がシンボリックリンクの実体側パスにchdirするため
+# `../sql`のような相対パス解決が取得用の一時ディレクトリ内で完結してしまう罠があった
+# (下記deploy_webapp参照)。実ファイルとしてコピーすることでこの罠自体を無くしている。
+deploy_isucon14() {
+  rsync -a --delete "${UPSTREAM_DIR}/" "${ISUCON14_DIR}/"
+  log "isucon14: deployed"
+}
+
+# webapp/sqlとfrontend/publicは本家(isucon14公式リポジトリ)から別途取得したもの。
+# ~/isucon14へ実ファイルとしてマージする(deploy_isucon14の後に呼ぶこと)。
+deploy_isucon14_readonly_data() {
+  rsync -a --delete "${ISUCON14_CHECKOUT_DIR}/$1/" "${ISUCON14_DIR}/$1/"
+  log "$1: deployed"
 }
 
 # 70-webapp-go.sh等が`~/webapp`を参照する既存の前提を変えずに済むよう、
-# 取り込んだ実体を指すシンボリックリンクを張る。
-#
-# Why not `~/webapp`を実ディレクトリにして子要素ごとに個別リンクする方式:
-# 一度その方式で実装したが、systemdのWorkingDirectory=~/webapp/go はシンボリックリンクの
-# 実体側パスにchdirするため、webapp/goプロセスから見た`../sql`は`~/webapp/sql`ではなく
-# upstreamツリー内の(存在しない)webapp/sqlに解決されてしまい、/api/initializeが
-# `fork/exec ../sql/init.sh: no such file or directory`で失敗した。
-# sqlのシンボリックリンクをupstreamツリーの中(webapp/go と同じ実ディレクトリ)に置けば、
-# `..`の解決先がupstreamツリー内で完結するため、`~/webapp`自体は単一リンクで問題ない。
-link_webapp() {
-  if [ -L "${WEBAPP_LINK}" ] && [ "$(readlink "${WEBAPP_LINK}")" = "${UPSTREAM_DIR}/webapp" ]; then
-    log "webapp: symlink already up to date"
-  else
-    ln -sfn "${UPSTREAM_DIR}/webapp" "${WEBAPP_LINK}"
-    log "webapp: symlink created"
-  fi
-}
-
-# webapp/sqlとfrontend/publicは本家(isucon14公式リポジトリ)取得のため、upstreamツリーの内側に
-# シンボリックリンクで差し込む(理由はlink_webapp内のコメント参照)。
-link_isucon14_into_upstream() {
-  local target="${ISUCON14_CHECKOUT_DIR}/$1"
-  local link="${UPSTREAM_DIR}/$1"
-  if [ -L "${link}" ] && [ "$(readlink "${link}")" = "${target}" ]; then
-    log "$1: symlink already up to date"
-  else
-    ln -sfn "${target}" "${link}"
-    log "$1: symlink created"
-  fi
+# ~/isucon14/webapp(sql等のマージ済み)を~/webappへ実ファイルとして複製する。
+deploy_webapp() {
+  rsync -a --delete "${ISUCON14_DIR}/webapp/" "${WEBAPP_DIR}/"
+  log "webapp: deployed"
 }
 
 # 70-webapp-go.shのsystemdユニットがEnvironmentFile=~/env.shとして参照する。
-link_env_sh() {
-  local target="${ISUCON14_CHECKOUT_DIR}/provisioning/ansible/roles/isucon-user/templates/env.sh"
-  if [ -L "${ENV_SH_LINK}" ] && [ "$(readlink "${ENV_SH_LINK}")" = "${target}" ]; then
-    log "env.sh: symlink already up to date"
-  else
-    ln -sfn "${target}" "${ENV_SH_LINK}"
-    log "env.sh: symlink created"
-  fi
+deploy_env_sh() {
+  install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+    "${ISUCON14_CHECKOUT_DIR}/provisioning/ansible/roles/isucon-user/templates/env.sh" "${ENV_SH_DEST}"
+  log "env.sh: deployed"
 }
 
-# cone modeはリポジトリルート直下のファイルも自動的に含むため、isuren-mondai自身の
-# mise.toml(Packer/AWSタスク定義。kakomon14のgo/nodeとは無関係)も一緒に取得されてしまう。
-# これが~/webapp/go等でmiseを実行する際にディレクトリ探索へ引っかかり、
-# 「untrusted config」としてmiseがエラー終了する原因になるため取り除く。
-remove_upstream_root_mise_toml() {
-  local f="${UPSTREAM_CHECKOUT_DIR}/mise.toml"
-  if [ -f "${f}" ]; then
-    rm -f "${f}"
-    log "upstream: removed stray ${f}"
-  fi
+# 取得用の一時ディレクトリ(.git含む)は上記デプロイが終われば不要。本番AMIでは1回きりの
+# プロビジョニングのため、残しておく再利用メリットよりディスク使用量・古い設定混入リスクを避ける
+# ことを優先する。
+cleanup_checkouts() {
+  rm -rf "${UPSTREAM_CHECKOUT_DIR}" "${ISUCON14_CHECKOUT_DIR}"
+  log "checkouts: removed"
 }
 
 sparse_checkout_fetch "${UPSTREAM_CHECKOUT_DIR}" "${UPSTREAM_REPO_URL}" "${UPSTREAM_COMMIT}" "${UPSTREAM_SUBPATH}"
 sparse_checkout_fetch "${ISUCON14_CHECKOUT_DIR}" "${ISUCON14_REPO_URL}" "${ISUCON14_COMMIT}" "${ISUCON14_SUBPATHS[@]}"
-remove_upstream_root_mise_toml
-link_isucon14
-link_webapp
-link_isucon14_into_upstream "webapp/sql"
-link_isucon14_into_upstream "frontend/public"
-link_env_sh
+deploy_isucon14
+deploy_isucon14_readonly_data "webapp/sql"
+deploy_isucon14_readonly_data "frontend/public"
+deploy_webapp
+deploy_env_sh
+cleanup_checkouts
 
 log "50-source.sh: done"
