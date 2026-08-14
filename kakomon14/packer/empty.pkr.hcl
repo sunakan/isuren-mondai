@@ -20,14 +20,32 @@ variable "subnet_id" {
   type = string
 }
 
+# isuren-mondai自身のビルド元コミットへのGitHub URL(mise-tasks/kakomon14/buildが
+# git rev-parse HEADから組み立てて渡す)。cloud-initのgit clone対象と同じコミットを指す。
+variable "project_url" {
+  type = string
+}
+
+# 取り込み元(本家isucon/isucon14)のコミットへのGitHub URL(mise-tasks/kakomon14/buildが
+# 50-source.shのISUCON14_COMMITから組み立てて渡す)。
+variable "base_url" {
+  type = string
+}
+
 locals {
-  name = "kakomon14-${formatdate("YYYYMMDD-hhmm", timestamp())}"
+  # AMI Nameは文字種制限(+・:が使えない)があるため、ISO8601のUTC基本形式(Z表記)にする。
+  name = "isuren/kakomon14-${formatdate("YYYYMMDD'T'hhmmss", timestamp())}Z"
+  # NameとことなりタグのValueには文字種制限が無いため、こちらはISO8601拡張形式でJSTの
+  # 正しいオフセット表記(+09:00)にする。timeaddでUTC瞬間を+9hずらしてからformatdateしているのは
+  # HCLにタイムゾーン変換関数が無いため(実際にタイムゾーン変換しているわけではなく、
+  # 表示上のJST値を作るための数値加算。付与する+09:00はこの値に対応する文字列)。
+  timestamp_jst = "${formatdate("YYYY-MM-DD'T'hh:mm:ss", timeadd(timestamp(), "9h"))}+09:00"
   ami_tags = {
-    Name    = local.name
-    Project = "isuren-mondai"
-    Kakomon = "kakomon14"
-    OS      = "ubuntu-26.04-resolute-arm64"
-    Packer  = "1"
+    Name      = local.name
+    Project   = var.project_url
+    Base      = var.base_url
+    OS        = "ubuntu-26.04-resolute-arm64"
+    Timestamp = local.timestamp_jst
   }
 }
 
@@ -70,6 +88,10 @@ source "amazon-ebs" "kakomon14" {
   launch_block_device_mappings {
     device_name = "/dev/sda1"
     volume_size = 16
+    # デフォルトfalseのため明示しないと、一時ビルドインスタンス終了後もルートボリュームが
+    # 削除されずビルドのたびに蓄積する(Packer公式ドキュメントに明記された既知の注意点。
+    # 実際に本プロジェクトでも過去のビルドで複数の未アタッチボリュームが蓄積していたことを確認した)。
+    delete_on_termination = true
   }
 }
 
@@ -86,7 +108,7 @@ build {
   }
 
   # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest時)が解決した具体的なタグを取得する。
-  # AMIタグ(frontend)への焼き込みはmise.tomlのbuild-kakomon14タスク側で行う
+  # AMIタグ(Frontend)への焼き込みはmise-tasks/kakomon14/buildタスク側で行う
   # (この時点ではAMI IDがまだ存在しないため、tagsブロックに直接は書けない)。
   provisioner "file" {
     source      = "/tmp/kakomon14-frontend-release-tag"

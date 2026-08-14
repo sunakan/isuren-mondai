@@ -13,7 +13,12 @@ source scripts/lib.sh
 # user-data.yamlはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだと
 # EC2起動時のgit fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため事前に検知する。
 require_clean_worktree
-require_pushed_commit "$(git rev-parse HEAD)"
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+require_pushed_commit "${PROJECT_COMMIT}"
+
+# AMIタグ(Base)用。50-source.shのISUCON14_COMMIT(取り込み元isucon/isucon14のコミット)を
+# デフォルト値定義行から抽出する(この値を上書きしている箇所はリポジトリ内に無い)。
+ISUCON14_COMMIT="$(sed -nE 's/.*ISUCON14_COMMIT:=([0-9a-f]+).*/\1/p' kakomon14/provisioning/50-source.sh)"
 
 # user-data.yamlはprovisioning/配下から再生成可能なためgit管理していない。
 # ビルドのたびに最新化することで、生成し忘れによる古いuser-dataでのビルドを防ぐ。
@@ -23,12 +28,17 @@ cd kakomon14/packer
 # packer build自体の終了コードが失われない。
 BUILD_LOG="$(mktemp)"
 trap 'rm -f "$BUILD_LOG" frontend-release-tag.txt' EXIT
-packer build -var "vpc_id=$VPC_ID" -var "subnet_id=$SUBNET_ID" empty.pkr.hcl | tee "$BUILD_LOG"
+packer build \
+  -var "vpc_id=$VPC_ID" \
+  -var "subnet_id=$SUBNET_ID" \
+  -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
+  -var "base_url=https://github.com/isucon/isucon14/commit/${ISUCON14_COMMIT}" \
+  empty.pkr.hcl | tee "$BUILD_LOG"
 AMI_ID="$(grep -oE 'ami-[0-9a-f]+' "$BUILD_LOG" | tail -n1)"
 
 # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest)がPacker側へ渡した、実際に焼き込まれた
 # frontendの具体的なタグ。latestだとディスク中身だけでは追跡できないため、AMIタグに残す。
 RESOLVED_TAG="$(cat frontend-release-tag.txt)"
 aws ec2 create-tags --resources "$AMI_ID" \
-  --tags "Key=frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}"
-echo "AMI tagged: frontend=${RESOLVED_TAG}"
+  --tags "Key=Frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}"
+echo "AMI tagged: Frontend=${RESOLVED_TAG}"
