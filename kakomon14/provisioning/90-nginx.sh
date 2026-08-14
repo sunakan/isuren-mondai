@@ -118,31 +118,21 @@ server {
 EOD
 )"
   fi
-  if [ ! -f "${SITE_AVAILABLE}" ] || [ "$(cat "${SITE_AVAILABLE}")" != "${content}" ]; then
-    echo "${content}" >"${SITE_AVAILABLE}"
-    log "nginx site config: changed ${SITE_AVAILABLE}"
-  else
-    log "nginx site config: already up to date"
-  fi
+  echo "${content}" >"${SITE_AVAILABLE}"
+  log "nginx site config: ${SITE_AVAILABLE} set"
 }
 
+# ln -sfnが冪等(既存シンボリックリンクは張り替え)なため、事前確認はせず常に実行する。
 enable_site() {
-  if [ ! -L "${SITE_ENABLED}" ] || [ "$(readlink "${SITE_ENABLED}")" != "${SITE_AVAILABLE}" ]; then
-    ln -sfn "${SITE_AVAILABLE}" "${SITE_ENABLED}"
-    log "nginx site: enabled"
-  else
-    log "nginx site: already enabled"
-  fi
+  ln -sfn "${SITE_AVAILABLE}" "${SITE_ENABLED}"
+  log "nginx site: enabled"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「Delete default config」
+# rm -fが冪等(存在しなくてもエラーにならない)なため、事前確認はせず常に実行する。
 remove_default_site() {
-  if [ -e "${DEFAULT_ENABLED}" ] || [ -L "${DEFAULT_ENABLED}" ]; then
-    rm -f "${DEFAULT_ENABLED}"
-    log "nginx default site: removed"
-  else
-    log "nginx default site: already removed"
-  fi
+  rm -f "${DEFAULT_ENABLED}"
+  log "nginx default site: removed"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「check nginx config」「Start nginx」

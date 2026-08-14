@@ -6,26 +6,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 # 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L1-4
+# set-timezone自体が冪等(既にUTCでも実害なし)なため、事前確認はせず常に実行する。
 set_timezone() {
-  if [ "$(timedatectl show -p Timezone --value)" != "UTC" ]; then
-    timedatectl set-timezone UTC
-    log "timezone: changed to UTC"
-  else
-    log "timezone: already UTC"
-  fi
+  timedatectl set-timezone UTC
+  log "timezone: set to UTC"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L13-20
 set_sysctl_port_range() {
   local conf=/etc/sysctl.d/99-isuren.conf
   local content='net.ipv4.ip_local_port_range = 10000 65535'
-  if [ ! -f "${conf}" ] || [ "$(cat "${conf}")" != "${content}" ]; then
-    echo "${content}" >"${conf}"
-    sysctl --system >/dev/null
-    log "sysctl: changed ${conf}"
-  else
-    log "sysctl: already up to date"
-  fi
+  echo "${content}" >"${conf}"
+  sysctl --system >/dev/null
+  log "sysctl: ${conf} set"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L22-33
@@ -40,12 +33,8 @@ set_limits() {
 * hard memlock unlimited
 EOD
   )
-  if [ ! -f "${conf}" ] || [ "$(cat "${conf}")" != "${content}" ]; then
-    echo "${content}" >"${conf}"
-    log "limits: changed ${conf}"
-  else
-    log "limits: already up to date"
-  fi
+  echo "${content}" >"${conf}"
+  log "limits: ${conf} set"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L35-43

@@ -24,14 +24,10 @@ sudo systemctl restart isuride-go
 echo "deploy.sh: isuride-go restarted"
 EOD
   )
-  if [ ! -f "${DEPLOY_SCRIPT}" ] || [ "$(cat "${DEPLOY_SCRIPT}")" != "${content}" ]; then
-    echo "${content}" >"${DEPLOY_SCRIPT}"
-    chown "${ISUREN_USER}:${ISUREN_USER}" "${DEPLOY_SCRIPT}"
-    chmod 0755 "${DEPLOY_SCRIPT}"
-    log "deploy.sh: changed ${DEPLOY_SCRIPT}"
-  else
-    log "deploy.sh: already up to date"
-  fi
+  echo "${content}" >"${DEPLOY_SCRIPT}"
+  chown "${ISUREN_USER}:${ISUREN_USER}" "${DEPLOY_SCRIPT}"
+  chmod 0755 "${DEPLOY_SCRIPT}"
+  log "deploy.sh: ${DEPLOY_SCRIPT} set"
 }
 
 set_deploy_script

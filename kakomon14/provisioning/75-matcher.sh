@@ -7,7 +7,6 @@ source "${SCRIPT_DIR}/lib.sh"
 
 ISUREN_HOME="/home/${ISUREN_USER}"
 SYSTEMD_UNIT="/etc/systemd/system/isuride-matcher.service"
-UNIT_CHANGED=0
 
 # 対応: isucon14/provisioning/ansible/roles/webapp/files/isuride-matcher.service
 # isucon->isurenに読み替え。Go版のみに絞る方針のため、他言語(node/perl/php/python/ruby/rust)への
@@ -36,26 +35,16 @@ RestartSec=5
 WantedBy=multi-user.target
 EOD
   )
-  if [ ! -f "${SYSTEMD_UNIT}" ] || [ "$(cat "${SYSTEMD_UNIT}")" != "${content}" ]; then
-    echo "${content}" >"${SYSTEMD_UNIT}"
-    systemctl daemon-reload
-    UNIT_CHANGED=1
-    log "systemd unit: changed ${SYSTEMD_UNIT}"
-  else
-    log "systemd unit: already up to date"
-  fi
+  echo "${content}" >"${SYSTEMD_UNIT}"
+  systemctl daemon-reload
+  log "systemd unit: ${SYSTEMD_UNIT} set"
 }
 
-# ユニットファイルが変わった場合は、稼働中でも再起動して新しい内容を反映させる
-# (enable --nowはすでに動作中のサービスに対しては何もしないため)。
+# 新しい内容を反映させるため、changed/already判定はせず常にrestartする(70-webapp-go.shと同じ方針)。
 start_service() {
   systemctl enable isuride-matcher
-  if [ "${UNIT_CHANGED}" = "1" ] || ! systemctl is-active --quiet isuride-matcher; then
-    systemctl restart isuride-matcher
-    log "isuride-matcher service: (re)started"
-  else
-    log "isuride-matcher service: already running"
-  fi
+  systemctl restart isuride-matcher
+  log "isuride-matcher service: enabled and restarted"
 }
 
 set_systemd_unit

@@ -27,14 +27,11 @@ create_user() {
 }
 
 # 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L22-26
+# chmod自体が冪等なため、事前確認はせず常に実行する。
 chmod_home() {
   local home="/home/${ISUREN_USER}"
-  if [ "$(stat -c %a "${home}")" != "755" ]; then
-    chmod 0755 "${home}"
-    log "home: chmod 755 ${home}"
-  else
-    log "home: already 755"
-  fi
+  chmod 0755 "${home}"
+  log "home: chmod 755 ${home}"
 }
 
 # 未対応(意図的に除外): isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L28-41
@@ -44,17 +41,13 @@ chmod_home() {
 set_sudoers() {
   local conf="/etc/sudoers.d/99-${ISUREN_USER}-user"
   local content="${ISUREN_USER}  ALL=(ALL) NOPASSWD:ALL"
-  if [ ! -f "${conf}" ] || [ "$(cat "${conf}")" != "${content}" ]; then
-    local tmp
-    tmp="$(mktemp)"
-    echo "${content}" >"${tmp}"
-    visudo -cf "${tmp}"
-    install -m 0440 -o root -g root "${tmp}" "${conf}"
-    rm -f "${tmp}"
-    log "sudoers: changed ${conf}"
-  else
-    log "sudoers: already up to date"
-  fi
+  local tmp
+  tmp="$(mktemp)"
+  echo "${content}" >"${tmp}"
+  visudo -cf "${tmp}"
+  install -m 0440 -o root -g root "${tmp}" "${conf}"
+  rm -f "${tmp}"
+  log "sudoers: ${conf} set"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/isucon-user/tasks/main.yml L52-59, templates/env.sh

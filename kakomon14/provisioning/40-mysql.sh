@@ -19,12 +19,8 @@ install_mysql() {
 
 # 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L7-11
 start_mysql_service() {
-  if systemctl is-active --quiet mysql && systemctl is-enabled --quiet mysql; then
-    log "mysql service: already enabled and running"
-  else
-    systemctl enable --now mysql
-    log "mysql service: enabled and started"
-  fi
+  systemctl enable --now mysql
+  log "mysql service: enabled and started"
 }
 
 # 対応: isucon14/provisioning/ansible/roles/mysql/tasks/main.yml L13-20

@@ -49,13 +49,9 @@ RestartSec=5
 WantedBy=multi-user.target
 EOD
   )
-  if [ ! -f "${SYSTEMD_UNIT}" ] || [ "$(cat "${SYSTEMD_UNIT}")" != "${content}" ]; then
-    echo "${content}" >"${SYSTEMD_UNIT}"
-    systemctl daemon-reload
-    log "systemd unit: changed ${SYSTEMD_UNIT}"
-  else
-    log "systemd unit: already up to date"
-  fi
+  echo "${content}" >"${SYSTEMD_UNIT}"
+  systemctl daemon-reload
+  log "systemd unit: ${SYSTEMD_UNIT} set"
 }
 
 # 新しいバイナリを反映させるため、changed/already判定はせず常にrestartする。

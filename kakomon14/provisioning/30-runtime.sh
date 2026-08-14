@@ -41,13 +41,9 @@ set_bashrc() {
 # aws-bastionリポジトリ自体が存在しない前提でも動くようにするため。
 set_mise_config() {
   local conf="${ISUREN_HOME}/.config/mise/config.toml"
-  if [ ! -f "${conf}" ] || ! diff -q "${SCRIPT_DIR}/mise.ami.toml" "${conf}" >/dev/null 2>&1; then
-    install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "$(dirname "${conf}")"
-    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.toml" "${conf}"
-    log "mise config: changed ${conf}"
-  else
-    log "mise config: already up to date"
-  fi
+  install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "$(dirname "${conf}")"
+  install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.toml" "${conf}"
+  log "mise config: ${conf} set"
 }
 
 # チェックサムを固定してサプライチェーン改ざん検知・再現性を担保する。
@@ -55,12 +51,8 @@ set_mise_config() {
 # `mise lock -g -p linux-arm64`で生成したものをgit管理し、そのまま配置する。
 set_mise_lock() {
   local lock="${ISUREN_HOME}/.config/mise/mise.lock"
-  if [ ! -f "${lock}" ] || ! diff -q "${SCRIPT_DIR}/mise.ami.lock" "${lock}" >/dev/null 2>&1; then
-    install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.lock" "${lock}"
-    log "mise lock: changed ${lock}"
-  else
-    log "mise lock: already up to date"
-  fi
+  install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.lock" "${lock}"
+  log "mise lock: ${lock} set"
 }
 
 # mise install自体が内部で冪等(既にインストール済みのバージョンは再取得しない)なため、
