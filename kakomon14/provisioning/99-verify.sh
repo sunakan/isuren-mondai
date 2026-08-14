@@ -24,7 +24,9 @@ runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
 # aqua経由のgossは他のmiseツールと異なりbin/配下ではなくインストールディレクトリ直下に
 # バイナリが展開される(実機のcloud-init-output.logで確認済み)。
 GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/goss"
-"${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation
+# isuride-go/payment_mockはsystemctl restart直後にport listenまで届いていないことがあり、
+# リトライ無しだとタイミング次第でport checkがfalse negativeになる(実機で確認済み)。
+"${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation --retry-timeout 30s --sleep 1s
 log "99-verify.sh: goss validate end"
 
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" uninstall "goss@${GOSS_VERSION}"

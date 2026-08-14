@@ -22,3 +22,8 @@ bash "${SCRIPT_DIR}/95-deploy-helper.sh"
 bash "${SCRIPT_DIR}/99-verify.sh"
 
 log "all.sh: done"
+# cloud-initのrunecmdは、ここまでの一連のコマンドのどれかが失敗しても`cloud-init status --wait`が
+# 成功扱い(status: done)を返すことがある(実機で確認済み: goss validate失敗でall.shが停止しても
+# AMI作成が続行された)。empty.pkr.hclがこのファイルの存在を「provisioning完走の証拠」として
+# 別途確認する(/opt/isuren-mondaiはこの後削除されるため、外側に置く)。
+touch /var/lib/cloud/kakomon14-provisioned

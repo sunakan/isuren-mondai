@@ -111,13 +111,15 @@ build {
   sources = ["source.amazon-ebs.kakomon14"]
 
   # user_dataのcloud-init(write_files+runcmdでall.shを実行)が完了するまで待ってからAMI化する。
-  # all.sh側がset -euo pipefailで冪等かつエラー時に非ゼロ終了するため、
-  # cloud-init status --waitの終了コードでプロビジョニングの成否がそのまま判定できる。
   # 失敗時はPackerがインスタンスを即座に破棄してしまいログを見返せなくなるため、
   # 失敗を検知したらAMI化前にログをbuild出力へ吐いてから非ゼロ終了する。
   provisioner "shell" {
     inline = [
       "sudo cloud-init status --wait || (echo '--- cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)",
+      # runecmd内のコマンド(bash all.sh)が非ゼロ終了しても、cloud-init status --waitはstatus: doneを
+      # 返すことがある(実機で確認済み: goss validate失敗でall.shが停止してもここまで来てしまった)。
+      # all.shが最後まで完走した証拠としてマーカーファイルの存在を別途確認する。
+      "test -f /var/lib/cloud/kakomon14-provisioned || (echo '--- provisioning failed (marker file not found): cloud-init-output.log (tail) ---'; sudo tail -n 300 /var/log/cloud-init-output.log; exit 1)",
       # 成功時はcloud-init-output.log全体をtailしないため、goss validateの結果だけが
       # ビルドログから一切見えなくなる(99-verify.shが仕込むマーカー行で範囲を抜き出す)。
       "echo '--- goss validate output ---'",
