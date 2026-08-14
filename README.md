@@ -25,7 +25,7 @@ git push origin kakomon14-frontend-v1.0.1
 CIが使えない場合は、ローカルからも直接リリースできる(緊急時用)。
 
 ```shell
-GH_TOKEN=$(ghtkn get *****) mise run release-kakomon14 kakomon14-frontend-v1.0.1
+GH_TOKEN=$(ghtkn get *****) mise run kakomon14:release kakomon14-frontend-v1.0.1
 ```
 
 ## 前提
@@ -41,7 +41,7 @@ mise trust
 過去問間で共有する永続VPC。一度デプロイしたら基本的に消さない。
 
 ```bash
-mise up-packer-network
+mise packer:up-network
 ```
 
 ## 2. 過去問ごとにPackerビルドする
@@ -49,7 +49,7 @@ mise up-packer-network
 現状はkakomon14のみ。cloud-init(`kakomon14/cloud-init/user-data.yaml.gz`)経由でisucon14(Go版)をプロビジョニングする。
 
 ```bash
-mise build-kakomon14
+mise kakomon14:build
 ```
 
 成功すると末尾に `AMIs were created: ap-northeast-1: ami-xxxxxxxx` のようにAMI IDが出力される。
@@ -105,5 +105,5 @@ aws ec2 delete-snapshot --region ap-northeast-1 --snapshot-id "$SNAPSHOT_ID"
 ## Packerビルド用VPCを片付ける(基本不要)
 
 ```bash
-mise down-packer-network
+mise packer:down-network
 ```

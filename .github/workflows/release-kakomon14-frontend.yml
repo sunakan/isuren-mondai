@@ -34,11 +34,11 @@ jobs:
           install: false
           cache: false
 
-      # build+releaseはmise run release-kakomon14がローカル運用と同じ手順で行う
+      # build+releaseはmise run kakomon14:releaseがローカル運用と同じ手順で行う
       # (kakomon14/scripts/build-frontend-release.sh → scripts/github-release.shの順)。
       # ワークフロー側で2ステップに分けて再実装すると処理が重複するため、既存タスクをそのまま呼ぶ。
       # GH_TOKENはこのstepだけで使うため、job全体のenvには置かない
       # (ghalintのjob_secretsポリシー: github.tokenをjob envに置かない)。
-      - run: mise run release-kakomon14 "${GITHUB_REF_NAME}"
+      - run: mise run kakomon14:release "${GITHUB_REF_NAME}"
         env:
           GH_TOKEN: ${{ github.token }}

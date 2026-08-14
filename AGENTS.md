@@ -94,7 +94,7 @@ frontendはAMI上ではビルドしない。t4g.small(メモリ1.8GiB、swap無�
   タグは`kakomon14-frontend-v1.0.0`のように過去問+役割を接頭辞にする(1つのリポジトリで複数過去問の
   リリースを扱うため)
 - 正のリリース経路は`.github/workflows/release-kakomon14-frontend.yml`によるタグpush契機のCI
-  (`ubuntu-24.04-arm`。AMIの実行環境と揃える)。`mise run release-kakomon14`はCIが使えない時の
+  (`ubuntu-24.04-arm`。AMIの実行環境と揃える)。`mise run kakomon14:release`はCIが使えない時の
   緊急用経路として残している。checkout直後のmise設定はuntrusted扱いになるため、CI側では
   `MISE_TRUSTED_CONFIG_PATHS`を明示している
 - AMI側(`80-frontend.sh`)は`FRONTEND_RELEASE_TAG`で固定したタグ(他の`*_COMMIT`系変数と同じ

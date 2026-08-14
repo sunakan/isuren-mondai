@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-#MISE description="kakomon14のビルド成果物をGitHub Releaseへアップロード(引数: タグ名。例: mise run release-kakomon14 kakomon14-v1.0.0)"
+#MISE description="kakomon14のビルド成果物をGitHub Releaseへアップロード(引数: タグ名。例: mise run kakomon14:release kakomon14-v1.0.0)"
 set -euo pipefail
-TAG="${1:?タグ名を指定してください(例: mise run release-kakomon14 kakomon14-v1.0.0)}"
+TAG="${1:?タグ名を指定してください(例: mise run kakomon14:release kakomon14-v1.0.0)}"
 # 時間のかかるビルドを始める前にタグの重複を検知したいため、depends(常にビルドが先に走る)
 # ではなくここで明示的に順序を制御する。
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
 require_tag_absent_or_at_head "$TAG"
 
-mise run build-frontend-kakomon14
+mise run kakomon14:build-frontend
 scripts/github-release.sh "$TAG" \
   kakomon14/dist/kakomon14-frontend.tar.gz \
   kakomon14/dist/frontend_hashes.json \
