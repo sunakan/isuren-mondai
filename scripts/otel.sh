@@ -43,7 +43,7 @@ otel_emit_provisioning_spans() {
   disk_total="$(grep -oE '\[kakomon14\] provisioning\.all: disk_total_bytes=[0-9]+' "${build_log}" | tail -n1 | sed -nE 's/.*disk_total_bytes=([0-9]+).*/\1/p' || true)"
 
   local start_line
-  start_line="$(grep -E '^\[kakomon14\] provisioning\.all: start_ns=' "${build_log}" | tail -n1 || true)"
+  start_line="$(grep -E '\[kakomon14\] provisioning\.all: start_ns=' "${build_log}" | tail -n1 || true)"
   local provisioning_start_ns
   provisioning_start_ns="$(printf '%s\n' "${start_line}" | sed -nE 's/.*start_ns=([0-9]+).*/\1/p')"
   local provisioning_disk_before
@@ -52,7 +52,7 @@ otel_emit_provisioning_spans() {
   received_traceparent="$(printf '%s\n' "${start_line}" | sed -nE 's/.*traceparent=(.*)$/\1/p')"
 
   local end_line
-  end_line="$(grep -E '^\[kakomon14\] provisioning\.all: end_ns=' "${build_log}" | tail -n1 || true)"
+  end_line="$(grep -E '\[kakomon14\] provisioning\.all: end_ns=' "${build_log}" | tail -n1 || true)"
   local provisioning_end_ns
   provisioning_end_ns="$(printf '%s\n' "${end_line}" | sed -nE 's/.*end_ns=([0-9]+).*/\1/p')"
   local provisioning_disk_after
@@ -92,7 +92,7 @@ otel_emit_provisioning_spans() {
     --attrs "disk.total_bytes=${disk_total},disk.before_bytes=${provisioning_disk_before},disk.after_bytes=${provisioning_disk_after},disk.delta_bytes=$((provisioning_disk_after - provisioning_disk_before)),exit_status=${provisioning_exit_status}" \
     --status-code "${provisioning_status_code}"
 
-  grep -E '^\[kakomon14\] step: ' "${build_log}" | while IFS= read -r line; do
+  grep -E '\[kakomon14\] step: ' "${build_log}" | while IFS= read -r line; do
     local step_script step_start_ns step_end_ns step_disk_before step_disk_after step_exit_status
     step_script="$(printf '%s\n' "${line}" | sed -nE 's/.*script=([^ ]+).*/\1/p')"
     step_start_ns="$(printf '%s\n' "${line}" | sed -nE 's/.*start_ns=([0-9]+).*/\1/p')"
