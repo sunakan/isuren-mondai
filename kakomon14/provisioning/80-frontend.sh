@@ -71,7 +71,7 @@ deploy_public() {
 }
 
 # frontend_hashes.json/frontend_files.jsonはbenchがfrontendの整合性確認に使うファイル
-# (kakomon14/upstream/isucon14/NOTICE.md「コミット対象から外したもの」参照)。
+# (upstream/isucon14/NOTICE.md「コミット対象から外したもの」参照)。
 # 取り込み時点の古い内容の上に、ダウンロードした最新版を上書きする。
 deploy_benchrun_manifests() {
   local f

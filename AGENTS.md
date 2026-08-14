@@ -26,8 +26,11 @@ frontendはAMI上ビルドからGitHub Releaseダウンロード方式へ移行�
 
 ## 過去問コードの取り込み(upstream)方針
 
-各過去問ディレクトリ(`kakomon14/`等)配下に`upstream/`を置き、取り込み元リポジトリ名でディレクトリを分ける
-(例: `kakomon14/upstream/isucon14/`。将来的に`kakomon14/upstream/isucon14-portal/`等も同様)。
+リポジトリルート直下に`upstream/`を置き、取り込み元リポジトリ名でディレクトリを分ける
+(例: `upstream/isucon14/`。将来的に`upstream/isucon14-portal/`等も同様)。
+過去問ごとの自作コード(`kakomon14/`等)とは別の場所に置くことで、「自分のコード」と
+「取り込んだ本家コード」を分離している(node_modules等の重量物・大量のファイルが
+自作コードの検索・閲覧のノイズにならないようにするため)。
 GoLandがディレクトリ名`vendor`をGoのvendoring規約として誤認識し除外扱いにするため、`upstream`という
 名前を採用している。
 
@@ -100,7 +103,7 @@ frontendはAMI上ではビルドしない。t4g.small(メモリ1.8GiB、swap無�
 - AMI側(`80-frontend.sh`)は`FRONTEND_RELEASE_TAG`で固定したタグ(他の`*_COMMIT`系変数と同じ
   ピン留め方式)からダウンロードするだけ。`sunakan/isuren-mondai`はpublicリポジトリなので認証不要
 - `frontend_hashes.json`・`frontend_files.json`はbenchがfrontendの整合性確認に使うファイルで、
-  ビルドのたびに内容が変わるためgit管理していない(`kakomon14/upstream/isucon14/NOTICE.md`参照)。
+  ビルドのたびに内容が変わるためgit管理していない(`upstream/isucon14/NOTICE.md`参照)。
   ダウンロードした最新版を`bench/benchrun/`に上書き配置する
 
 ## 見逃しがちな注意点(isucon14版)
