@@ -1,7 +1,7 @@
 monorepo_root = true
 
 [monorepo]
-config_roots = []
+config_roots = ["kakomon14/scripts"]
 
 # CIツール類はアプリの実行に関与しないため、goと違い厳密なバージョン固定はせずlatestにする。
 # 実際の再現性・改ざん検知はmise.lockのチェックサム固定で担保する(mise run lock-tools参照)。
