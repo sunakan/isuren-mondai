@@ -17,24 +17,11 @@ OUTPUT_FILE = SCRIPT_DIR / "user-data.yaml"
 OUTPUT_FILE_GZ = SCRIPT_DIR / "user-data.yaml.gz"
 REMOTE_DIR = "/opt/kakomon14/provisioning"
 
-# READMEはプロビジョニングの実行に不要なので配置対象から除く
-FILES = [
-    "lib.sh",
-    "10-base.sh",
-    "20-user.sh",
-    "30-runtime.sh",
-    "40-mysql.sh",
-    "50-source.sh",
-    "60-initdb.sh",
-    "70-webapp-go.sh",
-    "75-matcher.sh",
-    "77-payment-mock.sh",
-    "80-frontend.sh",
-    "90-nginx.sh",
-    "95-deploy-helper.sh",
-    "99-verify.sh",
+# .shは自動収集する(新規スクリプト追加時にこのリストへの追記を忘れる事故を防ぐ)。
+# READMEはプロビジョニングの実行に不要なので対象外。write_filesの配置順は実行順に影響しない
+# (実行順はall.sh側が握る)ため、ソートのみで十分。
+FILES = sorted(p.name for p in PROVISIONING_DIR.glob("*.sh")) + [
     "goss.yaml",
-    "all.sh",
     "mise.ami.toml",
     "mise.ami.lock",
 ]
