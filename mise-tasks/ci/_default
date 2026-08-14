@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 #MISE description="shellcheck/shfmt/actionlint/zizmor/ghalint/pinactを並行実行する(1つが失敗しても他は完走させる)"
-#MISE depends=["shellcheck", "shfmt", "actionlint", "zizmor", "ghalint", "pinact"]
+#MISE depends=["ci:shellcheck", "ci:shfmt", "ci:actionlint", "ci:zizmor", "ci:ghalint", "ci:pinact"]
