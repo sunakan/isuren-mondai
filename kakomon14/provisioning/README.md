@@ -1,7 +1,8 @@
-# scripts/kakomon14
+# kakomon14/provisioning
 
-isucon14をbastion上でネイティブ構築するための冪等なプロビジョニングスクリプト群。
-`all.sh`で`10-base.sh`〜`95-deploy-helper.sh`を順に実行する。
+isucon14(Go)をAMI上に構築するためのプロビジョニングスクリプト群(cloud-init経由でPackerビルド時に
+実行される)。各スクリプトはコマンド自体が冪等な操作を無条件実行し、意図した状態になっているかは
+`99-verify.sh`(goss)で最後にまとめて検証する。`all.sh`で`10-base.sh`〜`99-verify.sh`を順に実行する。
 
 ## チューニング中の再デプロイ
 
