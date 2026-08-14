@@ -3,4 +3,5 @@
 set -euo pipefail
 aws cloudformation deploy \
   --stack-name "$PACKER_NETWORK_STACK_NAME" \
-  --template-file packer-network.yaml
+  --template-file packer-network.yaml \
+  --capabilities CAPABILITY_IAM

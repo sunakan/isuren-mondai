@@ -47,6 +47,27 @@ Resources:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
+  # Packerがビルド中に起動する一時インスタンスへ付与する。SSM Session Manager経由で
+  # ビルド中の状態を覗けるようにするため(verify-ami.yamlのInstanceRoleと同じ用途・構成)。
+  PackerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  PackerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref PackerInstanceRole
+
 Outputs:
   VpcId:
     Description: Packer build用VPCのID
@@ -54,3 +75,6 @@ Outputs:
   SubnetId:
     Description: Packer build用Public SubnetのID
     Value: !Ref PublicSubnet
+  PackerInstanceProfileName:
+    Description: Packerビルド中の一時インスタンスへ付与するInstanceProfile名(SSM接続用)
+    Value: !Ref PackerInstanceProfile

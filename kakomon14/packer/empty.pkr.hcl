@@ -20,6 +20,13 @@ variable "subnet_id" {
   type = string
 }
 
+# packer-network.yamlのPackerInstanceProfile(AmazonSSMManagedInstanceCore付き)。
+# ビルド中の一時インスタンスへSSM Session Manager経由で接続し、cloud-initの進行状況を
+# 直接デバッグできるようにするため(mise-tasks/kakomon14/buildがCloudFormation Outputsから渡す)。
+variable "iam_instance_profile" {
+  type = string
+}
+
 # isuren-mondai自身のビルド元コミットへのGitHub URL(mise-tasks/kakomon14/buildが
 # git rev-parse HEADから組み立てて渡す)。cloud-initのgit clone対象と同じコミットを指す。
 variable "project_url" {
@@ -71,10 +78,11 @@ source "amazon-ebs" "kakomon14" {
   source_ami      = data.amazon-ami.ubuntu.id
   # ISUCON14公式の競技者VM(c5.large: 2vCPU/4GiB)とメモリ量を揃える。
   # t4g.small(2GiB)ではフロントエンドビルド等でOOMのリスクがあるため避ける。
-  instance_type   = "t4g.medium"
-  ssh_username    = "ubuntu"
-  vpc_id          = var.vpc_id
-  subnet_id       = var.subnet_id
+  instance_type        = "t4g.medium"
+  ssh_username         = "ubuntu"
+  vpc_id               = var.vpc_id
+  subnet_id            = var.subnet_id
+  iam_instance_profile = var.iam_instance_profile
 
   # cloud-init/generate-user-data.pyが生成したもの。git cloneで実体を取得する構成のため
   # 内容はごく小さく、EC2 User Dataの16KB制限(base64後)を気にする必要がない。

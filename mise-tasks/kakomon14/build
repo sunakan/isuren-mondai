@@ -7,6 +7,9 @@ VPC_ID="$(aws cloudformation describe-stacks \
 SUBNET_ID="$(aws cloudformation describe-stacks \
   --stack-name "$PACKER_NETWORK_STACK_NAME" \
   --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
 
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
@@ -38,6 +41,7 @@ trap 'rm -f "$BUILD_LOG" frontend-release-tag.txt' EXIT
 packer build \
   -var "vpc_id=$VPC_ID" \
   -var "subnet_id=$SUBNET_ID" \
+  -var "iam_instance_profile=$IAM_INSTANCE_PROFILE" \
   -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
   -var "base_url=https://github.com/isucon/isucon14/commit/${ISUCON14_COMMIT}" \
   empty.pkr.hcl | tee "$BUILD_LOG"
