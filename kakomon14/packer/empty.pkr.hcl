@@ -95,11 +95,12 @@ source "amazon-ebs" "kakomon14" {
   # kms_key_idを指定しない場合はaws/ebsが使われる。
   encrypt_boot = true
 
-  # bastion実測(mysqlデータ242MB+isucon14リポジトリ427MB+mise本体・モジュールキャッシュ624MB≒計1.3GB)の
-  # 3倍以上の余裕を持たせる(docs/plans/kakomon14/completed/20260812182550-cloud-init-handoff-prep.md)
+  # 実機のAMI検証(verify-ami)でdu -x /を実測したところ実データは3.2GBだった。EBSスナップショットは
+  # 使用済みブロックを差分記録する仕組みのため、削除済みファイルの残骸ブロック(TRIM/discard未対応の
+  # ため解放されない)を含めても収まる見込みで16から8に縮小し、AMIサイズの縮小を狙う。
   launch_block_device_mappings {
     device_name = "/dev/sda1"
-    volume_size = 16
+    volume_size = 8
     # デフォルトfalseのため明示しないと、一時ビルドインスタンス終了後もルートボリュームが
     # 削除されずビルドのたびに蓄積する(Packer公式ドキュメントに明記された既知の注意点。
     # 実際に本プロジェクトでも過去のビルドで複数の未アタッチボリュームが蓄積していたことを確認した)。
