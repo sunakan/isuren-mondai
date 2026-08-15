@@ -155,6 +155,15 @@ build {
       # クローンされた全インスタンスに引き継がれる(実機で複数インスタンスが同一machine-idを
       # 持つことを確認済み)。空にしておけば次回起動時にsystemdが自動生成する。
       "sudo truncate -s 0 /etc/machine-id",
+      # cloud-initのsshモジュール(ssh_deletekeys: true、デフォルト)は起動時に既存鍵を検知して
+      # 削除・再生成するため、鍵を消さなくても実行時の安全性(インスタンスごとに異なる鍵になること)
+      # 自体は保たれる(実機確認済み)。ただしそれはcloud-init側の設定に依存した間接的な保証であり、
+      # AWSの公開AMI作成ベストプラクティスは鍵ファイル自体をAMIスナップショットに残さないことを
+      # 直接推奨しているため、より確実な対応として削除しておく。
+      "sudo rm -f /etc/ssh/ssh_host_*",
+      # systemdのrandom-seedも複製元から削除するのがイメージ作成の定石(起動時にsystemdが
+      # 再生成する)。machine-id/SSH host keyほどの実害は無いが対応コストが低いため合わせて行う。
+      "sudo rm -f /var/lib/systemd/random-seed",
       # cloud-initはinstance-idの変化を検知してruncmd等を自動的に再実行するため、cleanしなくても
       # 機能的には問題ない(実機確認済み)。ただしAMIビルド時のログが新規起動インスタンスの
       # 初回ログに混在するとデバッグしづらいため、ログも含めてクリーンにしておく。
