@@ -58,9 +58,14 @@ Resources:
   BenchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: kakomon14 bench role (all traffic within the VPC)
+      GroupDescription: kakomon14 bench role (SSH from anywhere, all traffic within the VPC)
       VpcId: !Ref Vpc
       SecurityGroupIngress:
+        - Description: SSH from anywhere
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
         - Description: All traffic from within the VPC
           IpProtocol: -1
           CidrIp: 10.42.0.0/16
