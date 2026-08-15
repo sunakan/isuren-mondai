@@ -58,6 +58,7 @@ Resources:
   BenchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupDescription: kakomon14 bench role (all traffic within the VPC)
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - Description: All traffic from within the VPC

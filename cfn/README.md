@@ -1,26 +1,30 @@
-# cfn
+# CloudFormation
 
-kakomon14等のAMIを使ってベンチマーカー・競技サーバーを実際に起動するための、利用者向けCloudFormationテンプレート置き場。
-AMI自体の作り方(Packer/provisioning)は`kakomon14/`配下を参照。
+ベンチマーカー・競技サーバーを実際に起動するCloudFormationテンプレート置き場
 
 ## kakomon14-1bench-1web.yaml
 
-kakomon14 AMIから「ベンチマーカー1台+競技サーバー1台」構成を起動する使い捨てスタック。
-
-### 展開
+### デプロイ例
 
 ```shell
+# 例: GITHUB_USERS="sunakan"
+GITHUB_USERS=''
+AMI_ID=$(aws ec2 describe-images --owners self \
+  --filters 'Name=name,Values=isuren/kakomon14-*' 'Name=state,Values=available' \
+  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
+
 aws cloudformation deploy \
   --stack-name kakomon14-1bench-1web \
   --template-file cfn/kakomon14-1bench-1web.yaml \
-  --parameter-overrides AmiId=ami-xxxxxxxxxxxxxxxxx GithubUsers="your-github-id" \
+  --parameter-overrides AmiId="$AMI_ID" GithubUsers="${GITHUB_USERS}" \
   --capabilities CAPABILITY_IAM
 ```
 
-- `AmiId`: `mise run kakomon14:build`でビルドしたAMIのID(必須)
-- `GithubUsers`: 公開鍵を`https://github.com/<user>.keys`から取得して注入する、スペース区切りのGitHubユーザー名(任意。省略した場合はSSM Session Manager経由でのみ接続可能)
+- `AmiId`: `mise run kakomon14:build`でビルドした最新のAMIのID(必須。上記の`describe-images`で自動解決)
+- `GithubUsers`: 公開鍵を`https://github.com/<user>.keys`から取得して注入する、スペース区切りのGitHubユーザー名(任意)
+    - なくてもSSM Session Manager経由でも接続可能
 
-### 接続
+### ベンチ例
 
 ```shell
 aws ec2 describe-instances \
