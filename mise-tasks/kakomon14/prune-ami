@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#MISE description="最新のkakomon14 AMI以外のAMIと、紐づくスナップショットを削除する"
+#MISE interactive=true
+set -euo pipefail
+
+# AMIはビルドのたびに増えていき、登録解除してもスナップショットは自動では消えない
+# (実際に17個・240GBの未アタッチスナップショットが蓄積していたことがある)。
+# 最新1件だけ残し、それ以外をまとめて掃除する。
+# sort_by(...)[:-1]: 昇順ソートした末尾(最新)を除いた全件。
+TARGETS="$(aws ec2 describe-images --owners self \
+  --filters 'Name=name,Values=isuren/kakomon14-*' 'Name=state,Values=available' \
+  --query 'sort_by(Images,&CreationDate)[:-1].[ImageId,Name,CreationDate]' --output text)"
+
+if [ -z "$TARGETS" ]; then
+  echo "削除対象のAMIはありません(最新の1件のみ、または0件)"
+  exit 0
+fi
+
+echo "以下のAMIを削除します(スナップショットも含む):"
+echo "$TARGETS"
+read -r -p "続行しますか? [y/N] " ANSWER
+if [ "$ANSWER" != "y" ]; then
+  echo "中止しました"
+  exit 0
+fi
+
+while IFS=$'\t' read -r AMI_ID NAME _; do
+  SNAPSHOT_IDS="$(aws ec2 describe-images --image-ids "$AMI_ID" \
+    --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId' --output text)"
+  aws ec2 deregister-image --image-id "$AMI_ID"
+  echo "deregistered: ${AMI_ID} (${NAME})"
+  for SNAPSHOT_ID in $SNAPSHOT_IDS; do
+    aws ec2 delete-snapshot --snapshot-id "$SNAPSHOT_ID"
+    echo "deleted snapshot: ${SNAPSHOT_ID}"
+  done
+done <<<"$TARGETS"
