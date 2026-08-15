@@ -1,0 +1,4 @@
+interface:
+  display_name: "過去問AMI Recipe Onboarding"
+  short_description: "過去問AMI recipeの監査・計画・実装・検証を段階化する"
+  default_prompt: "$onboard-kakomon-ami-recipe を使って、指定した過去問AMI recipeをまずread-onlyで監査してください。"
