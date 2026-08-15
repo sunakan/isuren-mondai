@@ -22,28 +22,17 @@ file:
     group: root
     mode: "0440"
 
-  # 50-source.sh: シンボリックリンクではなく実ファイルとしてデプロイされていること
-  # (systemdのWorkingDirectory罠を避けるための方式変更。実際に反映されたかは今まで未検証だった)
+  # 85-bench-build.sh: ~/isucon14は各ステップ(50-source.shのfrontend/webapp削除、
+  # 85-bench-build.shのbench削除・LICENSE退避)で使い切られ、最終的にディレクトリ自体が
+  # 削除されていること
   /home/isuren/isucon14:
-    exists: true
-    filetype: directory
-  # 50-source.sh: 複製後の~/isucon14/webappは使われないため削除されていること
-  /home/isuren/isucon14/webapp:
-    exists: false
-  # 50-source.sh: frontendソース一式はどこからも参照されないため削除されていること
-  /home/isuren/isucon14/frontend:
-    exists: false
-  # 85-bench-build.sh: 単一バイナリのビルド後、ソース一式は不要なため削除されていること
-  /home/isuren/isucon14/bench:
     exists: false
   /home/isuren/bench:
     exists: true
     filetype: file
     mode: "0755"
-  # 50-source.sh: NOTICE.mdは実行環境に不要なため削除、LICENSEは著作権表示要件のため残す
-  /home/isuren/isucon14/NOTICE.md:
-    exists: false
-  /home/isuren/isucon14/LICENSE:
+  # 85-bench-build.sh: LICENSE(著作権表示要件のため必須)はホーム直下に退避されていること
+  /home/isuren/LICENSE:
     exists: true
     filetype: file
   /home/isuren/webapp:

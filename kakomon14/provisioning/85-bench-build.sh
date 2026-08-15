@@ -43,8 +43,19 @@ cleanup_bench_source() {
   log "isucon14/bench: removed"
 }
 
+# ~/isucon14はここまでの各ステップ(50-source.shのcleanup_isucon14_frontend/deploy_webapp、
+# 直前のcleanup_bench_source)で中身を使い切っており、この時点でLICENSE(MIT表示、著作権表示
+# 要件のため必須)だけが残る。ディレクトリ自体を残す意味が無いため、LICENSEをホーム直下へ
+# 移動して畳む。rmdirは空でない場合に失敗するため、想定外の残留物があれば検知できる。
+finalize_isucon14_license() {
+  mv "${ISUREN_HOME}/isucon14/LICENSE" "${ISUREN_HOME}/LICENSE"
+  rmdir "${ISUREN_HOME}/isucon14"
+  log "isucon14: LICENSE moved to home, directory removed"
+}
+
 update_benchrun_manifests
 build_bench
 cleanup_bench_source
+finalize_isucon14_license
 
 log "85-bench-build.sh: done"
