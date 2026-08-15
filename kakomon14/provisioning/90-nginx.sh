@@ -11,8 +11,8 @@ SITE_AVAILABLE="/etc/nginx/sites-available/isuride.conf"
 SITE_ENABLED="/etc/nginx/sites-enabled/isuride.conf"
 DEFAULT_ENABLED="/etc/nginx/sites-enabled/default"
 TLS_DIR="/etc/nginx/tls"
-TLS_CERT="${TLS_DIR}/_.xiv.isucon.net.crt"
-TLS_KEY="${TLS_DIR}/_.xiv.isucon.net.key"
+TLS_CERT="${TLS_DIR}/_.xiv.isuren.internal.crt"
+TLS_KEY="${TLS_DIR}/_.xiv.isuren.internal.key"
 
 # 対応: isucon14/provisioning/ansible/roles/nginx/tasks/main.yaml「Install package」
 # 2回目以降にネットワークへ出ないよう、未インストールのときだけapt-get updateする。
@@ -27,7 +27,9 @@ install_nginx() {
 }
 
 # 対応: isucon14/provisioning/ansible/roles/nginx/files/etc/nginx/tls/_.xiv.isucon.net.{crt,key}
-# 公式証明書は失効済み(2025年2月)のため自己署名で代用する。ベンチはTLS検証をしないため問題ない。
+# (公式証明書は失効済み(2025年2月)のため自己署名で代用する。ベンチはTLS検証をしないため問題ない)。
+# CN/SANはxiv.isucon.netではなくxiv.isuren.internalを使う(10-base.shのisuride.xiv.isuren.internalと
+# 同じ理由: 「isucon」はさくらインターネット株式会社の商標のため、配布するAMIには含めない)。
 # 有効期限が近い(30日未満)/存在しない場合のみ再生成する冪等な作りにする。
 generate_tls_cert() {
   if [ "${ENABLE_TLS}" != "true" ]; then
@@ -40,8 +42,8 @@ generate_tls_cert() {
     openssl req -x509 -nodes -newkey rsa:2048 \
       -keyout "${TLS_KEY}" -out "${TLS_CERT}" \
       -days 3650 \
-      -subj "/CN=*.xiv.isucon.net" \
-      -addext "subjectAltName=DNS:*.xiv.isucon.net,DNS:xiv.isucon.net"
+      -subj "/CN=*.xiv.isuren.internal" \
+      -addext "subjectAltName=DNS:*.xiv.isuren.internal,DNS:xiv.isuren.internal"
     log "nginx tls cert: generated"
   fi
 }
@@ -50,7 +52,7 @@ generate_tls_cert() {
 # 公式は443のみでTLS必須の構成だが、まずTLSなしのHTTP版で静的配信+/apiプロキシの経路を通す。
 # ボット避けのデフォルトvhost(公式L1-26)は本番運営向けのセキュリティ対策であり、
 # このbastionでは不要なため省略し、単一のHTTP vhostのみにした。
-# ENABLE_TLS=trueのときのみ、公式L28-56相当の443 vhost(xiv.isucon.net向け)を追加する。
+# ENABLE_TLS=trueのときのみ、公式L28-56相当の443 vhost(xiv.isuren.internal向け)を追加する。
 set_site_config() {
   local content
   content=$(
@@ -88,8 +90,8 @@ $(
 
 server {
   listen 443 ssl;
-  server_name xiv.isucon.net;
-  server_name *.xiv.isucon.net;
+  server_name xiv.isuren.internal;
+  server_name *.xiv.isuren.internal;
 
   ssl_certificate ${TLS_CERT};
   ssl_certificate_key ${TLS_KEY};
