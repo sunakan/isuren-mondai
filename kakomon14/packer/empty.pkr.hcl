@@ -91,9 +91,9 @@ source "amazon-ebs" "kakomon14" {
   tags          = local.ami_tags
   snapshot_tags = local.ami_tags
 
-  # AWS管理キー(aws/ebs)での暗号化は追加課金なし(https://aws.amazon.com/kms/pricing/)。
-  # kms_key_idを指定しない場合はaws/ebsが使われる。
-  encrypt_boot = true
+  # AWS管理キー(aws/ebs)で暗号化するとPublic AMIにできない
+  # 暗号化しないことを明示
+  encrypt_boot = false
 
   # 実機のAMI検証(verify-ami)でdu -x /を実測したところ実データは3.2GBだった。EBSスナップショットは
   # 使用済みブロックを差分記録する仕組みのため、削除済みファイルの残骸ブロック(TRIM/discard未対応の
