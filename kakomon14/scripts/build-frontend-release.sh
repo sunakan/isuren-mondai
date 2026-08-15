@@ -53,7 +53,10 @@ mkdir -p "${DIST_DIR}"
 rm -f "${ARTIFACT}"
 # COPYFILE_DISABLE=1: macOSのtarはデフォルトで拡張属性/リソースフォークを`._*`という
 # AppleDoubleファイルとして同梱してしまう(Linux上のtarでは不要だが無害なので常に設定する)。
-COPYFILE_DISABLE=1 tar -C "${FRONTEND_DIR}/build/client" -czf "${ARTIFACT}" .
+# LICENSE: GitHub Releaseとして単体配布されるアーティファクトになるため、MITライセンスが
+# 求める著作権表示・ライセンス全文の同梱を満たす目的で含める(複数の-C指定はBSD tar/GNU tar
+# どちらも対応)。
+COPYFILE_DISABLE=1 tar -czf "${ARTIFACT}" -C "${FRONTEND_DIR}/build/client" . -C "${REPO_ROOT}/upstream/isucon14" LICENSE
 cp "${BENCHRUN_DIR}/frontend_hashes.json" "${DIST_DIR}/frontend_hashes.json"
 cp "${BENCHRUN_DIR}/frontend_files.json" "${DIST_DIR}/frontend_files.json"
 
