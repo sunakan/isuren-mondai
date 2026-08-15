@@ -72,8 +72,10 @@ data "amazon-ami" "ubuntu" {
 }
 
 source "amazon-ebs" "kakomon14" {
-  ami_name        = local.name
-  ami_description = "kakomon14 isucon14(Go) provisioned by cloud-init"
+  ami_name = local.name
+  # "isucon"はさくらインターネット株式会社の商標のため、Public AMI化する方針を踏まえ含めない
+  # (README.mdの注記、nginx TLS証明書のホスト名変更(commit 9ef6955)と同様の対応)。
+  ami_description = "kakomon14 webapp environment (Go) provisioned by cloud-init"
   region          = var.region
   source_ami      = data.amazon-ami.ubuntu.id
   # ISUCON14公式の競技者VM(c5.large: 2vCPU/4GiB)とメモリ量を揃える。
@@ -139,5 +141,24 @@ build {
     source      = "/tmp/kakomon14-frontend-release-tag"
     destination = "${path.root}/frontend-release-tag.txt"
     direction   = "download"
+  }
+
+  # AMI化直前のクリーンアップ。ログ抽出・fileダウンロードより後に置く
+  # (cloud-init cleanで/var/log/cloud-init-output.logが消え、それより前段のログ抽出が壊れるため)。
+  provisioner "shell" {
+    inline = [
+      # ubuntuユーザーのauthorized_keysには、Packerが一時的に使うSSH公開鍵がAMI化後も残る
+      # (対応する秘密鍵はPacker側の使い捨てで実害は低いが、公開するAMIに素性不明の鍵を
+      # 残したくない)。
+      "sudo truncate -s 0 /home/ubuntu/.ssh/authorized_keys",
+      # machine-idはcloud-initのSSHホストキー再生成(cc_ssh)と異なりビルド時点の値がそのまま
+      # クローンされた全インスタンスに引き継がれる(実機で複数インスタンスが同一machine-idを
+      # 持つことを確認済み)。空にしておけば次回起動時にsystemdが自動生成する。
+      "sudo truncate -s 0 /etc/machine-id",
+      # cloud-initはinstance-idの変化を検知してruncmd等を自動的に再実行するため、cleanしなくても
+      # 機能的には問題ない(実機確認済み)。ただしAMIビルド時のログが新規起動インスタンスの
+      # 初回ログに混在するとデバッグしづらいため、ログも含めてクリーンにしておく。
+      "sudo cloud-init clean --logs",
+    ]
   }
 }
