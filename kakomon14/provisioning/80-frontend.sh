@@ -65,6 +65,10 @@ deploy_public() {
   runuser -u "${ISUREN_USER}" -- rm -rf "${staging}"
   runuser -u "${ISUREN_USER}" -- mkdir -p "${staging}" "${WEBAPP_PUBLIC_DIR}"
   runuser -u "${ISUREN_USER}" -- tar -xzf "${FRONTEND_RELEASE_DIR}/kakomon14-frontend.tar.gz" -C "${staging}"
+  # LICENSE: GitHub Release単体配布のアーティファクトとしては同梱している
+  # (kakomon14/scripts/build-frontend-release.sh参照)が、nginx配信対象のwebapp/publicには不要
+  # (~/isucon14/LICENSEで著作権表示は既に満たしている。50-source.sh参照)。
+  runuser -u "${ISUREN_USER}" -- rm -f "${staging}/LICENSE"
   runuser -u "${ISUREN_USER}" -- rsync -a --delete "${staging}/" "${WEBAPP_PUBLIC_DIR}/"
   log "webapp/public: deployed"
 }
