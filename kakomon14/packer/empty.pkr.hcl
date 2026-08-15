@@ -163,6 +163,12 @@ build {
       "sudo rm -f /etc/ssh/ssh_host_*",
       # systemdのrandom-seedも複製元から削除するのがイメージ作成の定石(起動時にsystemdが
       # 再生成する)。machine-id/SSH host keyほどの実害は無いが対応コストが低いため合わせて行う。
+      # systemd-random-seed.serviceはConflicts=shutdown.target(ExecStop=...save)を持つため、
+      # rm -fするだけだとPackerのインスタンス停止(内部的にはOS通常のshutdownシーケンス)時に
+      # このExecStopが発火し、削除したファイルが保存し直されて復活してしまう(実機のunit定義で
+      # 確認済み)。事前にサービス自体をstopしてinactiveにしておけば、shutdown時に再度stopが
+      # 要求されてもExecStopは実行されない。
+      "sudo systemctl stop systemd-random-seed.service",
       "sudo rm -f /var/lib/systemd/random-seed",
       # cloud-initはinstance-idの変化を検知してruncmd等を自動的に再実行するため、cleanしなくても
       # 機能的には問題ない(実機確認済み)。ただしAMIビルド時のログが新規起動インスタンスの
