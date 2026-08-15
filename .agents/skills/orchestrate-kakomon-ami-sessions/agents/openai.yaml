@@ -1,0 +1,4 @@
+interface:
+  display_name: "ルートセッションスキル"
+  short_description: "過去問AMI別セッションの準備・レビュー・main統合"
+  default_prompt: "$orchestrate-kakomon-ami-sessions を使って、対象過去問の専用worktree、実装プロンプト、commitとmain統合gateを準備してください。"
