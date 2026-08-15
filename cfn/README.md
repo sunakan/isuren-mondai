@@ -27,16 +27,23 @@ aws cloudformation deploy \
 ### ベンチ例
 
 ```shell
-aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=kakomon14-bench,kakomon14-web1" "Name=instance-state-name,Values=running" \
-  --query "Reservations[].Instances[].{Name:Tags[?Key=='Name']|[0].Value,InstanceId:InstanceId,PublicIp:PublicIp}" \
-  --output table
+STACK_NAME=kakomon14-1bench-1web
+WEB1_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon14-web1" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicIp" --output text)
+BENCH_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon14-bench" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicIp" --output text)
+echo "web1: ${WEB1_IP} / bench: ${BENCH_IP}"
 ```
+
+`web1`・`bench`どちらも空や`None`でないことを確認する(スタック名・タグの絞り込みが正しく効いているかのチェックを兼ねる)。
 
 GithubUsersを指定した場合はSSHで、指定しない場合はSSM Session Managerで接続する。
 
 ```shell
-ssh isuren@<Public IP>
+ssh isuren@${WEB1_IP}
+ssh isuren@${BENCH_IP}
 aws ssm start-session --target <Instance ID>
 ```
 
