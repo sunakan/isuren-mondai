@@ -1,0 +1,31 @@
+syntax = "proto3";
+package isuxportal.proto.services.bench;
+
+
+import "isuxportal/resources/benchmark_result.proto";
+
+service BenchmarkReport {
+  rpc ReportBenchmarkResult(stream ReportBenchmarkResultRequest)
+    returns (stream ReportBenchmarkResultResponse);
+  rpc CompleteBenchmarkJob(CompleteBenchmarkJobRequest)
+    returns (CompleteBenchmarkJobResponse);
+}
+
+message ReportBenchmarkResultRequest {
+  int64 job_id = 1;
+  string handle = 2;
+  int64 nonce = 3 [ deprecated = true ];
+  isuxportal.proto.resources.BenchmarkResult result = 4;
+}
+
+message ReportBenchmarkResultResponse {
+  int64 acked_nonce = 1 [ deprecated = true ];
+}
+
+message CompleteBenchmarkJobRequest {
+  int64 job_id = 1;
+  string handle = 2;
+  isuxportal.proto.resources.BenchmarkResult result = 4;
+}
+
+message CompleteBenchmarkJobResponse {}

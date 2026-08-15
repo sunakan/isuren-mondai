@@ -1,0 +1,8 @@
+# 親の../.gitignore(本家由来のため書き換えない)の先頭/なしbenchパターンが、無関係な
+# ディレクトリ名services/bench/にも意図せずマッチする罠がある(CLAUDE.md「見逃しがちな注意点」参照)。
+# gRPC生成コード(.pb.go/.proto)一式がこれで無視されコミットから漏れていたため、
+# より深い階層のこのファイルで打ち消す(.gitignoreは深い階層のものほど後に評価され優先される)。
+!gen/isuxportal/services/bench/
+!gen/isuxportal/services/bench/**
+!proto/isuxportal/services/bench/
+!proto/isuxportal/services/bench/**
