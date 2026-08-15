@@ -27,6 +27,25 @@ file:
   /home/isuren/isucon14:
     exists: true
     filetype: directory
+  # 50-source.sh: 複製後の~/isucon14/webappは使われないため削除されていること
+  /home/isuren/isucon14/webapp:
+    exists: false
+  # 50-source.sh: frontendソース一式はどこからも参照されないため削除されていること
+  /home/isuren/isucon14/frontend:
+    exists: false
+  # 85-bench-build.sh: 単一バイナリのビルド後、ソース一式は不要なため削除されていること
+  /home/isuren/isucon14/bench:
+    exists: false
+  /home/isuren/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  # 50-source.sh: NOTICE.mdは実行環境に不要なため削除、LICENSEは著作権表示要件のため残す
+  /home/isuren/isucon14/NOTICE.md:
+    exists: false
+  /home/isuren/isucon14/LICENSE:
+    exists: true
+    filetype: file
   /home/isuren/webapp:
     exists: true
     filetype: directory
@@ -59,12 +78,6 @@ file:
     linked-to: /etc/nginx/sites-available/isuride.conf
   /etc/nginx/sites-enabled/default:
     exists: false
-
-  # 95-deploy-helper.sh
-  /home/isuren/deploy.sh:
-    exists: true
-    filetype: file
-    mode: "0755"
 
 group:
   isuren:

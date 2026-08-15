@@ -12,16 +12,16 @@ source "${SCRIPT_DIR}/lib.sh"
 : "${UPSTREAM_COMMIT:=d9d526895d97a3707dda96c8fa722ec15356ba44}"
 UPSTREAM_SUBPATH="upstream/isucon14"
 
-# webapp/sql(サンプルデータ)・frontend/public(画像等の静的アセット)・env.shテンプレート
-# (DB接続情報。isucon-user roleのtemplates/env.sh)は自分で手を加えない読み取り専用データのため、
-# 取り込まず本家から直接sparse-checkoutで取得する(upstream/isucon14/NOTICE.md参照)。
+# webapp/sql(サンプルデータ)・env.shテンプレート(DB接続情報。isucon-user roleのtemplates/env.sh)は
+# 自分で手を加えない読み取り専用データのため、取り込まず本家から直接sparse-checkoutで取得する
+# (upstream/isucon14/NOTICE.md参照)。
 # env.shはISUCON_DB_USER/ISUCON_DB_PASSWORD="isucon"を含むが、本家の値をそのまま使う
 # (isucon-user roleが作るDBユーザーとの整合を保つため書き換えない。40-mysql.sh参照)。
 # コミットは/Users/user01/works/github.com/isucon/isucon14のHEADに合わせて固定
 # (isucon14公式リポジトリのmainブランチ、2024-12-13時点)。
 : "${ISUCON14_REPO_URL:=https://github.com/isucon/isucon14.git}"
 : "${ISUCON14_COMMIT:=53f8b627e040c30ebec600457c6c97da008b84b0}"
-ISUCON14_SUBPATHS=("webapp/sql" "frontend/public" "provisioning/ansible/roles/isucon-user/templates")
+ISUCON14_SUBPATHS=("webapp/sql" "provisioning/ansible/roles/isucon-user/templates")
 
 ISUREN_HOME="/home/${ISUREN_USER}"
 # sparse-checkoutの一時的な取得先。デプロイ完了後にcleanup_checkoutsで削除する
@@ -68,7 +68,7 @@ sparse_checkout_fetch() {
   fi
 }
 
-# 80-frontend.shが`~/isucon14/bench/benchrun`を参照する既存の前提を変えずに済むよう、
+# 85-bench-build.shが`~/isucon14/bench`を参照する既存の前提を変えずに済むよう、
 # 取り込んだ実体を~/isucon14へ実ファイルとしてデプロイする(rsyncはroot実行でもsrcの所有者
 # (isuren、sparse_checkout_fetchがrunuser -u isurenで取得したもの)を保持する)。
 #
@@ -81,7 +81,21 @@ deploy_isucon14() {
   log "isucon14: deployed"
 }
 
-# webapp/sqlとfrontend/publicは本家(isucon14公式リポジトリ)から別途取得したもの。
+# NOTICE.mdはisuren-mondaiリポジトリの取り込み範囲・除外理由を記録した開発者向けメモで、
+# 実行環境(AMI)には不要なため削除する。LICENSE(本家のMIT表示)は著作権表示要件のため残す。
+cleanup_isucon14_notice() {
+  rm -f "${ISUCON14_DIR}/NOTICE.md"
+  log "isucon14/NOTICE.md: removed"
+}
+
+# frontendはAMI上でビルドせず事前ビルド済みのGitHub Releaseを取得する(80-frontend.sh)ため、
+# ~/isucon14/frontend(ソース一式)はどこからも参照されない。
+cleanup_isucon14_frontend() {
+  rm -rf "${ISUCON14_DIR}/frontend"
+  log "isucon14/frontend: removed"
+}
+
+# webapp/sqlは本家(isucon14公式リポジトリ)から別途取得したもの。
 # ~/isucon14へ実ファイルとしてマージする(deploy_isucon14の後に呼ぶこと)。
 deploy_isucon14_readonly_data() {
   rsync -a --delete "${ISUCON14_CHECKOUT_DIR}/$1/" "${ISUCON14_DIR}/$1/"
@@ -90,8 +104,11 @@ deploy_isucon14_readonly_data() {
 
 # 70-webapp-go.sh等が`~/webapp`を参照する既存の前提を変えずに済むよう、
 # ~/isucon14/webapp(sql等のマージ済み)を~/webappへ実ファイルとして複製する。
+# 複製後の~/isucon14/webappは使われない(bench役が~/isucon14で必要とするのは~/isucon14/bench
+# のみ)ため削除する。
 deploy_webapp() {
   rsync -a --delete "${ISUCON14_DIR}/webapp/" "${WEBAPP_DIR}/"
+  rm -rf "${ISUCON14_DIR}/webapp"
   log "webapp: deployed"
 }
 
@@ -113,8 +130,9 @@ cleanup_checkouts() {
 sparse_checkout_fetch "${UPSTREAM_CHECKOUT_DIR}" "${UPSTREAM_REPO_URL}" "${UPSTREAM_COMMIT}" "${UPSTREAM_SUBPATH}"
 sparse_checkout_fetch "${ISUCON14_CHECKOUT_DIR}" "${ISUCON14_REPO_URL}" "${ISUCON14_COMMIT}" "${ISUCON14_SUBPATHS[@]}"
 deploy_isucon14
+cleanup_isucon14_notice
+cleanup_isucon14_frontend
 deploy_isucon14_readonly_data "webapp/sql"
-deploy_isucon14_readonly_data "frontend/public"
 deploy_webapp
 deploy_env_sh
 cleanup_checkouts

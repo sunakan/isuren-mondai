@@ -7,7 +7,6 @@ source "${SCRIPT_DIR}/lib.sh"
 
 ISUREN_HOME="/home/${ISUREN_USER}"
 WEBAPP_PUBLIC_DIR="${ISUREN_HOME}/webapp/public"
-BENCHRUN_DIR="${ISUREN_HOME}/isucon14/bench/benchrun"
 
 # frontendはAMI上でpnpm buildせず、事前にビルドしGitHub Releaseとして公開したものを取得する
 # (t4g.smallでのpnpm installはOOMを起こしうる上、node/pnpmをAMIに含めずに済む。
@@ -70,21 +69,9 @@ deploy_public() {
   log "webapp/public: deployed"
 }
 
-# frontend_hashes.json/frontend_files.jsonはbenchがfrontendの整合性確認に使うファイル
-# (upstream/isucon14/NOTICE.md「コミット対象から外したもの」参照)。
-# 取り込み時点の古い内容の上に、ダウンロードした最新版を上書きする。
-deploy_benchrun_manifests() {
-  local f
-  for f in frontend_hashes.json frontend_files.json; do
-    runuser -u "${ISUREN_USER}" -- cp "${FRONTEND_RELEASE_DIR}/${f}" "${BENCHRUN_DIR}/${f}"
-  done
-  log "bench/benchrun manifests: deployed"
-}
-
 resolve_frontend_release_tag
 persist_resolved_tag
 download_frontend_release
 deploy_public
-deploy_benchrun_manifests
 
 log "80-frontend.sh: done"

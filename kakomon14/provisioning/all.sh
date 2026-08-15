@@ -56,8 +56,8 @@ run_step 70-webapp-go.sh
 run_step 75-matcher.sh
 run_step 77-payment-mock.sh
 run_step 80-frontend.sh
+run_step 85-bench-build.sh
 run_step 90-nginx.sh
-run_step 95-deploy-helper.sh
 run_step 99-verify.sh
 
 log "all.sh: done"
