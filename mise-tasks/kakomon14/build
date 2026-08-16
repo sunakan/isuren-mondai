@@ -26,6 +26,14 @@ PROJECT_COMMIT="$(git rev-parse HEAD)"
 export PROJECT_COMMIT
 require_pushed_commit "${PROJECT_COMMIT}"
 
+# Target-local text inputs keep the source AMI exact and reviewable.
+# shellcheck source=kakomon14/scripts/ami-inputs.env
+source kakomon14/scripts/ami-inputs.env
+[[ "${KAKOMON14_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
+  echo "error: KAKOMON14_SOURCE_AMI_ID is not an exact AMI ID" >&2
+  exit 1
+}
+
 # OTel trace化用。EC2側(all.sh)はこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信は
 # 一切行わない(APIキーをEC2/AMIへ渡さないための設計。詳細はscripts/otel.sh参照)。
 # tracing無効時(OTEL_EXPORTER_OTLP_ENDPOINT未設定)でも生成自体は行う(コストが無視できるほど
@@ -64,6 +72,7 @@ BUILD_START_EPOCH="$(date +%s)"
 BUILD_EXIT=0
 packer build \
   -var "region=ap-northeast-1" \
+  -var "source_ami=${KAKOMON14_SOURCE_AMI_ID}" \
   -var "vpc_id=${VPC_ID}" \
   -var "subnet_id=${SUBNET_ID}" \
   -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \

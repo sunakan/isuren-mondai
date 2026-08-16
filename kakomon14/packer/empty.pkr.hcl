@@ -12,6 +12,14 @@ variable "region" {
   default = "ap-northeast-1"
 }
 
+variable "source_ami" {
+  type = string
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{17}$", var.source_ami))
+    error_message = "Source AMI must be one exact AMI ID. Image discovery belongs outside the build."
+  }
+}
+
 variable "vpc_id" {
   type = string
 }
@@ -56,23 +64,14 @@ locals {
   # 表示上のJST値を作るための数値加算。付与する+09:00はこの値に対応する文字列)。
   timestamp_jst = "${formatdate("YYYY-MM-DD'T'hh:mm:ss", timeadd(local.build_time, "9h"))}+09:00"
   ami_tags = {
-    Name      = local.name
-    Project   = var.project_url
-    Base      = var.base_url
-    OS        = "ubuntu-26.04-resolute-arm64"
-    Timestamp = local.timestamp_jst
+    Name         = local.name
+    Project      = var.project_url
+    Base         = var.base_url
+    OS           = "ubuntu-26.04-resolute-arm64"
+    Architecture = "arm64"
+    SourceAMI    = var.source_ami
+    Timestamp    = local.timestamp_jst
   }
-}
-
-data "amazon-ami" "ubuntu" {
-  filters = {
-    name                = "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-arm64-server-*"
-    root-device-type    = "ebs"
-    virtualization-type = "hvm"
-  }
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-  region      = var.region
 }
 
 source "amazon-ebs" "kakomon14" {
@@ -81,7 +80,7 @@ source "amazon-ebs" "kakomon14" {
   # (README.mdの注記、nginx TLS証明書のホスト名変更(commit 9ef6955)と同様の対応)。
   ami_description = "kakomon14 webapp environment (Go) provisioned by cloud-init"
   region          = var.region
-  source_ami      = data.amazon-ami.ubuntu.id
+  source_ami      = var.source_ami
   # ISUCON14公式の競技者VM(c5.large: 2vCPU/4GiB)とメモリ量を揃える。
   # t4g.small(2GiB)ではフロントエンドビルド等でOOMのリスクがあるため避ける。
   instance_type        = "t4g.medium"
