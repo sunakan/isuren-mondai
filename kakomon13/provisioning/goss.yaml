@@ -3,6 +3,14 @@ file:
     exists: true
     filetype: directory
     mode: "0755"
+  /home/isuren/.ssh:
+    exists: false
+  /etc/sudoers.d/99-isuren-user:
+    exists: true
+    filetype: file
+    owner: root
+    group: root
+    mode: "0440"
   /home/isuren/LICENSE:
     exists: true
     filetype: file
@@ -51,7 +59,7 @@ file:
     exists: false
   /etc/nginx/tls/pipe.u.isuren.internal.crt:
     exists: false
-  /etc/isuren/kakomon13/runtime.env:
+  /home/isuren/env.sh:
     exists: false
   /etc/isuren/kakomon13/mysql.cnf:
     exists: false
@@ -59,6 +67,18 @@ file:
     exists: false
   /home/isuren/isucon13:
     exists: false
+  /home/isuren/go:
+    exists: false
+  /home/isuren/.local/bin/mise:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/.config/mise/config.toml:
+    exists: true
+    filetype: file
+  /home/isuren/.config/mise/mise.lock:
+    exists: true
+    filetype: file
   /usr/local/libexec/kakomon13-instance-init:
     exists: true
     filetype: file
@@ -121,8 +141,13 @@ command:
     stdout:
       - aarch64
     exit-status: 0
+  mise-version:
+    exec: /home/isuren/.local/bin/mise --version
+    stdout:
+      - "2026.8.6 linux-arm64"
+    exit-status: 0
   go-version:
-    exec: /usr/local/bin/go version
+    exec: runuser -u isuren -- env HOME=/home/isuren /home/isuren/.local/bin/mise exec -- go version
     stdout:
       - "go version go1.26.6 linux/arm64"
     exit-status: 0

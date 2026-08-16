@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 ISUREN_HOME="/home/${ISUREN_USER}"
+MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
 STAGING_DIR="${ISUREN_HOME}/.kakomon13-staging"
 BENCH_DIR="${ISUREN_HOME}/isucon13/bench"
 BENCH_OUTPUT="${STAGING_DIR}/bench-linux-arm64"
@@ -19,8 +20,9 @@ install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${BENCH_DIR}/scenario/testdata/NoImage.jpg"
 
 # shellcheck disable=SC2016 # positional parameters expand inside the child shell
-runuser -u "${ISUREN_USER}" -- env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
-  sh -c 'cd "$1" && /usr/local/bin/go build -trimpath -ldflags "-s -w" -o "$2" ./cmd/bench' \
+runuser -u "${ISUREN_USER}" -- env \
+  HOME="${ISUREN_HOME}" CGO_ENABLED=0 GOOS=linux GOARCH=arm64 MISE_BIN="${MISE_BIN}" \
+  sh -c 'cd "$1" && "${MISE_BIN}" exec -- go build -trimpath -ldflags "-s -w" -o "$2" ./cmd/bench' \
   sh "${BENCH_DIR}" "${BENCH_OUTPUT}"
 test -x "${BENCH_OUTPUT}"
 

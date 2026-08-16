@@ -5,26 +5,73 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-GO_VERSION="1.26.6"
-GO_URL="https://dl.google.com/go/go1.26.6.linux-arm64.tar.gz"
-GO_SHA256="d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e"
-GO_ROOT="/opt/go-${GO_VERSION}"
+ISUREN_HOME="/home/${ISUREN_USER}"
+MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
+MISE_VERSION="2026.8.6"
+MISE_URL="https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-arm64"
+MISE_SHA256="f9bd051912beb8861bf248289bfb2d8c281ff00fcdf1e44d730b8ea7e859e9a4"
 
-grep -qF "go = \"${GO_VERSION}\"" "${SCRIPT_DIR}/mise.ami.toml"
-grep -qF "checksum = \"sha256:${GO_SHA256}\"" "${SCRIPT_DIR}/mise.ami.lock"
-grep -qF "url = \"${GO_URL}\"" "${SCRIPT_DIR}/mise.ami.lock"
+# The official recipe installs its language runtime below /home/isucon. Keep
+# that ownership boundary, while using the repository-wide mise layout shared
+# with KAKOMON14 instead of retaining a recipe-specific /opt installation.
+install_mise() {
+  if [ -x "${MISE_BIN}" ] &&
+    [ "$("${MISE_BIN}" --version | awk '{print $1}')" = "${MISE_VERSION}" ]; then
+    log "mise: already installed"
+    return
+  fi
 
-if [ ! -x "${GO_ROOT}/bin/go" ]; then
-  archive="$(mktemp)"
-  staging="$(mktemp -d)"
-  trap 'rm -f "${archive}"; rm -rf "${staging}"' EXIT
-  curl -fsSL "${GO_URL}" -o "${archive}"
-  echo "${GO_SHA256}  ${archive}" | sha256sum -c -
-  tar -xzf "${archive}" -C "${staging}"
-  mv "${staging}/go" "${GO_ROOT}"
-fi
-ln -sfn "${GO_ROOT}/bin/go" /usr/local/bin/go
-ln -sfn "${GO_ROOT}/bin/gofmt" /usr/local/bin/gofmt
+  local binary
+  binary="$(mktemp)"
+  if ! curl -fsSL "${MISE_URL}" -o "${binary}"; then
+    rm -f "${binary}"
+    return 1
+  fi
+  if ! echo "${MISE_SHA256}  ${binary}" | sha256sum -c -; then
+    rm -f "${binary}"
+    return 1
+  fi
+  install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "$(dirname "${MISE_BIN}")"
+  install -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${binary}" "${MISE_BIN}"
+  rm -f "${binary}"
+  log "mise: installed ${MISE_VERSION}"
+}
 
-test "$(/usr/local/bin/go version)" = "go version go${GO_VERSION} linux/arm64"
+set_bashrc() {
+  local bashrc="${ISUREN_HOME}/.bashrc"
+  # shellcheck disable=SC2016 # Write the activation command literally.
+  local line='eval "$(~/.local/bin/mise activate bash)"'
+  if ! grep -qF "${line}" "${bashrc}" 2>/dev/null; then
+    echo "${line}" >>"${bashrc}"
+    chown "${ISUREN_USER}:${ISUREN_USER}" "${bashrc}"
+    log "bashrc: added mise activate"
+  else
+    log "bashrc: already configured"
+  fi
+}
+
+set_mise_config() {
+  local conf="${ISUREN_HOME}/.config/mise/config.toml"
+  install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "$(dirname "${conf}")"
+  install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.toml" "${conf}"
+  log "mise config: ${conf} set"
+}
+
+set_mise_lock() {
+  local lock="${ISUREN_HOME}/.config/mise/mise.lock"
+  install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${SCRIPT_DIR}/mise.ami.lock" "${lock}"
+  log "mise lock: ${lock} set"
+}
+
+run_mise_install() {
+  runuser -u "${ISUREN_USER}" -- env HOME="${ISUREN_HOME}" "${MISE_BIN}" install
+  log "mise install: done"
+}
+
+install_mise
+set_bashrc
+set_mise_config
+set_mise_lock
+run_mise_install
+
 log "30-runtime.sh: done"

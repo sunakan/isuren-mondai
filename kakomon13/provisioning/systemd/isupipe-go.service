@@ -5,7 +5,7 @@ Requires=mysql.service kakomon13-instance-init.service kakomon13-pdns-zone.servi
 
 [Service]
 WorkingDirectory=/home/isuren/webapp/go
-EnvironmentFile=/etc/isuren/kakomon13/runtime.env
+EnvironmentFile=/home/isuren/env.sh
 User=isuren
 Group=isuren
 ExecStart=/home/isuren/webapp/go/isupipe

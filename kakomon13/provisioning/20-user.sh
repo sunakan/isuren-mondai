@@ -13,4 +13,15 @@ if ! id -u "${ISUREN_USER}" >/dev/null 2>&1; then
 fi
 chmod 0755 "/home/${ISUREN_USER}"
 
+# The official image creates an empty .ssh directory and a plaintext login
+# password. This image uses SSM/provider finalizers for access, so neither
+# belongs in the common artifact.
+
+sudoers="/etc/sudoers.d/99-${ISUREN_USER}-user"
+tmp="$(mktemp)"
+trap 'rm -f "${tmp}"' EXIT
+echo "${ISUREN_USER}  ALL=(ALL) NOPASSWD:ALL" >"${tmp}"
+visudo -cf "${tmp}"
+install -m 0440 -o root -g root "${tmp}" "${sudoers}"
+
 log "20-user.sh: done"

@@ -24,18 +24,18 @@ fi
 chmod 0600 /etc/nginx/tls/pipe.u.isuren.internal.key
 chmod 0644 /etc/nginx/tls/pipe.u.isuren.internal.crt
 
-cat >/etc/isuren/kakomon13/runtime.env <<EOF
-ISUCON13_MYSQL_DIALCONFIG_NET=tcp
-ISUCON13_MYSQL_DIALCONFIG_ADDRESS=127.0.0.1
-ISUCON13_MYSQL_DIALCONFIG_PORT=3306
-ISUCON13_MYSQL_DIALCONFIG_USER=isucon
-ISUCON13_MYSQL_DIALCONFIG_PASSWORD=isucon
-ISUCON13_MYSQL_DIALCONFIG_DATABASE=isupipe
-ISUCON13_MYSQL_DIALCONFIG_PARSETIME=true
-ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS=${address}
+cat >/home/isuren/env.sh <<EOF
+ISUCON13_MYSQL_DIALCONFIG_NET="tcp"
+ISUCON13_MYSQL_DIALCONFIG_ADDRESS="127.0.0.1"
+ISUCON13_MYSQL_DIALCONFIG_PORT="3306"
+ISUCON13_MYSQL_DIALCONFIG_USER="isucon"
+ISUCON13_MYSQL_DIALCONFIG_DATABASE="isupipe"
+ISUCON13_MYSQL_DIALCONFIG_PARSETIME="true"
+ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS="${address}"
+ISUCON13_POWERDNS_DISABLED="false"
 EOF
-chown root:isuren /etc/isuren/kakomon13/runtime.env
-chmod 0640 /etc/isuren/kakomon13/runtime.env
+chown isuren:isuren /home/isuren/env.sh
+chmod 0755 /home/isuren/env.sh
 
 cat >/etc/isuren/kakomon13/mysql.cnf <<'EOF'
 [client]

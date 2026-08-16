@@ -119,7 +119,7 @@ build {
   provisioner "shell" {
     inline = [
       "test ! -e /etc/nginx/tls/pipe.u.isuren.internal.key",
-      "test ! -e /etc/isuren/kakomon13/runtime.env",
+      "test ! -e /home/isuren/env.sh",
       "sudo truncate -s 0 /home/ubuntu/.ssh/authorized_keys",
       "sudo truncate -s 0 /etc/machine-id",
       "sudo rm -f /etc/ssh/ssh_host_*",

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC1091
-source /etc/isuren/kakomon13/runtime.env
+source /home/isuren/env.sh
 zone=u.isuren.internal
 address="${ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS}"
 

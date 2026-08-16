@@ -116,6 +116,41 @@ diff -u "${expected_media}" "${actual_media}"
 grep -qF 'go = "1.26.6"' kakomon13/provisioning/mise.ami.toml
 grep -qF 'd0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e' \
   kakomon13/provisioning/mise.ami.lock
+# shellcheck disable=SC2016 # These are literal source contracts.
+grep -qF 'MISE_BIN="${ISUREN_HOME}/.local/bin/mise"' kakomon13/provisioning/30-runtime.sh
+grep -qF 'MISE_VERSION="2026.8.6"' kakomon13/provisioning/30-runtime.sh
+grep -qF 'f9bd051912beb8861bf248289bfb2d8c281ff00fcdf1e44d730b8ea7e859e9a4' \
+  kakomon13/provisioning/30-runtime.sh
+if rg -n 'mise[.]run|curl[^|]*[|][[:space:]]*(ba)?sh' kakomon13/provisioning/30-runtime.sh; then
+  fail "mise installer must be exact and checksum-verified"
+fi
+# shellcheck disable=SC2016 # This is a literal source contract.
+grep -qF 'runuser -u "${ISUREN_USER}" -- env HOME="${ISUREN_HOME}" "${MISE_BIN}" install' \
+  kakomon13/provisioning/30-runtime.sh
+for build_script in kakomon13/provisioning/70-benchmark.sh kakomon13/provisioning/85-webapp-go.sh; do
+  # shellcheck disable=SC2016 # This is a literal source contract.
+  grep -qF '"${MISE_BIN}" exec -- go build' "${build_script}" ||
+    fail "Go build must run through mise: ${build_script}"
+done
+if rg -n --glob '*.sh' --glob '*.service' --glob '*.yaml' --glob '*.hcl' \
+  '/opt/go-|/usr/local/bin/go|/etc/isuren/kakomon13/runtime[.]env' \
+  kakomon13/provisioning kakomon13/packer; then
+  fail "legacy KAKOMON13 runtime layout remains"
+fi
+grep -qF 'EnvironmentFile=/home/isuren/env.sh' \
+  kakomon13/provisioning/systemd/isupipe-go.service
+grep -qF 'source /home/isuren/env.sh' kakomon13/provisioning/runtime/pdns-zone.sh
+for expected in \
+  'ISUCON13_MYSQL_DIALCONFIG_NET="tcp"' \
+  'ISUCON13_MYSQL_DIALCONFIG_ADDRESS="127.0.0.1"' \
+  'ISUCON13_MYSQL_DIALCONFIG_PORT="3306"' \
+  'ISUCON13_MYSQL_DIALCONFIG_USER="isucon"' \
+  'ISUCON13_MYSQL_DIALCONFIG_DATABASE="isupipe"' \
+  'ISUCON13_MYSQL_DIALCONFIG_PARSETIME="true"' \
+  'ISUCON13_POWERDNS_DISABLED="false"'; do
+  grep -qF "${expected}" kakomon13/provisioning/runtime/instance-init.sh ||
+    fail "official env.sh key is missing: ${expected}"
+done
 grep -qF 'node = "24.19.0"' kakomon13/scripts/mise.toml
 grep -qF 'd28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f' \
   kakomon13/scripts/mise.lock
@@ -143,6 +178,10 @@ grep -qF '"/home/${ISUREN_USER}/isucon13"' kakomon13/provisioning/95-seal.sh ||
   fail "benchmark source tree must be removed during seal"
 grep -A1 -F '  /home/isuren/isucon13:' kakomon13/provisioning/goss.yaml |
   grep -qF 'exists: false' || fail "Goss must reject a retained benchmark source tree"
+grep -A1 -F '  /home/isuren/go:' kakomon13/provisioning/goss.yaml |
+  grep -qF 'exists: false' || fail "Goss must reject a retained build-only GOPATH"
+grep -A1 -F '  /home/isuren/env.sh:' kakomon13/provisioning/goss.yaml |
+  grep -qF 'exists: false' || fail "Goss must require sealed env.sh removal"
 if rg -n '^[[:space:]]+contains:' kakomon13/provisioning/goss.yaml; then
   fail "deprecated literal Goss file.contains contract remains"
 fi

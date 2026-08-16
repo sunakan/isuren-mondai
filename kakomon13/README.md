@@ -36,6 +36,22 @@ are absent from the sealed image. The self-signed certificate is only a public
 practice fixture; a standalone Bench node must receive the Web trust anchor
 through its separately approved finalizer. It is not an mTLS or Portal key.
 
+The installed home layout follows the official `/home/isucon` structure with
+the account name translated to `/home/isuren`: Application files live below
+`webapp/`, the runtime environment is rendered as `env.sh` on every fresh boot,
+and the license and benchmark executable live at the home root. Intentional
+differences are the repository-wide mise runtime under `.local/`, the
+architecture-neutral benchmark name `bench`, and removal of build-only
+`isucon13/`, `go/`, and staging trees from the sealed image. Runtime data and
+image fixtures are fetched inside the image build and installed where the
+official Application expects them, but remain outside Git.
+
+The official empty `.ssh/` directory, plaintext login password, xbuild
+wrappers, and `local/golang/` tree are intentionally not reproduced. Access is
+owned by SSM/provider finalizers, and mise replaces xbuild while preserving the
+contestant-owned runtime boundary. Passwordless sudo is retained, matching the
+official contestant user contract.
+
 The benchmark binary accepts, for example:
 
 ```text

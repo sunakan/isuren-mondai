@@ -9,7 +9,7 @@ systemctl stop nginx pdns mysql isupipe-go kakomon13-pdns-zone kakomon13-instanc
 rm -f \
   /etc/nginx/tls/pipe.u.isuren.internal.crt \
   /etc/nginx/tls/pipe.u.isuren.internal.key \
-  /etc/isuren/kakomon13/runtime.env \
+  "/home/${ISUREN_USER}/env.sh" \
   /etc/isuren/kakomon13/mysql.cnf
 mysql_datadir=/var/lib/mysql
 if [ -d "${mysql_datadir}" ]; then
@@ -24,6 +24,6 @@ fi
 rm -rf \
   "/home/${ISUREN_USER}/.kakomon13-staging" \
   "/home/${ISUREN_USER}/isucon13"
-rm -rf "/home/${ISUREN_USER}/.cache/go-build" "/home/${ISUREN_USER}/go/pkg/mod/cache"
+rm -rf "/home/${ISUREN_USER}/.cache/go-build" "/home/${ISUREN_USER}/go"
 
 log "95-seal.sh: done"
