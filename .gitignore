@@ -11,5 +11,5 @@ upstream/isucon14/bench/benchrun/frontend_files.json
 # ローカルでのDB確認用にkakomon14:refresh-upstreamタスクで取り込むが、サンプルデータの肥大化を
 # 避けるためコミット対象から外す(NOTICE.md参照)。
 upstream/isucon14/webapp/sql/
-# Packerのfile provisioner(download)がビルドのたびに取得する一時ファイル(AMIタグ付け用。mise.toml参照)。
-kakomon14/packer/frontend-release-tag.txt
+# Packerのfile provisioner(download)がビルドのたびに取得する一時ファイル(AMIタグ・digest記録用。各mise task参照)。
+kakomon*/packer/frontend-release-*.txt
