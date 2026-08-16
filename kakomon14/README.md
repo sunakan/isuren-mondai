@@ -8,8 +8,7 @@ mise kakomon14:build
 
 ```shell
 # CI で動く
-git tag kakomon14-frontend-v1.0.1
-git push origin kakomon14-frontend-v1.0.1
+git tag -m "Release kakomon14 frontend v1.0.1" kakomon14-frontend-v1.0.1 && git push origin kakomon14-frontend-v1.0.1
 
 # ローカル版
 GH_TOKEN=$(ghtkn get *****) mise run kakomon14:release kakomon14-frontend-v1.0.1

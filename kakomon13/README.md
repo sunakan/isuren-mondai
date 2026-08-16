@@ -24,8 +24,7 @@ Push an exact KAKOMON13 frontend tag to build and publish the Release in GitHub
 Actions:
 
 ```shell
-git tag kakomon13-frontend-v1.0.1
-git push origin kakomon13-frontend-v1.0.1
+git tag -m "Release kakomon13 frontend v1.0.1" kakomon13-frontend-v1.0.1 && git push origin kakomon13-frontend-v1.0.1
 ```
 
 The workflow fetches the non-managed image assets from the exact official
