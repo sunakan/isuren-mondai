@@ -67,6 +67,11 @@ file:
     exists: true
     filetype: file
     mode: "0644"
+  # 90-services.sh: standalone benchが別途trust anchorを配布されなくても検証できるよう、
+  # 固定証明書をOSのCA trust storeにも登録する
+  /usr/local/share/ca-certificates/pipe.u.isuren.internal.crt:
+    exists: true
+    filetype: file
   /home/isuren/env.sh:
     exists: false
   /etc/isuren/kakomon13/mysql.cnf:
@@ -148,6 +153,13 @@ command:
     exec: uname -m
     stdout:
       - aarch64
+    exit-status: 0
+  # update-ca-certificatesがpipe.u.isuren.internal.crtをOSのCA bundleへ実際に
+  # 反映したことを確認する(ファイル存在だけでは反映有無が分からないため)
+  kakomon13-cert-trusted:
+    exec: "openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /etc/nginx/tls/pipe.u.isuren.internal.crt"
+    stdout:
+      - "/etc/nginx/tls/pipe.u.isuren.internal.crt: OK"
     exit-status: 0
   mise-version:
     exec: /home/isuren/.local/bin/mise --version

@@ -69,6 +69,11 @@ practice fixture for a single time-boxed (~8h) competition over dummy data;
 it is not an mTLS or Portal key and must never be reused for trusted
 production traffic.
 
+Because every clone carries the same certificate, it is also registered with
+the OS trust store (`update-ca-certificates`) at build time. A standalone
+Bench node can therefore verify Web over TLS out of the box, with no runtime
+step to fetch or trust a per-clone certificate.
+
 The installed home layout follows the official `/home/isucon` structure with
 the account name translated to `/home/isuren`: Application files live below
 `webapp/`, the runtime environment is rendered as `env.sh` on every fresh boot,

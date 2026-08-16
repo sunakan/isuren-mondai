@@ -34,10 +34,17 @@ usermod -a -G pdns "${ISUREN_USER}"
 systemctl daemon-reload
 systemctl enable mysql pdns nginx isupipe-go kakomon13-instance-init kakomon13-pdns-zone
 
-# Validate the exact fresh-boot configuration, then remove the generated
-# instance material in 95-seal.sh. These keys never become image input.
+# Generates the fixed wildcard TLS key/certificate this recipe intentionally
+# keeps in the sealed image (see 95-seal.sh, README.md). env.sh and
+# mysql.cnf from this run are still removed in 95-seal.sh.
 /usr/local/libexec/kakomon13-instance-init
 nginx -t
 pdns_server --config=check
+
+# Trust the fixed certificate at the OS level so a standalone Bench node can
+# verify Web over TLS without a separate trust-anchor distribution step.
+install -m 0644 /etc/nginx/tls/pipe.u.isuren.internal.crt \
+  /usr/local/share/ca-certificates/pipe.u.isuren.internal.crt
+update-ca-certificates
 
 log "90-services.sh: done"
