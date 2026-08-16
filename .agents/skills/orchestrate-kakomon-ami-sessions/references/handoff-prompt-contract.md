@@ -22,7 +22,7 @@
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
 | plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
 | runtime | Go、Node.js、package manager、OS、architectureの採用済み値または停止条件 |
-| frontend delivery | target固有workflow path、tag filter、asset名、manifest/license、remote Release/digest gate |
+| frontend delivery | official prebuiltのAMI内直接取得またはCI/Release buildの採用方式。前者はURL/commit/tree/file manifest/SHA-256/license、後者はworkflow path/tag filter/asset/digest |
 | platform | AWS region `ap-northeast-1`、同regionのexact base AMI ID方針、profile / Packer / build / verify / cleanupのregion一致 |
 | completion | `audit-complete`、`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main`、`frontend-release-published`、`verify-ready` |
 
@@ -73,7 +73,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
 - `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。worktree-local mirrorの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
 - 画像を含むbinary、編集しない静的asset、`sql/`、初期データはupstreamへcommitせず、worktree-local mirrorのtarget固有subpathからfrontend buildまたは検証用stagingへ一時的に`rsync`する。このimportでは`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
-- cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildが必要とする非commit dataは、公式exact commitから一時取得してcommit済みfile manifestで検証する。frontend等の生成物はignore済み`dist/`へ出力して外部Releaseで配布し、exact tagとSHA-256をbuild入力にする。`tmp/`を実行時依存にしない。
+- cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildが必要とする非commit dataは、公式exact commitからbuild instance内で一時取得してcommit済みfile manifestで検証してよい。この方式ではlocal `dist/`を必須前処理やPacker uploadにしない。こちらでbuildするfrontend等はignore済み`dist/`へ出力して外部Releaseで配布し、exact tagとSHA-256をbuild入力にする。両方式を混ぜず、`tmp/`を実行時依存にしない。
 - build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryをGit管理下へ追加しない。manifest、checksum、provenanceのtext metadataだけはcommitしてよい。Git管理が必要または望ましいと判断した場合は追加・stage・commit前に停止し、対象file、理由、外部配布またはexact source取得の代替案を示して人間へ相談する。
 - 画像や他のbinaryのworking tree / build先への配置は許可するが、配置先がignore対象であり、stage・commit・merge payloadへ入らないことを確認させる。
 - `upstream/isucon14/NOTICE.md`、`kakomon14/provisioning/50-source.sh`、`mise-tasks/kakomon14/{refresh-upstream,diff}`は構造上の参考に限る。除外pathとlocal変更はtarget自身の監査で決め、公式更新で保守中の差分を黙って上書きしない。
@@ -114,7 +114,8 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - Node.jsは「本家に合わせる」を数字の推測で済ませない。`package.json`、`packageManager`、lockfile、CI、`.node-version`等からexact versionを特定する。
 - upstreamがmajor/rangeしか指定しない場合は、互換試験候補を提示して`decision-required`にする。`node = "lts"`や`latest`を採用しない。
 - frontend package managerとversionをupstreamに合わせ、KAKOMON14のpnpmを他editionへ自動移植しない。
-- frontend成果物をAMI外でbuildするかAMI内でbuildするかはcurrent planに従う。生成物はGit管理せずignore済み`dist/`または一時directoryへ置く。license、exact tag/tree、SHA-256、外部配布先、配置先が欠ければ停止する。
+- frontendをこちらでbuildするか、official prebuiltをそのまま使うかを最初に分ける。official prebuiltはexact commit/treeからAMI内で直接取得し、file manifest/SHA-256/licenseを検証できるならlocal `dist/`、Node.js、package manager、Releaseを要求しない。こちらでbuildする成果物はGit管理せずignore済み`dist/`または一時directoryへ置き、external Releaseへexact tag/SHA-256付きで配布する。
+- prebuilt bundleの外部URLはruntime到達性を確認する。未登録service worker等のdormant referenceを一括置換・削除せず、activeな絶対domain依存があれば生成済みassetを改変せず該当fileと影響を報告して停止する。
 - CI/Release配布ではbuild scriptだけを完成扱いにしない。target固有workflow、target限定tag filter、期待asset名を実装し、人間push後のremote Release/digest確認を外部verifyの入口にする。
 
 ## OS、architecture、domain
@@ -151,11 +152,12 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 1. topic branchがcleanで、全変更がcommit済みである。
 2. current planの入口・完了条件を満たし、未決policyやstop conditionがない。
 3. main worktreeがcleanで、他sessionのactive owner、resource guard、所有不明の差分がない。このpromptがtarget限定のmain統合権限を持つ。
-4. read-only fetch後のlocal mainと`origin/main`が同期し、remote divergenceを確認済みである。fetchできなければ停止する。
-5. topicの差分が変更許可pathだけで、セルフレビューにblocking/major findingがなく、必要validationがGreenである。
+4. topicの差分が変更許可pathだけで、セルフレビューにblocking/major findingがなく、必要validationがGreenである。local mergeでは`origin/main`をfetch・比較せず、remote divergenceを条件にしない。
 
-topicがcurrent mainを含まない場合はtopic worktreeでmainをmergeする。競合なしならvalidationとセルフレビューを再実施し、競合したら自動解決せず停止する。その後main worktreeで直前のHEADとclean状態を再確認し、`git merge --ff-only <topic-branch>`を実行する。fast-forwardできなければ別sessionがmainを進めた可能性を報告して停止し、main上でmerge commitを作らない。
+topicがcurrent mainを含まない場合は、ユーザー指定に従いtopic worktreeでmainをmergeまたはrebaseする。競合なしでもcommit identityを取り直し、validationとセルフレビューを再実施する。rebaseならrebase前後の許可path treeを比較し、同一の場合だけ以前の外部証拠をslice同一性の補助証拠として残す。競合したら自動解決せず停止する。その後main worktreeで直前のHEADとclean状態を再確認し、`git merge --ff-only <topic-branch>`を実行する。fast-forwardできなければ別sessionがmainを進めた可能性を報告して停止し、main上でmerge commitを作らない。
 
 統合後はtopic HEADがmainのancestorであること、main HEAD、status、変更pathを確認して`merged-to-main`と報告する。worktreeとbranchを削除せず、pushは人間へ戻す。
+
+ユーザーがcleanupを明示した場合だけ、mainがtopic HEADを含むこと、main/topicのclean、worktreeの絶対pathとbranchを再確認する。対象worktreeだけをremoveした後にexact topic branchだけを削除し、他targetのactive worktree/branchは存在確認以外に使わない。
 
 報告へbranch、topic commit、main統合前後のHEAD、worktree status、変更file、検証結果、セルフレビュー結果、未決、not-run gateを含める。`merged-to-main`をAMI完成、Orb Green、AWS Greenと表現しない。

@@ -40,7 +40,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - [検証gate](references/verification-gates.md)を読み、依頼されたgateだけを実施する。
 - 一つの成功を別gateの成功へ読み替えない。gateごとにartifact identity、recipe digest、環境、証拠、cleanupを記録する。
-- external frontendを使う場合はremote mainとtarget固有Release asset/digestをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。
+- external frontendを使う場合は検証対象recipe commitがremoteから取得可能で、target固有Release asset/digestが存在することをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。local mainとremote mainの完全一致は要求しない。
 - Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。AWS regionは東京`ap-northeast-1`へ固定する。
 - 承認のない外部操作、対象不明なcleanup、秘密情報の表示を行わない。
 
@@ -55,14 +55,14 @@ Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、競技用domainが存在す�
 - implement worktree作成直後にmain source cacheを同名のworktree-local `tmp/all-kakomon`へclone全体で`rsync -a`していない、bootstrapで`.git/`を落としている、またはlocal mirrorがtop-level Gitでignoreされていない。
 - main source cacheとworktree-local mirrorのorigin URL、full HEAD、clean状態を確認せずimportしようとしている、または不一致cacheをsession自身でfetch / checkout / resetしようとしている。
 - `tmp/all-kakomon`を変更許可path、stage、commit、merge payloadへ含めようとしている。worktreeに残る一時cache自体はmain統合のblockerにしない。
-- clean clone、cloud-init、AMI buildが`tmp/all-kakomon`の存在を前提にしており、commit済みmanaged sourceまたはmanifest / checksum固定bundleへ変換されていない。
-- managed upstreamと、worktree-local mirrorから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データの境界、subpath、license、exact commit、manifest / checksumが固定されていない。
+- clean clone、cloud-init、AMI buildが`tmp/all-kakomon`の存在を前提にしている。保守codeはcommit済みmanaged source、非commit dataは公式exact commitからAMI内で直接取得してmanifest/checksum検証するか、外部の固定bundleへ変換する。
+- managed upstreamと、画像・静的asset・`sql/`・初期データ等の非commit dataの境界、subpath、license、exact commit、AMI内直接取得または外部bundle、manifest/checksumが固定されていない。
 - architecture、provider、compact/canonical topologyの対応が不明である。
 - Ubuntu 26.04 arm64で必要componentが成立せず、amd64・旧Ubuntuへのfallbackを人間判断なしで進めようとしている。
 - profile、Packer、base AMI、build、fresh boot、product検証、cleanupのAWS regionが`ap-northeast-1`へ固定されていない、暗黙のdefault regionに依存している、または別regionへfallbackしようとしている。
 - upstreamに競技用domainがあるのに`isuren.internal`へのtarget限定写像、TLS SAN、自己署名fixtureまたは本物の秘密の境界が固定されていない。
 - benchmarkの実行方法、target、result/failure契約が分からない。
-- frontend buildが必要なのに、生成物、package manager、lockfile、build command、配置先のいずれかが不明である。
+- frontendをこちらでbuildするのか、official prebuiltをbyte-for-byte使うのかが未分類である。buildが必要なら生成物、package manager、lockfile、build command、配置先のいずれかが不明、prebuiltならexact commit/tree/file manifest/SHA-256/licenseまたはruntime外部依存の調査が不足している。
 - external frontend配布なのに、target固有workflow、remote exact tag、期待asset、published SHA-256のいずれかがなく、外部verifyを開始しようとしている。
 - mutableな`latest`、floating tag、`most_recent`、幅付きversion制約をartifact入力のまま使う。
 - 未統合KAKOMON14や別worktreeの値に依存する。

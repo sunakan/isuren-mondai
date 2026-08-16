@@ -14,13 +14,13 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - 実装開始条件を満たさない対象はaudit promptだけにし、実装worktreeを先に作らない。
 - 実装promptへtarget限定の`git add`、commit、セルフレビュー、local `main`への統合権限を明記する。権限をaudit promptへ広げない。
 - 実装promptのmain統合権限を、そのtargetの検証済みcommitを`--ff-only`で統合する範囲に限定する。他sessionがmainを変更中なら競合せず停止させる。
-- AWS、Orb、GitHub write、AMI build、EC2起動をprompt生成やlocal実装へ混ぜない。remote同期確認のread-only fetchだけはmain統合preflightとして許可する。それ以外の外部操作は独立した承認済みverify handoffにする。
+- AWS、Orb、GitHub write、AMI build、EC2起動をprompt生成やlocal実装へ混ぜない。local main統合では`main`と`origin/main`を比較せず、remote同期をmerge条件にしない。remote確認はpush済みcommitやReleaseを必要とする外部verifyのhandoffだけで行う。
 
 ## 現在の正本と所有を先に読む
 
 次を毎回読み直し、過去のsession記憶や未統合worktreeを正本にしない。
 
-1. repository rootの`AGENTS.md`、`README.md`、Git status、remote divergence、`git worktree list --porcelain`。
+1. repository rootの`AGENTS.md`、`README.md`、Git status、local main HEAD、`git worktree list --porcelain`。remote divergenceはlocal main統合の判定材料にしない。
 2. `/Users/user01/works/github.com/sunakan/isuren/docs/decisions/20260815-isuren-mondai-image-strategy.md`。
 3. 対象edition/variantのcurrent planと、その`status`、`depends_on`、`conflicts_with`、変更許可path。
 4. 統合済み`kakomon14/**`。activeなKAKOMON14 worktreeは所有確認だけにし、内容を参照しない。変更pathとresourceがtargetに重ならず、current target planまたはユーザーが非依存と明示した場合は、その存在だけを実装blockerにしない。
@@ -38,7 +38,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - source cacheが期待identityと違う、複製先が既に存在する、または複製後のorigin / HEAD / clean状態が一致しない場合は停止する。clone、fetch、pull、checkout、reset、cleanで補正しない。
 - worktree-local cache mirrorをread-only audit / import sourceにし、以後main checkout側のcacheはidentity再確認以外のcontent audit / importに使わない。managed sourceまたは一時build/provisioning stagingへ搬入するときは対象subpathを明示し、`.git/`、`node_modules/`、`dist/`等を除外する。
 - `tmp/all-kakomon/**`はgitignore対象の一時cacheであり、変更許可path、stage、commit、merge payloadに含めない。存在したままでもlocal main統合の妨げにせず、worktree cleanupとともに破棄してよい。
-- cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するprovenanceではない。保守codeだけをcommit済み`upstream/**`へ置く。非commit asset/dataは、公式exact commitからbuild/provisioning時に一時取得してcommit済みfile manifestで検証するか、ignore済み`dist/`で生成してGitHub Release等の外部配布先へexact tagとSHA-256付きで公開する。実行環境が`tmp/`の存在を前提にしない。
+- cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するprovenanceではない。保守codeだけをcommit済み`upstream/**`へ置く。非commit asset/dataは、公式exact commitからbuild instance内で一時取得してcommit済みfile manifestで検証するか、ignore済み`dist/`で生成してGitHub Release等の外部配布先へexact tagとSHA-256付きで公開する。前者ではlocal `dist/`をPacker入力や必須前処理にせず、どちらでも`tmp/` cacheへ実行時依存しない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
 - 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
 - external frontendをtarget固有workflowで配布する場合は、`.github/workflows/release-<canonical-slug>-frontend.yml`も明示的な変更許可pathへ含める。workflowが必要なのに通常のtarget root外であることを理由に欠落させず、許可がなければscope expansionとして停止する。
@@ -68,8 +68,10 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 
 ## frontend配布をverify入口から逆算する
 
+- official repositoryがprebuilt frontendをexact commit/treeで保持し、こちらでsourceを保守・再buildしないtargetでは、AMI内直接取得を独立したdelivery方式として扱う。local `dist/`、Node.js、package manager、Release workflowを要求せず、official URL、commit、tree、file manifest、SHA-256、licenseを固定してbyte-for-byte配置させる。
+- prebuilt asset内の外部URLは、文字列の存在だけで変更せず、実際にHTML/bundleが登録・参照するruntime dependencyかを分ける。未登録のservice worker等に残るdormant referenceは証拠付きで維持し、activeな絶対domain依存があれば生成済みassetを書き換えず停止させる。
 - frontendをCI/Release配布するtargetでは、build scriptだけでなくtarget固有workflow、tag filter、asset名、manifest/licenseをrepository sliceの受け入れ条件にする。
-- `all-sh-slice-committed`、remote Release発行、外部verify readinessを別状態にする。人間push後にremote main、tag、Release asset、published digestをread-onlyで確認するまでEC2/VMへprovisioningを開始しない。
+- `all-sh-slice-committed`、remote Release発行、外部verify readinessを別状態にする。人間push後に検証対象recipe commit、tag、Release asset、published digestをread-onlyで確認するまでEC2/VMへprovisioningを開始しない。
 - Releaseが欠ける場合は既存local `dist/`や別targetのartifactで迂回せず、EC2を変更する前に停止する。
 - 詳細とbinaryのstage検査は[Releaseと外部verifyのhandoff契約](references/release-and-verify-preflight.md)に従う。
 
@@ -101,7 +103,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 
 実装準備を依頼され、plan入口条件がGreenの場合だけ次を行う。
 
-1. base branch、full SHA、clean状態、upstreamとのahead/behindを記録する。remote更新が必要なら勝手にpull/rebaseしない。
+1. base branch、full SHA、clean状態を記録する。local worktree準備では`main`と`origin/main`を比較しない。remote更新が別目的で必要なら勝手にpull/rebaseしない。
 2. existing worktree、branch、同名path、active ownerとの衝突を確認する。
 3. branchを`codex/<canonical-slug>-ami-recipe`、worktreeを`/private/tmp/isuren-mondai-<canonical-slug>-ami-recipe`の形で提案する。衝突時は名前を推測で再利用せず停止する。
 4. exact base SHAからworktreeを作る。
@@ -141,13 +143,14 @@ branch名へ必ずcanonical slugを含める。すでに別sessionが所有す�
 - commit前にstatus、staged stat、staged full diff、`git diff --staged --check`を確認させる。無関係な既存差分をcommitへ含めない。
 - commit前に[Releaseと外部verifyのhandoff契約](references/release-and-verify-preflight.md)のbinary tracking gateも実施する。画像・archive・build出力の配置とGit追跡を混同しない。
 - commit後に[review契約](references/review-contract.md)でセルフレビューし、blocking/major findingが残らず、必要validationがGreenの場合だけ`ready-to-merge-main`とする。
-- main統合直前にremoteをread-onlyで更新し、main worktreeのclean状態、ahead/behind、他sessionのactive owner、resource guard、topicとの差分を再確認する。mainまたはtopicに所有不明の差分があれば停止する。
-- topicがcurrent mainを含まない場合はtopic worktreeでmainをmergeし、競合なしの場合だけ同じvalidationとセルフレビューを再実施する。競合を推測で解決しない。
+- main統合直前にlocal main HEAD、main worktreeのclean状態、他sessionのactive owner、resource guard、topicとの差分を再確認する。`origin/main`のfetch、ahead/behind、一致は確認せず、merge条件にしない。mainまたはtopicに所有不明の差分があれば停止する。
+- topicがcurrent mainを含まない場合は、ユーザー指定に従ってtopic worktreeでmainをmergeまたはrebaseする。競合を推測で解決しない。成功後はcommit identityを取り直し、同じvalidationとセルフレビューを再実施する。rebase前の外部証拠は新commitの証拠へ自動昇格せず、許可pathのtreeが同一ならslice同一性だけを別途記録する。
 - main worktreeでは`git merge --ff-only <topic-branch>`だけを許可する。fast-forwardできなければ停止し、merge commitをmain上で作らない。
 - 統合後にtopic HEADがmainのancestorであること、mainのstatus、HEAD、変更範囲を確認して`merged-to-main`と報告する。worktreeやbranchを自動削除しない。
+- worktree/branch削除はユーザーが明示した場合だけ行う。mainがtopic HEADを含むこと、main/topicのclean、対象worktreeの絶対pathとbranchを再確認し、対象worktreeだけをremoveしてから、そのexact branchだけを削除する。他targetのactive worktreeやbranchへ触れない。
 - AIはpushしない。人間がpushし、remoteにexact main commitが存在することを確認する。
 - EC2内で`git clone`して試すverify promptはpush後にだけ作る。local-only commitをclone可能と扱わない。
-- external frontendなら、remote main同期だけでなくtargetのRelease assetとpublished digestが存在するまでverify promptを実行可能扱いにしない。
+- external frontendなら、検証対象recipe commitがremoteから取得可能で、targetのRelease assetとpublished digestが存在するまでverify promptを実行可能扱いにしない。local mainとremote mainの完全一致は要求しない。
 - `aws-bastion`のcurrent task定義を再読し、namespace入力が実際にtaskへ届くことをread-onlyで確認する。現状の`up-bastion`は`STACK_NAME`を入力として読まず、`mise.toml`の固定`BASTION_STACK_NAME`はshell側の同名変数を上書きするため、専用prefixを指定可能と扱わない。
 - namespace入力を受け取れない場合は外部検証を止め、`BASTION_STACK_NAME = { default = "aws-bastion" }`またはtask argument等へ変更する別scopeを提案する。`mise.local.toml`を黙って作らない。
 - EC2起動やAMI build前に、account、固定region `ap-northeast-1`、namespace、費用上限、TTL、exact stack、cleanup ownerとcommand、秘密の受け渡し、人間承認を確定する。別regionが観測されたら操作を開始しない。

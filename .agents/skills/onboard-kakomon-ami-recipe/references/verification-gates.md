@@ -16,9 +16,9 @@
 
 ## verify開始前のartifact gate
 
-外部VM/EC2へ変更を加える前に、local worktreeがclean、HEADとremote mainのfull SHAが一致、recipeが要求するexternal frontendのremote tag/公開Release/期待asset/published SHA-256が存在することを確認する。GitHub Releaseが必要なのにworkflowまたはReleaseがない場合は`blocked`として停止し、partial provisioningでinstanceを汚さない。
+外部VM/EC2へ変更を加える前に、local worktreeがcleanで、検証対象recipe commitがremote repositoryからexact SHAで取得可能であることを確認する。local HEADとremote mainの完全一致は要求しない。recipeがexternal frontendを要求する場合だけremote tag/公開Release/期待asset/published SHA-256を確認し、workflowまたはReleaseがない場合は`blocked`としてpartial provisioningを始めない。
 
-local `dist/`、別targetのRelease、過去のdownload済みarchiveを代用しない。公式source/dataをbuild instance内で取得する契約と、frontendをCIでbuildしてRelease配布する契約を別々に守る。
+local `dist/`、別targetのRelease、過去のdownload済みarchiveを代用しない。公式source/dataやofficial prebuilt frontendをbuild instance内でexact identityから取得する契約と、こちらでfrontendをbuildしてCI/Release配布する契約を別々に守る。前者ではlocal `dist/`が存在しなくても正常とする。
 
 ## 外部操作preflight
 

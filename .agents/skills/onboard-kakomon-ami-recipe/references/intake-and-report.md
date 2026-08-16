@@ -9,20 +9,20 @@
 | identity | edition、Qualify/Final等のvariant、Go版など対象実装 |
 | provenance | official upstream URL、exact commit/tag、license/notice |
 | audit evidence | main source cacheとworktree-local mirrorの絶対path、HEAD、remote、clean状態、expected official identityとの一致、bootstrap方法、top-level Gitのignore状態、参考実装の絶対pathとprovenance |
-| managed source | `upstream/<official-repo-name>`のbaseline、cacheからrsyncするsubpath、取り込み・除外範囲、local変更、画像・静的asset・`sql/`・初期データbundleのmanifest / checksum |
+| managed source | `upstream/<official-repo-name>`のbaseline、cacheからrsyncするsubpath、取り込み・除外範囲、local変更、画像・静的asset・`sql/`・初期データのAMI内直接取得または外部bundle、manifest/checksum |
 | artifact | Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、provider、同regionのexact base image ID方針、edition固有recipe identity、非互換時の停止証拠 |
 | hostname/TLS | upstreamの競技用domain、`isuren.internal`写像、DNS/hosts・proxy・SAN・cookie・benchmark整合、自己署名fixtureまたは本物の秘密の境界 |
 | topology | compact topology、canonical topology、各nodeのrole/network/port |
-| benchmark | 配置先、build/実行方法、target指定、result/failureの構造、必要データ |
+| benchmark | official home上のsource/binary/wrapper/asset配置、build/実行方法、cwd、target指定、result/failureの構造、build後に削除可能なsourceと必要データ |
 | runtime | 統合済みKAKOMON14比較元、upstream指定、採用候補、checksum/lock方針 |
-| frontend | build要否、runtimeの意味、package manager、lockfile、command、生成物、配置先、target固有workflow/tag/asset/digest |
-| operations | Orb/AWS resource namespace、AWS region `ap-northeast-1`、費用上限、TTL、同regionでのcleanup条件・担当、外部操作の承認範囲、remote main/Release readiness |
+| frontend | build要否またはofficial prebuilt採用、runtimeの意味、package manager/lockfile/command、official commit/tree、生成物file manifest/SHA-256、配置先、runtime外部URL、必要ならworkflow/tag/asset/digest |
+| operations | Orb/AWS resource namespace、AWS region `ap-northeast-1`、費用上限、TTL、同regionでのcleanup条件・担当、外部操作の承認範囲、検証対象recipe commitのremote availability/Release readiness |
 
 implement worktreeでは、作成直後にmain checkoutのread-only source cacheを検証し、clone全体を同名の`tmp/all-kakomon/<official-repo-name>`へ`rsync -a`する。bootstrapだけは複製先でGit identityを再検証するため`.git/`を含める。複製先はgitignore対象の一時cacheであり、stage、commit、merge payloadに含めない。存在したままのlocal main統合を許し、worktree cleanup時に破棄してよい。
 
 以後はworktree-local mirrorをread-onlyのaudit / import cacheにする。別sessionはofficial repositoryを再clone、fetch、pullせず、main source cacheはidentity再確認以外のcontent audit / importに使わない。両cacheのorigin URL、full HEAD、clean状態がexpected official identityと一致する場合だけ対象subpathを`rsync`する。不一致ならcacheを変更せず、人間による更新待ちとして停止する。
 
-cache自体はbuild provenanceではない。保守codeはcommit済みmanaged source、非commit asset/dataはofficial URL・exact commit・file manifest・SHA-256を持つ固定bundleへ変換する。clean clone、cloud-init、AMI buildが`tmp/all-kakomon`を直接参照してはならない。
+cache自体はbuild provenanceではない。保守codeはcommit済みmanaged sourceにする。非commit asset/dataはofficial URL・exact commit・file manifest・SHA-256を固定し、build instance内で直接取得するか外部固定bundleとして配布する。clean clone、cloud-init、AMI buildが`tmp/all-kakomon`を直接参照してはならず、AMI内直接取得方式ではlocal `dist/`も必須入力にしない。
 
 参考実装は構成・差分発見の証拠であり、official provenanceの代替ではない。統合済みKAKOMON14は構造とruntime比較の基準に限り、未統合worktreeや一時生成物を取り込まない。
 

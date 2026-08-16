@@ -10,9 +10,11 @@ current planがfrontendをAMI外のCI/Release artifactとして配布する場�
 4. 人間push後、remote tag、公開Release、期待asset名、asset digestをGitHub API等でread-only確認する。local `dist/`、過去のterminal出力、別targetのReleaseを代用しない。
 5. provisioning/Packerへexact tagとSHA-256を渡す。ReleaseがなければEC2/VMを変更する前に`blocked`で停止する。
 
-`all-sh-slice-committed`はrepository実装の完了、`frontend-release-published`はremote配布の完了、`verify-ready`は両方とremote main同期を満たす状態として分ける。Release発行はGitHub writeなので、人間の承認なしに実行しない。
+`all-sh-slice-committed`はrepository実装の完了、`frontend-release-published`はremote配布の完了、`verify-ready`は検証対象recipe commitがremoteから取得可能で必要なReleaseが存在する状態として分ける。local mainとremote mainの完全一致は要求しない。Release発行はGitHub writeなので、人間の承認なしに実行しない。
 
 公式source/dataをbuild instance内で取得する方針と、frontendをCIでbuildしてRelease配布する方針を混同しない。ローカルPCへ公式assetを保持しない場合も、frontend生成物をAMI内buildへ勝手に変更しない。
+
+official repositoryがprebuilt frontendをcommitしており、こちらで再buildしない方針を採用した場合は、CI/Release gateではなくAMI内直接取得gateを使う。official URL、exact commit、Git tree、file manifest、SHA-256、licenseを固定し、Node.js/package manager/local `dist/`を不要にする。activeな絶対domain依存が見つかった場合は生成済みassetを書き換えず停止する。
 
 ## binary tracking gate
 
@@ -29,12 +31,14 @@ commit前に、少なくとも次を独立に確認する。
 
 外部mutation前に次を順番どおり確認する。
 
-1. local worktreeがcleanで、HEADと`origin/main`のexact full SHAが一致する。
+1. local worktreeがcleanで、検証対象recipe commitがremote repositoryからexact SHAで取得可能である。local mainとremote mainの完全一致は要求しない。
 2. external frontendなら上記delivery gateが`frontend-release-published`である。
 3. account/provider、region、resource ID、owner、費用上限、TTL、停止時刻、cleanup ownerを固定する。
 4. AWSは`ap-northeast-1`を全commandへ明示し、instance ID、AMI ID、instance type、architecture、OS version、SSM Onlineをread-onlyで照合する。
 5. 既存instanceを使う場合も、対象以外のinstance/volume/AMI/stackへ触れない。削除・停止を依頼されていなければ行わない。
 6. provisioning、sealed Goss、reboot後stateを別々に回収する。前の成功を次へコピーしない。
+
+SSM接続を利用者へ引き渡す場合は、確認済みregionとinstance IDを使う`aws ssm start-session`のexact commandを示し、participant shellはsession内の`sudo -iu isuren`等、採用userへlogin shellとして切り替える手順を分けて示す。public IP、SSH user、暗黙regionを推測で混ぜない。
 
 AWS credential processがhost keychain等を必要としてsandbox内で失敗した場合は、secretを表示せず、必要なread/write command prefixだけをscoped escalationする。credentialをargv、chat、log、artifactへ書かない。
 
@@ -50,4 +54,5 @@ stop/start、reboot、`cloud-init clean`、既存instance上での`all.sh`再実
 
 - `curl -k`成功はserver-side HTTPS応答の証拠であり、browser UIの証拠ではない。
 - browserの`ERR_CONNECTION_REFUSED`はDNS解決、TCP 443、proxy/firewall、macOS local-network permission、certificate扱いをclient側で分離する。curl成功だけでbrowser問題をnginx障害と断定しない。
+- browser確認を依頼されたら、public IPだけでなくnginxの`server_name`とHost header契約を読み、必要な`/etc/hosts`行とURLを報告する。IP直打ちで同じvirtual hostへ入れると推測しない。
 - benchmarkのtimeoutはApplication不具合だけでなくCPU/instance size不足でも起きる。instance type、CPU/load、timeout、result JSONを記録し、十分なresourceでの再現前にcode defectと断定しない。
