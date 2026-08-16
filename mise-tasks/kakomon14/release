@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="frontendのdist出力をGitHub Releaseへuploadする (kakomon14独自: archive/frontend manifestを公開)"
+#MISE description="frontendのdist出力をGitHub Releaseへuploadする (引数: exact tag)"
 set -euo pipefail
 
 TAG="${1:?タグ名を指定してください(例: mise run kakomon14:release kakomon14-frontend-v1.0.0)}"
