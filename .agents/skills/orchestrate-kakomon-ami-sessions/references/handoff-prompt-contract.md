@@ -17,7 +17,7 @@
 |---|---|
 | identity | edition、variant、canonical slug、Go版の範囲 |
 | workspace | topic worktreeとmain worktreeの絶対path、branch、base full SHA、target専用の`kakomon*/**`・`upstream/**`・`mise-tasks/**`変更許可path、main統合権限 |
-| audit cache | main checkout配下の絶対path、remote、HEAD、dirty状態、official identityとの一致、rsync対象subpath |
+| audit cache | main checkoutのsource cacheとworktree-local mirrorの絶対path、remote、HEAD、dirty状態、official identityとの一致、bootstrapとimportの境界、rsync対象subpath |
 | official source | URL、exact full SHA/tag、license/notice |
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
 | plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
@@ -62,15 +62,18 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 
 ### 変更範囲
 
+- worktree作成直後、変更開始前にmain checkoutのsource cacheを検証し、worktreeの`tmp/all-kakomon/<official-repo-name>`へ`rsync -a`する。bootstrapだけは`.git/`を含め、複製先が既に存在する場合と`--delete`は禁止する。
+- 複製後にworktree-local mirrorのorigin URL、full HEAD、clean状態がsource cacheおよびofficial identityと一致し、top-level Gitで`tmp/`がignoreされることを確認する。不一致ならmirrorを補正せず停止する。
+- 以後のcontent audit / importはworktree-local mirrorだけをread-onlyで使い、main checkout側のsource cacheはidentity再確認以外に使わない。official repositoryのclone、fetch、pull、checkout、reset、cleanも行わない。
+- `tmp/all-kakomon/**`は一時cacheであり、変更許可path、stage、commit、merge payloadに含めない。cacheがworktreeに残っていてもmain統合のblockerにせず、worktree cleanup時に破棄してよい。
 - canonical target directoryの`provisioning/`、`cloud-init/`、`packer/`、`scripts/`を作る。
 - 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
-- `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。verified cacheの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
-- 別sessionはofficial repositoryを再clone、fetch、pullしない。cacheのorigin URL、full HEAD、clean状態が期待値と一致しなければ、cacheを変更せず人間による更新待ちとして停止する。
-- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、verified cacheのtarget固有subpathからfrontend artifact buildまたはbundle準備前に`rsync`する。`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
+- `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。worktree-local mirrorの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
+- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、worktree-local mirrorのtarget固有subpathからfrontend artifact buildまたはbundle準備前に`rsync`する。このimportでは`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
 - cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildへ渡す非commit dataはfile manifest、official commit、SHA-256を持つ固定bundleへ変換し、`tmp/`を実行時依存にしない。
 - `upstream/isucon14/NOTICE.md`、`kakomon14/provisioning/50-source.sh`、`mise-tasks/kakomon14/{refresh-upstream,diff}`は構造上の参考に限る。除外pathとlocal変更はtarget自身の監査で決め、公式更新で保守中の差分を黙って上書きしない。
 - 他targetの`kakomon*/**`、`upstream/**`、`mise-tasks/**`を変更しない。repository-wide fileが必要なら実装を広げずscope expansionとして報告する。`kakomon14/**`とその対応rootは統合済みcommit treeを参照するだけにする。
-- audit cacheと2つの参考repoを変更しない。
+- source cache、worktree-local mirror、2つの参考repoを変更しない。
 - 非重複として明示されたactive worktreeは存在だけでblockerにしないが、その内容、branch、artifact、VM、resourceへ触れない。
 
 ### 実装責任

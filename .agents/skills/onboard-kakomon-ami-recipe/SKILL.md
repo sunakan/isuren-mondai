@@ -18,7 +18,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - ファイル変更、依存導入、VM作成、AMI build、AWS/Orb/GitHub操作をしない。
 - official upstream、ローカルaudit clone、参考実装、統合済みKAKOMON14を証拠源ごとに分ける。
-- official repositoryを再clone、fetch、pullしない。main checkout配下の`tmp/all-kakomon/<official-repo-name>`をread-onlyで使い、identity不一致ならcacheを変更せず停止する。
+- official repositoryを再clone、fetch、pullしない。implement worktreeではmain checkoutのsource cacheから作成直後に複製した`tmp/all-kakomon/<official-repo-name>`をread-onlyで使い、identity不一致ならcacheを変更せず停止する。worktreeを作らないauditはmain source cacheを直接使ってよい。
 - [auditチェックリスト](references/audit-checklist.md)を最後まで実施する。
 - 不明点を推測で埋めず、`decision-required`または`evidence-missing`として返す。
 
@@ -51,9 +51,11 @@ Ubuntu 26.04 arm64と、競技用domainが存在する場合の`isuren.internal`
 
 - editionとQualify/Final等のvariantが一意でない。
 - official URLとexact commit/tagが固定されていない。
-- `tmp/all-kakomon`等のcacheのorigin URL、full HEAD、clean状態を確認せず`rsync`しようとしている、または不一致cacheをsession自身でfetch / checkout / resetしようとしている。
+- implement worktree作成直後にmain source cacheを同名のworktree-local `tmp/all-kakomon`へclone全体で`rsync -a`していない、bootstrapで`.git/`を落としている、またはlocal mirrorがtop-level Gitでignoreされていない。
+- main source cacheとworktree-local mirrorのorigin URL、full HEAD、clean状態を確認せずimportしようとしている、または不一致cacheをsession自身でfetch / checkout / resetしようとしている。
+- `tmp/all-kakomon`を変更許可path、stage、commit、merge payloadへ含めようとしている。worktreeに残る一時cache自体はmain統合のblockerにしない。
 - clean clone、cloud-init、AMI buildが`tmp/all-kakomon`の存在を前提にしており、commit済みmanaged sourceまたはmanifest / checksum固定bundleへ変換されていない。
-- managed upstreamと、verified cacheから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データの境界、subpath、license、exact commit、manifest / checksumが固定されていない。
+- managed upstreamと、worktree-local mirrorから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データの境界、subpath、license、exact commit、manifest / checksumが固定されていない。
 - architecture、provider、compact/canonical topologyの対応が不明である。
 - Ubuntu 26.04 arm64で必要componentが成立せず、amd64・旧Ubuntuへのfallbackを人間判断なしで進めようとしている。
 - upstreamに競技用domainがあるのに`isuren.internal`へのtarget限定写像、TLS SAN、自己署名fixtureまたは本物の秘密の境界が固定されていない。

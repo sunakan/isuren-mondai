@@ -8,7 +8,7 @@
 |---|---|
 | identity | edition、Qualify/Final等のvariant、Go版など対象実装 |
 | provenance | official upstream URL、exact commit/tag、license/notice |
-| audit evidence | ローカルaudit / import cacheの絶対path、HEAD、remote、clean状態、expected official identityとの一致、参考実装の絶対pathとprovenance |
+| audit evidence | main source cacheとworktree-local mirrorの絶対path、HEAD、remote、clean状態、expected official identityとの一致、bootstrap方法、top-level Gitのignore状態、参考実装の絶対pathとprovenance |
 | managed source | `upstream/<official-repo-name>`のbaseline、cacheからrsyncするsubpath、取り込み・除外範囲、local変更、画像・静的asset・`sql/`・初期データbundleのmanifest / checksum |
 | artifact | Ubuntu 26.04 arm64、provider、exact base image ID方針、edition固有recipe identity、非互換時の停止証拠 |
 | hostname/TLS | upstreamの競技用domain、`isuren.internal`写像、DNS/hosts・proxy・SAN・cookie・benchmark整合、自己署名fixtureまたは本物の秘密の境界 |
@@ -18,7 +18,9 @@
 | frontend | build要否、runtimeの意味、package manager、lockfile、command、生成物、配置先 |
 | operations | Orb/AWS resource namespace、費用上限、TTL、cleanup条件・担当、外部操作の承認範囲 |
 
-ローカルcloneはread-onlyのaudit / import cacheであり、別sessionはofficial repositoryを再clone、fetch、pullしない。cacheのorigin URL、full HEAD、clean状態がexpected official identityと一致する場合だけ対象subpathを`rsync`する。不一致ならcacheを変更せず、人間による更新待ちとして停止する。
+implement worktreeでは、作成直後にmain checkoutのread-only source cacheを検証し、clone全体を同名の`tmp/all-kakomon/<official-repo-name>`へ`rsync -a`する。bootstrapだけは複製先でGit identityを再検証するため`.git/`を含める。複製先はgitignore対象の一時cacheであり、stage、commit、merge payloadに含めない。存在したままのlocal main統合を許し、worktree cleanup時に破棄してよい。
+
+以後はworktree-local mirrorをread-onlyのaudit / import cacheにする。別sessionはofficial repositoryを再clone、fetch、pullせず、main source cacheはidentity再確認以外のcontent audit / importに使わない。両cacheのorigin URL、full HEAD、clean状態がexpected official identityと一致する場合だけ対象subpathを`rsync`する。不一致ならcacheを変更せず、人間による更新待ちとして停止する。
 
 cache自体はbuild provenanceではない。保守codeはcommit済みmanaged source、非commit asset/dataはofficial URL・exact commit・file manifest・SHA-256を持つ固定bundleへ変換する。clean clone、cloud-init、AMI buildが`tmp/all-kakomon`を直接参照してはならない。
 

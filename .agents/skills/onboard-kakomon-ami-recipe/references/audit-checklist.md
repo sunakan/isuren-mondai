@@ -4,9 +4,10 @@
 
 - editionとQualify/Final等のvariantを一意にする。
 - official upstream URL、remote、exact commit/tag、license/noticeを確認する。
-- ローカルaudit / import cacheのremote、full HEAD、clean状態を記録し、expected official identityとの一致を確認する。別sessionはclone / fetch / pullせず、不一致ならcacheを変更せず停止する。
+- implement worktreeではmain source cacheを検証してから、作成直後にclone全体を同名のworktree-local `tmp/all-kakomon`へ`rsync -a`したことを確認する。bootstrapでは`.git/`を含め、既存宛先と`--delete`を使わない。
+- main source cacheとworktree-local mirrorのremote、full HEAD、clean状態を記録し、expected official identityとの一致を確認する。local mirrorがtop-level Gitでignoreされ、stage、commit、merge payloadに含まれないことも確認する。別sessionはclone / fetch / pullせず、不一致ならcacheを変更せず停止する。
 - 参考実装の出典、revision、想定OS/architecture/providerを分離する。
-- official treeを、こちらで保守するApplication・benchmark・frontend等のコードと、verified cacheから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データへ分類し、target固有subpathを列挙する。
+- official treeを、こちらで保守するApplication・benchmark・frontend等のコードと、worktree-local mirrorから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データへ分類し、target固有subpathを列挙する。
 - Go版の範囲をApplication、benchmark、補助service、frontend、OS packageごとに定義する。
 - upstreamのprovisioning、README、inventory、systemd、container構成から正本候補を特定する。
 
@@ -51,7 +52,7 @@
 - `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerの責任を[recipe実装契約](recipe-contract.md)へ照合する。
 - 手動修正、秘密、role固有identity、builder一時file、mutable inputがimageへ残る経路を探す。
 - source、runtime、frontend、base image、package、tool/pluginのpinとchecksum不足を列挙する。
-- managed upstreamのbaseline/local差分、LICENSE/NOTICE、cache rsync対象のexact commit/subpath、固定bundleのmanifest/checksum、`tmp/`非依存を照合する。
+- managed upstreamのbaseline/local差分、LICENSE/NOTICE、worktree-local mirrorからrsyncするexact commit/subpath、固定bundleのmanifest/checksum、artifactの`tmp/`非依存を照合する。
 - Orb recipe、Orb Golden、standalone、AMI build、fresh boot、Orb/AWS productを[検証gate](verification-gates.md)へ割り当てる。
 - 各外部gateにnamespace、TTL、費用、cleanup command/owner、残存確認があるか調べる。
 

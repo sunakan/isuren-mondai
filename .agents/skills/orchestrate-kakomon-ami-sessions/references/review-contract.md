@@ -15,7 +15,7 @@
 - main worktree絶対path、main HEAD、`origin/main`とのahead/behind、clean状態、他sessionのactive owner、main統合権限
 - current planのstatus、依存、競合、変更許可path
 - official URL、full SHA/tag、license/notice
-- audit cacheと参考repoのremote、HEAD、dirty状態
+- main checkoutのsource cache、worktree-local mirror、参考repoのremote、HEAD、dirty状態
 - 変更fileと実行済みvalidationのraw output
 
 別session所有の未統合worktree、VM、artifactを開いたり変更したりせず、今回の対象と明示されたworktreeだけをreviewする。
@@ -35,14 +35,16 @@
 - canonical slug、branch、directory、variantが一貫している。
 - 変更がpromptで許可されたtarget専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけに収まり、他target、参考repo、audit cacheに変更がない。
 - staged/unstaged/untrackedを分け、許可pathだけがcommitされている。`git add .`や`git add -A`でscopeを広げていない。
+- `tmp/all-kakomon/**`がtop-level Gitでignoreされ、stage、commit、merge payloadに含まれていない。worktree-local mirrorの存在自体や統合前に削除していないことをfindingにしない。
 
 ### provenanceとruntime
 
-- audit / import cacheのorigin URL、full HEAD、clean状態を検証し、期待identityと一致する場合だけ対象subpathを`rsync`している。別sessionがclone / fetch / pull / checkout / resetしていない。
+- main checkoutのsource cacheを検証後、worktree作成直後にclone全体を同名のworktree-local mirrorへ`rsync -a`し、このbootstrapだけは`.git/`を含めている。両cacheのorigin URL、full HEAD、clean状態がofficial identityと一致し、既存宛先や`--delete`を使っていない。
+- bootstrap後のaudit/importはworktree-local mirrorだけから行い、main source cacheを変更・直接利用していない。別sessionがclone / fetch / pull / checkout / reset / cleanでcacheを補正していない。
 - cacheをclean clone、cloud-init、AMI buildの直接build sourceにせず、保守codeはcommit済みmanaged source、非commit dataはmanifest / checksum固定bundleへ変換している。
 - official URL、full SHA/tag、license/noticeを固定している。
 - managed upstreamが公式baselineから取り込んだ保守対象コードとlocal変更を追跡し、`NOTICE.md`の範囲・除外・provenanceと実treeが一致する。
-- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、verified cacheのexact commitとtarget固有subpathから`rsync`し、固定bundleへ変換する。mutable branch、由来不明archiveへfallbackしていない。
+- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、worktree-local mirrorのexact commitとtarget固有subpathから`rsync`し、固定bundleへ変換する。mutable branch、由来不明archiveへfallbackしていない。
 - cache由来データを保守対象コードへ実ファイルで統合し、不要な`.git`、生成物、依存directory、重複sourceをartifactへ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
