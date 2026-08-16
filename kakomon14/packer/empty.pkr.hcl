@@ -74,15 +74,16 @@ locals {
   }
 }
 
+# AMI buildではfrontendをビルドせず、事前ビルド済みReleaseを取得する。
+# 現在は2vCPU/4GiBのt4g.mediumを採用している。t4g.smallへ下げる場合は、Go/DB/benchmark
+# provisioningをfresh buildで検証してから変更する。
 source "amazon-ebs" "kakomon14" {
   ami_name = local.name
   # "isucon"はさくらインターネット株式会社の商標のため、Public AMI化する方針を踏まえ含めない
   # (README.mdの注記、nginx TLS証明書のホスト名変更(commit 9ef6955)と同様の対応)。
-  ami_description = "kakomon14 webapp environment (Go) provisioned by cloud-init"
-  region          = var.region
-  source_ami      = var.source_ami
-  # ISUCON14公式の競技者VM(c5.large: 2vCPU/4GiB)とメモリ量を揃える。
-  # t4g.small(2GiB)ではフロントエンドビルド等でOOMのリスクがあるため避ける。
+  ami_description      = "kakomon14 webapp environment (Go) provisioned by cloud-init"
+  region               = var.region
+  source_ami           = var.source_ami
   instance_type        = "t4g.medium"
   ssh_username         = "ubuntu"
   vpc_id               = var.vpc_id
