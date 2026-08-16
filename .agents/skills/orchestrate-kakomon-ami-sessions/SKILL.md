@@ -23,10 +23,10 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 1. repository rootの`AGENTS.md`、`README.md`、Git status、remote divergence、`git worktree list --porcelain`。
 2. `/Users/user01/works/github.com/sunakan/isuren/docs/decisions/20260815-isuren-mondai-image-strategy.md`。
 3. 対象edition/variantのcurrent planと、その`status`、`depends_on`、`conflicts_with`、変更許可path。
-4. 統合済み`kakomon14/**`。activeなKAKOMON14 worktreeは所有確認だけにし、内容を参照しない。
+4. 統合済み`kakomon14/**`。activeなKAKOMON14 worktreeは所有確認だけにし、内容を参照しない。変更pathとresourceがtargetに重ならず、current target planまたはユーザーが非依存と明示した場合は、その存在だけを実装blockerにしない。
 5. `$onboard-kakomon-ami-recipe`と必要なreference。生成promptでもこのSkillを明示的に使わせる。
 
-採用済みplanと依頼値が衝突したら、どちらかを勝手に選ばない。`decision-required`として実装promptとworktree作成を止める。特にGo、Node.js、OS、architecture、topology、hostname、frontend配布方法を再確認する。
+採用済みplanと依頼値が衝突したら、どちらかを勝手に選ばない。`decision-required`として実装promptとworktree作成を止める。特にGo、Node.js、OS、architecture、topology、hostname、frontend配布方法を再確認する。ただし、current target planまたはユーザーの最新の明示判断が古い展開順・保留理由を置き換えている場合は、その判断をpromptへ記録し、古い一般順序だけをblockerとして復活させない。
 
 ## 対象identityを一意にする
 
@@ -41,7 +41,8 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 
 - read-only auditはtargetごとに並行してよい。
 - local実装はcurrent planの入口条件を満たし、変更pathとworktree所有が重複しないtargetだけ許可する。
-- 採用済み展開順や依存gateを「worktreeが分かれている」だけで迂回しない。
+- current target planまたはユーザーの明示的な再優先順位付けを、古い一般的な展開順より優先する。明示判断のない依存gateを「worktreeが分かれている」だけで迂回しない。
+- active worktreeがあっても、targetの変更path・artifact・VM・resource namespaceと重ならなければ、それだけで停止しない。所有外worktreeの内容や生成物には触れない。
 - 最初の3問は独立recipeを保ち、共通libraryを先回りして作らない。
 - 他の`kakomon*/**`、特に`kakomon14/**`を変更しない。repository-wide変更が必要なら別planへ分離する。
 
@@ -50,7 +51,8 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - GoはApplicationとbenchmarkの両方で`1.26.6`を第一かつ唯一の実装候補とする。
 - version文字列、official archive URL、architecture別SHA-256、mise config/lock、Goss、provenanceを同じidentityへ束縛する。
 - Go 1.26.6で非互換なら旧versionへ自動fallbackせず、component別の失敗証拠を示して停止する。
-- KAKOMON14の1.26.6整合とcurrent planが要求する再検証が統合されるまで、依存する新規recipeをimplementへ進めない。
+- 統合済みKAKOMON14のruntime config/lockは構造上の比較元に限る。KAKOMON14のApplication、benchmark、Goss、Orb、AMI再検証を、独立targetのrepository-only audit/実装の入口条件にしない。
+- 各targetがGo 1.26.6のofficial URL・architecture別SHA-256・config/lockを独立に固定し、Applicationとbenchmarkをtarget自身のvalidationで確認する。KAKOMON14の成功・失敗証拠を流用しない。
 - Node.jsは対象upstreamの証拠からexact versionを決める。`latest`、`lts`、major/rangeだけの指定をartifact入力にしない。
 
 ## モデルと推論レベルを提案する
@@ -87,6 +89,8 @@ branch名へ必ずcanonical slugを含める。すでに別sessionが所有す�
 - mode（`audit`または`implement-through-all-sh`）
 - worktreeの絶対path、branch、base SHA。prompt-onlyなら`not-created`
 - implementation readinessとblocker
+
+共通のaudit/recipe/reviewチェックリストをprompt本文へ複製せず、`$onboard-kakomon-ami-recipe`とreferenceへ委譲する。prompt本文にはtarget固有のidentity、解決済み値、証拠snapshot、変更境界、例外判断、停止条件、Git権限だけを簡潔に書く。
 
 入口条件が不足する場合も、調査を進められるならaudit promptを返す。`all.sh` sliceの完成はAMI完成ではないため、完了ラベルを`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main`のいずれかに限定する。
 

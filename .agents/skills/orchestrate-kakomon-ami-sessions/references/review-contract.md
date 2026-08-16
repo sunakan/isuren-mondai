@@ -44,6 +44,7 @@
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
 - URL、checksum、config、lock、Goss、provenanceのcross-versionがない。
 - `latest`、`lts`、floating tag、rangeだけのplugin/base image選択がない。
+- target自身のApplication/benchmark validationを確認し、KAKOMON14のrecipe・Orb・AMI証拠をtargetの入口条件や成功証拠へ流用していない。
 
 ### recipe
 

@@ -20,13 +20,13 @@
 | audit cache | main checkout配下の絶対path、remote、HEAD、dirty状態 |
 | official source | URL、exact full SHA/tag、license/notice |
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
-| plan gate | plan ID、status、依存、競合、implementation readiness |
+| plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
 | runtime | Go、Node.js、package manager、OS、architectureの採用済み値または停止条件 |
 | completion | `audit-complete`、`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main` |
 
 ## promptの必須構成
 
-1つのpromptへ次をこの順で書く。
+1つのpromptへ次をこの順で書く。共通チェックリストは`$onboard-kakomon-ami-recipe`へ委譲し、target固有でない説明を繰り返さない。
 
 1. role: 1 targetだけを担当する別Codexセッションであること。
 2. cwd / Git identity: worktree絶対path、branch、base SHA。
@@ -65,6 +65,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - このsliceではtarget directory配下だけを変更する。`mise-tasks/**`、`upstream/**`、repository-wide fileが必要なら実装を広げずscope expansionとして報告する。
 - 他の`kakomon*/**`を変更しない。`kakomon14/**`は統合済みcommit treeを参照するだけにする。
 - audit cacheと2つの参考repoを変更しない。
+- 非重複として明示されたactive worktreeは存在だけでblockerにしないが、その内容、branch、artifact、VM、resourceへ触れない。
 
 ### 実装責任
 
@@ -94,7 +95,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 
 - ApplicationとbenchmarkのGoを`1.26.6`へ固定する。非互換なら旧versionへfallbackせず、component別の失敗証拠を出して停止する。
 - version文字列だけでなく、architecture別URL、checksum、mise config/lock、Goss/provenanceを同じidentityへ束縛する。
-- KAKOMON14のGo 1.26.6整合とplan指定の再検証が未統合なら、依存targetの実装を開始しない。
+- KAKOMON14のApplication、benchmark、Goss、Orb、AMI再検証を独立targetのrepository-only実装の入口条件にしない。target自身でGo 1.26.6の入力identityとApplication/benchmarkを検証し、KAKOMON14の証拠を流用しない。
 - Node.jsは「本家に合わせる」を数字の推測で済ませない。`package.json`、`packageManager`、lockfile、CI、`.node-version`等からexact versionを特定する。
 - upstreamがmajor/rangeしか指定しない場合は、互換試験候補を提示して`decision-required`にする。`node = "lts"`や`latest`を採用しない。
 - frontend package managerとversionをupstreamに合わせ、KAKOMON14のpnpmを他editionへ自動移植しない。
