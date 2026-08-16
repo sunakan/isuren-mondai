@@ -1,43 +1,53 @@
 #!/usr/bin/env python3
-"""Generate small cloud-config that runs the exact recipe commit.
+"""Generate cloud-config for one exact isuren-mondai recipe commit."""
 
-The embedded runner clones the recipe and lets provisioning fetch every pinned
-official input inside the AMI build. Packer does not upload a dist bundle.
-"""
-
-import base64
+import argparse
 import os
 import pathlib
 import re
 
+import yaml
 
-SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-TEMPLATE = SCRIPT_DIR / "run-recipe.sh"
-OUTPUT = SCRIPT_DIR / "user-data.yaml"
+
+REPO_URL = "https://github.com/sunakan/isuren-mondai.git"
+CLONE_DIR = "/opt/isuren-mondai"
+PROVISIONING_DIR = f"{CLONE_DIR}/kakomon9-qualify/provisioning"
+ARTIFACT_DIR = "/opt/isuren-artifacts/kakomon9-qualify"
+
+
+def build_cloud_config(commit: str, traceparent: str) -> dict:
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise ValueError("PROJECT_COMMIT must be a full lowercase Git SHA")
+    if traceparent and re.fullmatch(r"00-[0-9a-f]{32}-[0-9a-f]{16}-01", traceparent) is None:
+        raise ValueError("TRACEPARENT has an invalid format")
+    return {
+        "runcmd": [
+            f"git init --quiet {CLONE_DIR}",
+            f"git -C {CLONE_DIR} remote add origin {REPO_URL}",
+            f"git -C {CLONE_DIR} fetch --quiet --depth 1 origin {commit}",
+            f"git -C {CLONE_DIR} checkout --quiet {commit}",
+            (
+                f"env PROJECT_ROOT={CLONE_DIR} ARTIFACT_DIR={ARTIFACT_DIR} "
+                f"RECIPE_COMMIT={commit} ENABLE_TEST_TLS=true TRACEPARENT={traceparent} "
+                f"bash {PROVISIONING_DIR}/all.sh"
+            ),
+            f"rm -rf {ARTIFACT_DIR} {CLONE_DIR}",
+        ]
+    }
 
 
 def main() -> None:
-    commit = os.environ["PROJECT_COMMIT"]
-    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
-        raise SystemExit("PROJECT_COMMIT must be a full lowercase SHA")
-    runner = TEMPLATE.read_text().replace("__PROJECT_COMMIT__", commit)
-    encoded = base64.b64encode(runner.encode()).decode()
-    content = "\n".join(
-        [
-            "#cloud-config",
-            "write_files:",
-            "  - path: /usr/local/sbin/kakomon9-qualify-provision",
-            "    owner: root:root",
-            "    permissions: '0755'",
-            "    encoding: b64",
-            f"    content: {encoded}",
-            "runcmd:",
-            "  - [/usr/local/sbin/kakomon9-qualify-provision]",
-            "",
-        ]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True, type=pathlib.Path)
+    args = parser.parse_args()
+    config = build_cloud_config(
+        os.environ["PROJECT_COMMIT"],
+        os.environ.get("TRACEPARENT", ""),
     )
-    OUTPUT.write_text(content)
-    print(f"wrote {OUTPUT}")
+    args.output.write_text(
+        "#cloud-config\n" + yaml.safe_dump(config, allow_unicode=True, sort_keys=False, width=4096)
+    )
+    print(args.output)
 
 
 if __name__ == "__main__":

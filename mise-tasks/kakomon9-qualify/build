@@ -1,29 +1,99 @@
 #!/usr/bin/env bash
-#MISE description="Build the kakomon9-qualify AMI with AMI-side pinned artifact fetch"
+#MISE description="AMIをPackerでbuildする"
 set -euo pipefail
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo 'commit all recipe changes before an AMI build' >&2
-  exit 1
-fi
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
+# user-dataはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだとEC2起動時の
+# git fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため、ここで先に検知する。
+require_clean_worktree
 PROJECT_COMMIT="$(git rev-parse HEAD)"
-PROJECT_BRANCH="$(git symbolic-ref --short HEAD)"
-REMOTE_COMMIT="$(git ls-remote origin "refs/heads/${PROJECT_BRANCH}" | awk '{print $1}')"
-if [ "${REMOTE_COMMIT}" != "${PROJECT_COMMIT}" ]; then
-  echo "origin/${PROJECT_BRANCH} does not resolve to ${PROJECT_COMMIT}; push is a human-owned prerequisite" >&2
-  exit 1
-fi
 export PROJECT_COMMIT
-kakomon9-qualify/cloud-init/generate-user-data.py
-packer init kakomon9-qualify/packer
+require_pushed_commit "${PROJECT_COMMIT}"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:kakomon9-qualify")"
 
-VPC_ID="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
-SUBNET_ID="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
-IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+# OTel trace化用。EC2側(all.sh)はこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信は
+# 一切行わない(APIキーをEC2/AMIへ渡さないための設計。詳細はscripts/otel.sh参照)。
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export TRACEPARENT
 
+# Target-local artifact inputs keep the base image and official data identities exact and reviewable.
+# shellcheck source=kakomon9-qualify/scripts/artifact-inputs.env
+source kakomon9-qualify/scripts/artifact-inputs.env
+[[ "${BASE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
+  echo "error: BASE_AMI_ID is not an exact AMI ID" >&2
+  exit 1
+}
+[[ "${OFFICIAL_MAINTAINED_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: OFFICIAL_MAINTAINED_COMMIT is invalid" >&2
+  exit 1
+}
+[[ "${OFFICIAL_FRONTEND_TREE}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: OFFICIAL_FRONTEND_TREE is invalid" >&2
+  exit 1
+}
+[[ "${OFFICIAL_FRONTEND_MANIFEST_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "error: OFFICIAL_FRONTEND_MANIFEST_SHA256 is invalid" >&2
+  exit 1
+}
+
+VPC_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+
+user_data="$(mktemp)"
+python3 kakomon9-qualify/cloud-init/generate-user-data.py --output "${user_data}"
+packer init kakomon9-qualify/packer/kakomon9-qualify.pkr.hcl
+BUILD_LOG="$(mktemp)"
+trap 'rm -f "${BUILD_LOG}" "${user_data}"' EXIT
+
+# buildログを画面に出しつつファイルにも残す(AMI ID抽出・span化のため)。
+# packer buildのexit codeをOTel送信のために明示的に捕まえた上でtaskを継続させる。
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
 packer build \
+  -var "region=ap-northeast-1" \
+  -var "source_ami=${BASE_AMI_ID}" \
   -var "vpc_id=${VPC_ID}" \
   -var "subnet_id=${SUBNET_ID}" \
   -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \
+  -var "user_data_file=${user_data}" \
   -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
-  kakomon9-qualify/packer
+  -var "recipe_tree=${RECIPE_TREE}" \
+  kakomon9-qualify/packer/kakomon9-qualify.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
+
+# trace送信はPacker build完了後に行う。送信の成否はBUILD_EXITに影響させない
+# (otel_span/otel_emit_provisioning_spansは失敗しても呼び出し元を落とさない設計)。
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE="ok"
+  if [ "${BUILD_EXIT}" -ne 0 ]; then
+    ROOT_STATUS_CODE="error"
+  fi
+  otel_span \
+    --service "${OTEL_SERVICE_NAME:-kakomon9-qualify-ami-build}" \
+    --name "packer.build" \
+    --kind server \
+    --force-trace-id "${TRACE_ID}" \
+    --force-span-id "${ROOT_SPAN_ID}" \
+    --start "${BUILD_START_EPOCH}" \
+    --end "${BUILD_END_EPOCH}" \
+    --status-code "${ROOT_STATUS_CODE}"
+  otel_emit_provisioning_spans "${BUILD_LOG}" "${TRACE_ID}" "${ROOT_SPAN_ID}" kakomon9-qualify
+fi
+
+# 最後に実行されたコマンドがexit 0で終わっても、元のPacker exit codeを返す。
+exit "${BUILD_EXIT}"

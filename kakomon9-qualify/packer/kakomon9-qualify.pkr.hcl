@@ -7,6 +7,19 @@ packer {
   }
 }
 
+variable "region" {
+  type    = string
+  default = "ap-northeast-1"
+}
+
+variable "source_ami" {
+  type = string
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{17}$", var.source_ami))
+    error_message = "Source AMI must be one exact AMI ID. Image discovery belongs outside the build."
+  }
+}
+
 variable "vpc_id" {
   type = string
 }
@@ -23,9 +36,15 @@ variable "project_url" {
   type = string
 }
 
+variable "user_data_file" {
+  type = string
+}
+
+variable "recipe_tree" {
+  type = string
+}
+
 locals {
-  region          = "ap-northeast-1"
-  source_ami      = "ami-0df1235688731e6cc"
   source_serial   = "20260806"
   source_owner    = "099720109477"
   build_time      = timestamp()
@@ -36,10 +55,11 @@ locals {
   tags = {
     Name            = local.name
     Project         = var.project_url
+    RecipeTree      = var.recipe_tree
     OfficialSource  = "https://github.com/isucon/isucon9-qualify/commit/${local.official_commit}"
     FrontendTree    = local.frontend_tree
     OS              = "ubuntu-26.04-resolute-arm64"
-    BaseAMI         = local.source_ami
+    BaseAMI         = var.source_ami
     BaseOwner       = local.source_owner
     BaseImageSerial = local.source_serial
     Timestamp       = local.timestamp_jst
@@ -49,15 +69,15 @@ locals {
 source "amazon-ebs" "kakomon9_qualify" {
   ami_name        = local.name
   ami_description = "kakomon9-qualify Go practice environment provisioned by cloud-init"
-  region          = local.region
-  source_ami      = local.source_ami
+  region          = var.region
+  source_ami      = var.source_ami
   instance_type   = "t4g.medium"
   ssh_username    = "ubuntu"
 
   vpc_id               = var.vpc_id
   subnet_id            = var.subnet_id
   iam_instance_profile = var.iam_instance_profile
-  user_data_file       = "${path.root}/../cloud-init/user-data.yaml"
+  user_data_file       = var.user_data_file
 
   tags          = local.tags
   snapshot_tags = local.tags

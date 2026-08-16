@@ -6,6 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 require_root
 
+# Build inputs are validated before any target step changes the image. This
+# keeps the provisioning log and completion marker bound to the exact recipe.
+: "${RECIPE_COMMIT:?RECIPE_COMMIT must be the full project commit}"
+[[ "${RECIPE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: RECIPE_COMMIT is not a full lowercase Git SHA" >&2
+  exit 1
+}
+
 # Ubuntu mounts /tmp as a RAM-backed tmpfs. The official release bundles are
 # larger than the available tmpfs on the practice instances, so keep all
 # mktemp/unzip/package temporary files on the root-backed volume instead.
@@ -14,18 +22,20 @@ rm -rf "${RECIPE_TMPDIR}"
 install -d -m 1777 "${RECIPE_TMPDIR}"
 export TMPDIR="${RECIPE_TMPDIR}"
 
-log "all.sh: start"
+# These raw values are converted into OTel spans by the host-side target build
+# task after Packer completes. The VM does not send telemetry or receive keys.
+log "start"
 log "provisioning.all: temp_dir=${TMPDIR}"
 log "spans: begin"
 log "provisioning.all: disk_total_bytes=$(disk_total_bytes)"
 log "provisioning.all: start_ns=$(now_ns) disk_before=$(disk_used_bytes)"
 
-record_end() {
+record_provisioning_all_end() {
   local status=$?
   log "provisioning.all: end_ns=$(now_ns) disk_after=$(disk_used_bytes) exit_status=${status}"
   log "spans: end"
 }
-trap record_end EXIT
+trap record_provisioning_all_end EXIT
 
 run_step() {
   local script="$1"
