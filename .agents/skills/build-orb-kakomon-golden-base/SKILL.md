@@ -20,8 +20,9 @@ AMIのdiskを変換しない。AMIとOrbはexact recipe commit/treeとtarget-loc
    `provisioning/goss.yaml`を読む。canonical slugとUbuntu 26.04 arm64対応を確認する。
 2. `git status --short`、HEAD、push済みcommit、`orb list --format json`を確認する。
    既存の同名VMがある場合は停止する。上書き・削除・自動renameをしない。
-3. まずread-only dry-runを行う。dry-runもdirty worktreeまたはupstream tracking refに
-   含まれないHEADを検知した時点で停止する。別端末からpushした直後なら`git fetch`して再実行する。
+3. まずread-only dry-runを行う。dry-runも同名Orb VM、dirty worktree、またはupstream
+   tracking refに含まれないHEADをこの順で検知した時点で停止する。別端末からpushした直後なら
+   `git fetch`して再実行する。
 
    ```bash
    mise orb:build-golden-base kakomon14

@@ -91,7 +91,11 @@ require_command() {
 }
 
 machine_exists() {
-  orb list --quiet | grep -Fxq -- "$1"
+  local machine_names
+  if ! machine_names="$(orb list --quiet)"; then
+    fail "could not list Orb VMs"
+  fi
+  printf '%s\n' "${machine_names}" | grep -Fxq -- "$1"
 }
 
 machine_is_stopped() {
@@ -174,6 +178,10 @@ fi
 for command in git openssl orb python3; do
   require_command "${command}"
 done
+
+if machine_exists "${vm_name}"; then
+  fail "同名のOrb VMがすでに存在します。上書き・削除はしません: ${vm_name}"
+fi
 
 project_commit="$(git rev-parse HEAD)"
 [[ "${project_commit}" =~ ^[0-9a-f]{40}$ ]] || fail "HEAD is not one exact commit"
@@ -264,8 +272,9 @@ fi
 source scripts/otel.sh
 require_pushed_commit "${project_commit}"
 
+# dry-run後に別processが同名VMを作る競合も、create直前の再確認で止める。
 if machine_exists "${vm_name}"; then
-  fail "Orb VM already exists; refusing to overwrite or delete it: ${vm_name}"
+  fail "同名のOrb VMがすでに存在します。上書き・削除はしません: ${vm_name}"
 fi
 
 user_data="$(mktemp)"
