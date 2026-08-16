@@ -16,7 +16,8 @@
 ## Orb Golden Base
 
 問題recipeだけを導入した停止済みVMを`<canonical-slug>-golden-base`として作る。
-既定はdry-runであり、同名VMを上書き・削除しない。
+既定はdry-runであり、同名VMを上書き・削除しない。dry-runの入口でもdirty worktreeと
+upstream tracking branchに含まれないHEADを検知して停止する。
 
 ```bash
 mise orb:build-golden-base kakomon14

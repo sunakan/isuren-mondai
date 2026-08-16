@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
 
 execute=false
 target=""
@@ -175,6 +177,8 @@ done
 
 project_commit="$(git rev-parse HEAD)"
 [[ "${project_commit}" =~ ^[0-9a-f]{40}$ ]] || fail "HEAD is not one exact commit"
+require_clean_worktree
+require_commit_in_upstream_tracking_ref "${project_commit}"
 recipe_tree="$(git rev-parse "${project_commit}:${target}")"
 [[ "${recipe_tree}" =~ ^[0-9a-f]{40}$ ]] || fail "target recipe tree is not one exact tree"
 
@@ -256,11 +260,8 @@ if [[ "${execute}" != true ]]; then
   exit 0
 fi
 
-# shellcheck source=scripts/lib.sh
-source scripts/lib.sh
 # shellcheck source=scripts/otel.sh
 source scripts/otel.sh
-require_clean_worktree
 require_pushed_commit "${project_commit}"
 
 if machine_exists "${vm_name}"; then

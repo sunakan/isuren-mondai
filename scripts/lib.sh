@@ -9,6 +9,25 @@ require_clean_worktree() {
   fi
 }
 
+# dry-runを含むrecipe commandの入口で、HEADがworktree-local upstream tracking refに
+# 含まれることを確認する。git pushは成功時にtracking refも更新するため、通常の未pushを
+# network/API tokenなしで早期検知できる。別端末からpushした直後などtracking refが古い場合は
+# fail closedになるため、git fetch後に再実行する。外部remote上の最終確認は実build直前の
+# require_pushed_commit(GitHub API)で別途行う。
+require_commit_in_upstream_tracking_ref() {
+  local commit="$1"
+  local upstream
+  if ! upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"; then
+    echo "エラー: upstream tracking branchが設定されていません。git push -uを先に実行してください。" >&2
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor "${commit}" "${upstream}"; then
+    echo "エラー: コミット ${commit} は${upstream}に含まれていません。git pushを忘れていませんか?" >&2
+    echo "  別端末ですでにpush済みなら、git fetch後に再実行してください。" >&2
+    exit 1
+  fi
+}
+
 # GH_TOKEN未設定/空だとgh apiが認証エラーで失敗し、require_pushed_commitが
 # 「コミットが見当たらない」という紛らわしいエラーを出す(実際は未pushではなく未認証)。
 # トークンの値自体は出力しない(有無だけを見る)。
