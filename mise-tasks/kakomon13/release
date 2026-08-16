@@ -8,10 +8,18 @@ TAG="${1:?タグ名を指定してください(例: mise run kakomon13:release k
 }
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
 require_tag_absent_or_at_head "${TAG}"
 
+# Yarnのinstall/buildへRelease書き込み権限を渡さない。tokenはshell変数だけに退避し、
+# GitHub Releaseを作成する子processへだけ環境変数として戻す。
+release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export -n release_gh_token
+unset GH_TOKEN GITHUB_TOKEN
 mise run kakomon13:build-frontend
-scripts/github-release.sh "${TAG}" \
+GH_TOKEN="${release_gh_token}" scripts/github-release.sh "${TAG}" \
   kakomon13/dist/kakomon13-frontend.tar.gz \
   kakomon13/dist/kakomon13-frontend.tar.gz.sha256 \
   kakomon13/dist/frontend.manifest.sha256
+unset release_gh_token

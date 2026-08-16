@@ -16,6 +16,7 @@ done
 while IFS= read -r path; do
   case "${path}" in
     kakomon13/* | upstream/isucon13/* | mise-tasks/kakomon13/*) ;;
+    .github/workflows/release-kakomon13-frontend.yml) ;;
     .agents/skills/orchestrate-kakomon-ami-sessions/*) ;;
     *) fail "changed path is outside the approved roots: ${path}" ;;
   esac
@@ -157,6 +158,23 @@ grep -qF 'd28c8a5bf0a808f0ed434a1dce8c54ae98f0371c0bd86ac58abc613f73e6643f' \
 grep -qF '8294b7aa9b03997481c06babf1e8b270c859358f27da57a11509afe537ac381d' \
   kakomon13/scripts/mise.lock
 grep -qF '"packageManager": "yarn@3.2.2"' upstream/isucon13/frontend/package.json
+
+release_workflow=".github/workflows/release-kakomon13-frontend.yml"
+test -f "${release_workflow}" || fail "missing KAKOMON13 frontend release workflow"
+grep -qF 'name: release-kakomon13-frontend' "${release_workflow}"
+grep -qF '      - "kakomon13-frontend-v*"' "${release_workflow}"
+# shellcheck disable=SC2016 # GitHub Actions expressionを文字列として検査する。
+grep -qF 'mise run kakomon13:release "${GITHUB_REF_NAME}"' "${release_workflow}"
+if rg -n 'kakomon14|pnpm' "${release_workflow}"; then
+  fail "KAKOMON13 release workflow contains another target or package manager"
+fi
+# shellcheck disable=SC2016 # build script内の変数参照を文字列として検査する。
+grep -qF 'MISE_CONFIG_FILE="${MISE_CONFIG}" mise install' \
+  kakomon13/scripts/build-frontend-release.sh ||
+  fail "fresh CI must install the locked KAKOMON13 Node runtime"
+# shellcheck disable=SC2016 # release task内の変数参照を文字列として検査する。
+grep -qF 'unset GH_TOKEN GITHUB_TOKEN' mise-tasks/kakomon13/release ||
+  fail "frontend build must not inherit the GitHub Release token"
 
 if rg -n 'most_recent|= "(?:latest|lts)"|version\s*=\s*"~>' \
   kakomon13/packer/*.hcl kakomon13/provisioning/mise.ami.toml kakomon13/scripts/mise.toml; then

@@ -9,6 +9,7 @@ OUTPUT="${RELEASE_DIST}/kakomon13-frontend.tar.gz"
 OUTPUT_CHECKSUM="${OUTPUT}.sha256"
 FRONTEND_MANIFEST="${RELEASE_DIST}/frontend.manifest.sha256"
 ASSET_MANIFEST="${ROOT_DIR}/kakomon13/scripts/frontend-assets.manifest.sha256"
+MISE_CONFIG="${ROOT_DIR}/kakomon13/scripts/mise.toml"
 EXPECTED_NODE_VERSION="v24.19.0"
 OFFICIAL_REPO_URL="https://github.com/isucon/isucon13.git"
 OFFICIAL_COMMIT="8f6afdc3603f0c661368de4659a7240862f59623"
@@ -67,9 +68,15 @@ run_node() {
   else
     COREPACK_HOME="${stage}/corepack" XDG_CACHE_HOME="${stage}/cache" \
       YARN_CACHE_FOLDER="${stage}/yarn-cache" \
-      MISE_CONFIG_FILE="${ROOT_DIR}/kakomon13/scripts/mise.toml" mise exec -- "$@"
+      MISE_CONFIG_FILE="${MISE_CONFIG}" mise exec -- "$@"
   fi
 }
+
+# mise-actionはmise本体だけを用意する。fresh CIでもlock済みNodeを使えるよう、
+# localで明示されたNode binを使わない通常経路ではbuild script自身がinstallする。
+if [ -z "${KAKOMON13_NODE_BIN_DIR:-}" ]; then
+  MISE_CONFIG_FILE="${MISE_CONFIG}" mise install
+fi
 
 if [ "$(run_node node --version)" != "${EXPECTED_NODE_VERSION}" ]; then
   echo "error: Node.js ${EXPECTED_NODE_VERSION} is required" >&2

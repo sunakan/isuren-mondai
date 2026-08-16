@@ -1,0 +1,43 @@
+name: release-kakomon13-frontend
+
+on:
+  push:
+    tags:
+      # 他の過去問のタグでは起動しない。build/release taskはkakomon13専用である。
+      - "kakomon13-frontend-v*"
+
+permissions: {}
+
+concurrency:
+  group: release-kakomon13-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish KAKOMON13 frontend
+    # AMIと同じarm64で、KAKOMON13が固定したNode/Yarnのbuildを検証する。
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: write # gh release createで、このtagのReleaseとassetを作成するため。
+    env:
+      # checkout直後のmise設定がuntrusted扱いで止まらないようrepositoryだけを信頼する。
+      MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 後続のremote確認はpublic repositoryへの匿名アクセスで足りる。
+          persist-credentials: false
+
+      # Node 24.19.0の導入はKAKOMON13のbuild scriptがmise.lockを使って行う。
+      # タグpush workflowではcacheを共有せず、release入力を毎回作り直す。
+      - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+        with:
+          install: false
+          cache: false
+
+      # Yarn 3.2.2でViteをbuildし、manifest・LICENSE入りarchiveを作ってから、
+      # 同じKAKOMON13 tagのGitHub Releaseへuploadする。
+      - run: mise run kakomon13:release "${GITHUB_REF_NAME}"
+        env:
+          GH_TOKEN: ${{ github.token }}

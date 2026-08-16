@@ -10,6 +10,24 @@ writes `upstream/isucon13/frontend/dist/`, while release files are assembled in
 the ignored `kakomon13/dist/` directory and distributed through an exact-tagged
 GitHub Release.
 
+## Frontend Release
+
+Push an exact KAKOMON13 frontend tag to build and publish the Release in GitHub
+Actions:
+
+```shell
+git tag kakomon13-frontend-v1.0.0
+git push origin kakomon13-frontend-v1.0.0
+```
+
+The workflow fetches the non-managed image assets from the exact official
+commit inside its runner; no local artifact upload is required.
+
+The Release contains `kakomon13-frontend.tar.gz`, its outer SHA-256 file, and
+the frontend file manifest. Pass the archive digest from
+`kakomon13-frontend.tar.gz.sha256` to the AMI build as
+`KAKOMON13_FRONTEND_RELEASE_SHA256`.
+
 ## Hostname and external-media boundary
 
 The recipe-owned zone is `u.isuren.internal`; its canonical Application target
