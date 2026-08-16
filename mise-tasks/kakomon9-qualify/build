@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-#MISE description="Build the pinned kakomon9-qualify AMI after explicit artifact preparation"
+#MISE description="Build the kakomon9-qualify AMI with AMI-side pinned artifact fetch"
 set -euo pipefail
 
 if [ -n "$(git status --porcelain)" ]; then
   echo 'commit all recipe changes before an AMI build' >&2
   exit 1
 fi
-kakomon9-qualify/scripts/verify-artifacts.sh
-
 PROJECT_COMMIT="$(git rev-parse HEAD)"
 PROJECT_BRANCH="$(git symbolic-ref --short HEAD)"
 REMOTE_COMMIT="$(git ls-remote origin "refs/heads/${PROJECT_BRANCH}" | awk '{print $1}')"

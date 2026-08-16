@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DIST_DIR="${TARGET_DIR}/dist"
+OUTPUT_DIR="${OUTPUT_DIR:-${TARGET_DIR}/dist}"
 # shellcheck source=./artifact-inputs.env
 source "${SCRIPT_DIR}/artifact-inputs.env"
 
@@ -164,7 +164,8 @@ EOF
 )
 test "$(sha256_file "${new_dist}/MANIFEST.sha256")" = "${DIST_MANIFEST_SHA256}"
 
-rm -rf "${DIST_DIR}"
-mv "${new_dist}" "${DIST_DIR}"
-log "prepared ${DIST_DIR}"
-log "manifest SHA-256 $(sha256_file "${DIST_DIR}/MANIFEST.sha256")"
+install -d -m 0755 "$(dirname "${OUTPUT_DIR}")"
+rm -rf "${OUTPUT_DIR}"
+mv "${new_dist}" "${OUTPUT_DIR}"
+log "prepared ${OUTPUT_DIR}"
+log "manifest SHA-256 $(sha256_file "${OUTPUT_DIR}/MANIFEST.sha256")"

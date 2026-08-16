@@ -59,8 +59,11 @@ No shipped page or bundle registers that service worker. The target accepts
 this one dormant official reference, monitors both facts during artifact
 preparation and provisioning, and does not delete or rewrite it.
 
-The following unmodified inputs are prepared outside this directory and are
-not committed as managed source:
+The following unmodified inputs are fetched during the AMI build by
+`kakomon9-qualify/provisioning/05-artifacts.sh` and are not committed as
+managed source. The optional local
+`kakomon9-qualify/scripts/prepare-artifacts.sh` task is only for inspection;
+Packer does not upload its `dist/` output:
 
 - `webapp/public/**` from the managed baseline commit
 - `webapp/init.sh` and `webapp/sql/{00_create_database.sql,01_schema.sql,02_categories.sql}`
@@ -69,5 +72,5 @@ not committed as managed source:
   and `initial-data/result/category_json.txt` from the managed baseline commit
 - release `v2` assets `initial.zip`, `bench1.zip`, and `initial-data.zip`
 
-The target-specific preparation scripts pin and verify their URLs, Git commit,
-Git tree, file manifests, and SHA-256 values before provisioning consumes them.
+The target-specific AMI provisioning pins and verifies the URLs, Git commit,
+Git tree, file manifests, and SHA-256 values before any service consumes them.

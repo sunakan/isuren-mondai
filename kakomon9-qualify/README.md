@@ -69,11 +69,11 @@ becomes exit 3, and a non-zero benchmark process status is preserved.
 
 ## Frontend exception
 
-Frontend source is not managed and Node.js/npm are not installed. The official
-prebuilt `webapp/public` Git tree
-`a427d1c0adf7e8875d7dfbdca352de5a199edd69` is copied byte-for-byte from the
-maintained baseline by `scripts/prepare-artifacts.sh`. The generated `dist/`
-tree is ignored by Git.
+Frontend source is not managed and Node.js/npm are not installed. During the
+AMI build, provisioning fetches the official prebuilt `webapp/public` Git tree
+`a427d1c0adf7e8875d7dfbdca352de5a199edd69` byte-for-byte from the maintained
+baseline. A generated `dist/` tree is optional local inspection output and is
+not a Packer input.
 
 The official service worker contains an unchanged Workbox 4.3.1 CDN import.
 No bundled page registers that service worker. Artifact verification therefore
@@ -89,16 +89,20 @@ separately rejects any embedded `catatsuy.org`, `isucon.pw`, or
 
 ## Responsibilities
 
-1. `mise run kakomon9-qualify:prepare-artifacts` fetches exact official inputs,
-   checks their identities, and writes `dist/MANIFEST.sha256`.
-2. `packer/` uploads that already prepared dist tree. It does not build the
-   frontend or fetch floating assets.
-3. `cloud-init/` checks out the exact isuren-mondai commit, waits for Packer's
-   artifact-ready marker, then calls `provisioning/all.sh`.
-4. `provisioning/` installs the runtime and services, verifies the dist
-   manifest before consuming it, records provenance, and runs Goss.
-5. Packer verifies the completion marker and seals clone-local identity. AMI
-   build, fresh-boot, benchmark, Orb, and AWS product gates remain separate.
+1. `cloud-init/` checks out the exact isuren-mondai commit and calls
+   `provisioning/all.sh`.
+2. `provisioning/10-base.sh` installs the pinned build tools, then
+   `05-artifacts.sh` fetches every official input at its exact commit/URL and
+   verifies tree, manifest, and SHA-256 identities inside the AMI build.
+3. `provisioning/` installs the runtime and services, consumes the verified
+   inputs, records provenance, and runs Goss.
+4. Packer waits for the completion marker and seals clone-local identity. It
+   does not upload `dist/`; AMI build, fresh-boot, benchmark, Orb, and AWS
+   product gates remain separate.
+
+For optional local inspection, `mise run kakomon9-qualify:prepare-artifacts`
+still writes an ignored `dist/` tree, but the normal Packer build does not need
+or consume it.
 
 The optional TLS certificate is generated during provisioning only when
 `ENABLE_TEST_TLS=true`. It is a public practice fixture: its private key is

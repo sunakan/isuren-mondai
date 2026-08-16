@@ -74,26 +74,11 @@ source "amazon-ebs" "kakomon9_qualify" {
 build {
   sources = ["source.amazon-ebs.kakomon9_qualify"]
 
-  # /tmp is a RAM-backed tmpfs on Ubuntu 26.04 and cannot hold the fixed
-  # release bundle. Stage the upload on the root-backed ubuntu home instead.
+  # cloud-init clones the exact recipe commit. After 10-base.sh installs the
+  # required tools, provisioning fetches and verifies every official input in
+  # the AMI build; no local dist upload or floating download is used here.
   provisioner "shell" {
     inline = [
-      "rm -rf /home/ubuntu/kakomon9-qualify-dist",
-      "mkdir -p /home/ubuntu/kakomon9-qualify-dist",
-    ]
-  }
-
-  provisioner "file" {
-    source      = "${path.root}/../dist/"
-    destination = "/home/ubuntu/kakomon9-qualify-dist"
-  }
-
-  provisioner "shell" {
-    inline = [
-      "sudo install -d -m 0755 /opt/isuren-artifacts",
-      "sudo rm -rf /opt/isuren-artifacts/kakomon9-qualify",
-      "sudo mv /home/ubuntu/kakomon9-qualify-dist /opt/isuren-artifacts/kakomon9-qualify",
-      "sudo touch /opt/isuren-artifacts/kakomon9-qualify.ready",
       "sudo cloud-init status --wait || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
       "test -f /var/lib/cloud/kakomon9-qualify-provisioned || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
       "echo '--- goss validate output ---'",

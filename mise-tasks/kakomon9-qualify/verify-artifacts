@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="Verify the complete kakomon9-qualify dist identity and checksums"
+#MISE description="Optionally verify a locally prepared kakomon9-qualify dist tree"
 set -euo pipefail
 exec kakomon9-qualify/scripts/verify-artifacts.sh

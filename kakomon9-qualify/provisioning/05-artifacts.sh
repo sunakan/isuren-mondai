@@ -7,6 +7,12 @@ source "${SCRIPT_DIR}/lib.sh"
 # shellcheck source=../scripts/artifact-inputs.env
 source "${PROJECT_ROOT}/kakomon9-qualify/scripts/artifact-inputs.env"
 
+if [ "${OUTPUT_DIR:-}" != "${ARTIFACT_DIR}" ]; then
+  OUTPUT_DIR="${ARTIFACT_DIR}"
+  export OUTPUT_DIR
+fi
+bash "${PROJECT_ROOT}/kakomon9-qualify/scripts/prepare-artifacts.sh"
+
 require_file "${ARTIFACT_DIR}/MANIFEST.sha256"
 require_file "${ARTIFACT_DIR}/MANIFEST.sha256.sha256"
 (
@@ -34,4 +40,4 @@ if grep -R -a -F -q 'navigator.serviceWorker' "${ARTIFACT_DIR}/frontend/public";
   exit 1
 fi
 
-log "05-artifacts.sh: all fixed artifacts verified"
+log "05-artifacts.sh: official inputs fetched and verified in AMI"

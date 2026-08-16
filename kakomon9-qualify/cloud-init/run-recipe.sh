@@ -5,21 +5,15 @@ PROJECT_COMMIT=__PROJECT_COMMIT__
 REPOSITORY_URL=https://github.com/sunakan/isuren-mondai.git
 CLONE_DIR=/opt/isuren-mondai-source
 ARTIFACT_DIR=/opt/isuren-artifacts/kakomon9-qualify
-READY_FILE=/opt/isuren-artifacts/kakomon9-qualify.ready
+
+# Packer does not upload a dist bundle. provisioning/05-artifacts.sh fetches
+# every official input at its pinned commit/URL after 10-base.sh installs the
+# required network and archive tools.
 
 if [[ ! "${PROJECT_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
   echo 'cloud-init received an invalid project commit' >&2
   exit 1
 fi
-
-for _ in $(seq 1 3600); do
-  if [ -f "${READY_FILE}" ]; then
-    break
-  fi
-  sleep 1
-done
-test -f "${READY_FILE}"
-test -d "${ARTIFACT_DIR}"
 
 rm -rf "${CLONE_DIR}"
 git init --quiet "${CLONE_DIR}"
@@ -37,4 +31,3 @@ env \
 # These are transport/build inputs, not final image contents. Durable source,
 # package, binary, frontend, and TLS evidence was copied by provisioning.
 rm -rf "${ARTIFACT_DIR}" "${CLONE_DIR}"
-rm -f "${READY_FILE}"

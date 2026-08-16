@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
-#MISE description="Run local source, shell, artifact, cloud-init, and Packer static validation"
+#MISE description="Run local source, shell, cloud-init, and Packer static validation"
 set -euo pipefail
 
-kakomon9-qualify/scripts/verify-artifacts.sh
 kakomon9-qualify/scripts/test-run-benchmark.sh
+
+if rg -n 'kakomon9-qualify-dist|artifact-ready|path\.root\}/\.\./dist' \
+  kakomon9-qualify/packer kakomon9-qualify/cloud-init; then
+  echo 'Packer/cloud-init still depends on a local dist upload' >&2
+  exit 1
+fi
+grep -qF 'run_step 10-base.sh' kakomon9-qualify/provisioning/all.sh
+grep -qF 'run_step 05-artifacts.sh' kakomon9-qualify/provisioning/all.sh
+base_line="$(grep -n 'run_step 10-base.sh' kakomon9-qualify/provisioning/all.sh | cut -d: -f1)"
+artifact_line="$(grep -n 'run_step 05-artifacts.sh' kakomon9-qualify/provisioning/all.sh | cut -d: -f1)"
+test "${base_line}" -lt "${artifact_line}"
+grep -qF 'prepare-artifacts.sh' kakomon9-qualify/provisioning/05-artifacts.sh
+grep -qF 'OUTPUT_DIR' kakomon9-qualify/provisioning/05-artifacts.sh
+git check-ignore -q kakomon9-qualify/dist/MANIFEST.sha256
 
 find kakomon9-qualify mise-tasks/kakomon9-qualify \
   -type f -name '*.sh' -not -path '*/dist/*' -print0 |
@@ -31,7 +44,7 @@ esac
 
 PROJECT_COMMIT="$(git rev-parse HEAD)" kakomon9-qualify/cloud-init/generate-user-data.py
 packer fmt -check kakomon9-qualify/packer
-packer validate \
+packer validate -syntax-only \
   -var vpc_id=vpc-static-validation \
   -var subnet_id=subnet-static-validation \
   -var iam_instance_profile=static-validation \

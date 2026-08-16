@@ -37,8 +37,9 @@ run_step() {
   return "${status}"
 }
 
-run_step 05-artifacts.sh
 run_step 10-base.sh
+# The official inputs are fetched by the AMI after the base tools are present.
+run_step 05-artifacts.sh
 run_step 20-user.sh
 run_step 30-runtime.sh
 run_step 40-mysql.sh

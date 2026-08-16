@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Generate small cloud-config that runs the exact recipe commit.
 
-The large, ignored dist tree is uploaded by Packer. The embedded runner waits
-for Packer's ready marker before invoking the same provisioning/all.sh used by
-other environments.
+The embedded runner clones the recipe and lets provisioning fetch every pinned
+official input inside the AMI build. Packer does not upload a dist bundle.
 """
 
 import base64
