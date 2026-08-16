@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="kakomon14/provisioning/mise.ami.tomlをDocker上でlockし、mise.ami.lockを更新する"
+#MISE description="AMI用mise lockを更新する (kakomon14独自: Docker内でarm64 lockを生成)"
 set -euo pipefail
 
 # mise.ami.tomlは非標準ファイル名のためmise lockのプロジェクト探索に引っかからない。
