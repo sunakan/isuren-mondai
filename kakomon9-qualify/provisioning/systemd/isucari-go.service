@@ -8,11 +8,7 @@ Type=simple
 User=isuren
 Group=isuren
 WorkingDirectory=/home/isuren/isucari/webapp/go
-Environment=MYSQL_HOST=127.0.0.1
-Environment=MYSQL_PORT=3306
-Environment=MYSQL_USER=isucari
-Environment=MYSQL_PASS=isucari
-Environment=MYSQL_DBNAME=isucari
+EnvironmentFile=/home/isuren/env.sh
 ExecStart=/home/isuren/isucari/bin/isucari
 Restart=on-failure
 RestartSec=2s

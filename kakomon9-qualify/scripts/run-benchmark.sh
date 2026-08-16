@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${BENCH_DIR:=/home/isuren/isucari}"
-: "${BENCH_BINARY:=${BENCH_DIR}/bin/bench}"
+: "${BENCH_BINARY:=/home/isuren/bench}"
 : "${TARGET_URL:=http://isucon9.isuren.internal}"
 : "${TARGET_HOST:=isucon9.isuren.internal}"
 

@@ -57,10 +57,18 @@ benchmark-owned payment/shipment mocks on one image for personal practice.
 Only nginx is public. Payment and shipment bind to loopback during a benchmark
 run; they are not persistent services.
 
+The official benchmark node built its binary under
+`/home/isucon/isucari/bin/benchmarker`. This recipe follows the established
+KAKOMON13/14 practice-image layout instead: the final binary is
+`/home/isuren/bench`, its authoritative-result wrapper is
+`/home/isuren/run-benchmark`, and build-only `isucari/bench` source is removed.
+The required runtime assets remain under `isucari/initial-data` and
+`isucari/webapp/public/static`.
+
 Run the benchmark as the practice user:
 
 ```bash
-sudo -u isuren /home/isuren/isucari/bin/run-benchmark
+sudo -u isuren /home/isuren/run-benchmark
 ```
 
 The wrapper preserves the official final JSON on stdout. Exit 0 means that
@@ -95,7 +103,9 @@ separately rejects any embedded `catatsuy.org`, `isucon.pw`, or
    `05-artifacts.sh` fetches every official input at its exact commit/URL and
    verifies tree, manifest, and SHA-256 identities inside the AMI build.
 3. `provisioning/` installs the runtime and services, consumes the verified
-   inputs, records provenance, and runs Goss.
+   inputs, installs the official public DB environment as
+   `/home/isuren/env.sh`, records provenance, and runs Goss. The upstream MIT
+   notice is also available as `/home/isuren/LICENSE`.
 4. Packer waits for the completion marker and seals clone-local identity. It
    does not upload `dist/`; AMI build, fresh-boot, benchmark, Orb, and AWS
    product gates remain separate.

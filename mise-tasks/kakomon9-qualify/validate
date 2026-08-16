@@ -16,6 +16,12 @@ artifact_line="$(grep -n 'run_step 05-artifacts.sh' kakomon9-qualify/provisionin
 test "${base_line}" -lt "${artifact_line}"
 grep -qF 'prepare-artifacts.sh' kakomon9-qualify/provisioning/05-artifacts.sh
 grep -qF 'OUTPUT_DIR' kakomon9-qualify/provisioning/05-artifacts.sh
+grep -qF 'EnvironmentFile=/home/isuren/env.sh' \
+  kakomon9-qualify/provisioning/systemd/isucari-go.service
+grep -qF 'BENCH_BIN="${ISUREN_HOME}/bench"' \
+  kakomon9-qualify/provisioning/85-bench-build.sh
+grep -qF 'rm -rf "${APP_ROOT}/bench" "${APP_ROOT}/cmd/bench"' \
+  kakomon9-qualify/provisioning/85-bench-build.sh
 git check-ignore -q kakomon9-qualify/dist/MANIFEST.sha256
 
 find kakomon9-qualify mise-tasks/kakomon9-qualify \

@@ -3,14 +3,38 @@ file:
     exists: true
     filetype: file
     mode: "0755"
+  /home/isuren/LICENSE:
+    exists: true
+    filetype: file
+    mode: "0644"
+  /home/isuren/env.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+    # Goss 0.4.10 treats these bare values as literal substrings. The five
+    # official assignments are fixed public practice credentials.
+    contains:
+      - "MYSQL_HOST=127.0.0.1"
+      - "MYSQL_PORT=3306"
+      - "MYSQL_USER=isucari"
+      - "MYSQL_DBNAME=isucari"
+      - "MYSQL_PASS=isucari"
+  /home/isuren/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/run-benchmark:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isucari/bench:
+    exists: false
+  /home/isuren/isucari/cmd:
+    exists: false
   /home/isuren/isucari/bin/bench:
-    exists: true
-    filetype: file
-    mode: "0755"
+    exists: false
   /home/isuren/isucari/bin/run-benchmark:
-    exists: true
-    filetype: file
-    mode: "0755"
+    exists: false
   /home/isuren/isucari/webapp/public/asset-manifest.json:
     exists: true
     filetype: file
@@ -84,6 +108,9 @@ command:
     exit-status: 0
   hostname-contract:
     exec: "grep -Fq '127.0.0.1 isucon9.isuren.internal isucari.t.isuren.internal' /etc/hosts && grep -Fq 'server_name isucon9.isuren.internal isucari.t.isuren.internal;' /etc/nginx/sites-available/kakomon9-qualify.conf"
+    exit-status: 0
+  application-environment:
+    exec: "grep -Fxq 'EnvironmentFile=/home/isuren/env.sh' /etc/systemd/system/isucari-go.service"
     exit-status: 0
   healthcheck:
     exec: "curl -fsS -o /dev/null -H 'Host: isucon9.isuren.internal' http://127.0.0.1/"
