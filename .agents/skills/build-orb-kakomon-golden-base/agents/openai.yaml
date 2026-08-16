@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orb 過去問 Golden Base"
+  short_description: "過去問recipeから停止済みOrb Golden Baseを構築"
+  default_prompt: "$build-orb-kakomon-golden-base を使って、kakomon14のOrb Golden Baseを事前監査し、承認後に構築してください。"

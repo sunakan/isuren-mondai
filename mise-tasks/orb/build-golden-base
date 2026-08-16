@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="問題recipeだけを導入した停止済みOrb Golden Baseを作成(引数: canonical kakomon slug; 既定dry-run、--executeで作成)"
+set -euo pipefail
+exec scripts/orb/build-kakomon-golden-base.sh "$@"

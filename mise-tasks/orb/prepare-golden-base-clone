@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="停止済みOrb Golden Baseをcloneしhost identityを再生成(引数: canonical kakomon slug, clone名; 既定dry-run、--executeで作成)"
+set -euo pipefail
+exec scripts/orb/prepare-kakomon-golden-base-clone.sh "$@"
