@@ -11,9 +11,8 @@ MISE_VERSION="2026.8.6"
 MISE_URL="https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-arm64"
 MISE_SHA256="f9bd051912beb8861bf248289bfb2d8c281ff00fcdf1e44d730b8ea7e859e9a4"
 
-# The official recipe installs its language runtime below /home/isucon. Keep
-# that ownership boundary, while using the repository-wide mise layout shared
-# with KAKOMON14 instead of retaining a recipe-specific /opt installation.
+# Keep the language runtime below the contestant home and use the same
+# repository-wide mise layout instead of retaining a recipe-specific /opt path.
 install_mise() {
   if [ -x "${MISE_BIN}" ] &&
     [ "$("${MISE_BIN}" --version | awk '{print $1}')" = "${MISE_VERSION}" ]; then

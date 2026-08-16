@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+# Build inputs are validated before any target step changes the image. This
+# keeps the provisioning log and completion marker bound to exact identities.
 : "${RECIPE_COMMIT:?RECIPE_COMMIT must be the full project commit}"
 : "${FRONTEND_RELEASE_TAG:?FRONTEND_RELEASE_TAG must be an exact release tag}"
 : "${FRONTEND_RELEASE_SHA256:?FRONTEND_RELEASE_SHA256 must be an exact SHA-256}"
@@ -22,10 +24,14 @@ source "${SCRIPT_DIR}/lib.sh"
 }
 
 log "start"
+
+# These raw values are converted into OTel spans by the host-side target build
+# task after Packer completes. The VM does not send telemetry or receive keys.
 log "spans: begin"
 log "provisioning.all: disk_total_bytes=$(disk_total_bytes)"
 log "provisioning.all: start_ns=$(now_ns) disk_before=$(disk_used_bytes) traceparent=${TRACEPARENT:-<unset>}"
 
+# Keep the provisioning span complete even when set -e stops a failed step.
 record_provisioning_all_end() {
   local status=$?
   log "provisioning.all: end_ns=$(now_ns) disk_after=$(disk_used_bytes) exit_status=${status}"

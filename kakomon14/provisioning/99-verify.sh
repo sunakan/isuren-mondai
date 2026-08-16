@@ -5,37 +5,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-ISUREN_HOME="/home/${ISUREN_USER}"
-MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
-# gossはビルド時の検証にしか使わず、goと違い本番稼働中(チューニング中の再ビルド等)には一切
-# 使わないため、mise.ami.tomlには加えず、ここで一時的に取得し確認後に削除する
-# (goss.yaml自体は/opt/isuren-mondaiごと削除される。generate-user-data.py参照)。
 GOSS_VERSION="0.4.10"
+GOSS_URL="https://github.com/goss-org/goss/releases/download/v0.4.10/goss_0.4.10_linux_arm64.tar.gz"
+GOSS_SHA256="90a59612b4d67d9f1a9038634c000790136bb82526a69de1e81ac075c2f6d2c6"
+JOURNAL_UNITS=(isuride-go isuride-payment_mock)
+journal_args=()
+for unit in "${JOURNAL_UNITS[@]}"; do
+  journal_args+=(-u "${unit}")
+done
+archive="$(mktemp)"
+staging="$(mktemp -d)"
+trap 'rm -f "${archive}"; rm -rf "${staging}"' EXIT
 
-# provisioning各スクリプトが冪等コマンドの無条件実行(if判定なし)に簡略化されたため、
-# 「実際に意図通りの状態になったか」の確認はここに一本化する(goss.yaml参照)。
-# mysql -uroot等root権限が必要なチェックを含むため、isurenのmiseでフルパス解決した上で
-# root(このスクリプト自体の実行ユーザー)として実行する(30-runtime.sh・70-webapp-go.shと同じパターン)。
-# ビルド成功時、Packer側(empty.pkr.hcl)がこの開始/終了ログをマーカーにcloud-init-output.logから
-# goss validateの出力だけを抜き出してビルドログに出す。cloud-init status --waitは失敗時しか
-# ログをtailしないため、成功時に「本当に全項目を検証できたか」を確認する手段がここ以外に無い。
+# Download the verifier into a temporary directory, validate its exact
+# identity, and remove it after the sealed single-host check completes.
 log "99-verify.sh: goss validate start"
-runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" install "goss@${GOSS_VERSION}"
-# aqua経由のgossは他のmiseツールと異なりbin/配下ではなくインストールディレクトリ直下に
-# バイナリが展開される(実機のcloud-init-output.logで確認済み)。
-GOSS_BIN="$(runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" where "goss@${GOSS_VERSION}")/goss"
-# isuride-go/payment_mockはsystemctl restart直後にport listenまで届いていないことがあり、
-# リトライ無しだとタイミング次第でport checkがfalse negativeになる(実機で確認済み)。
-# それでも30秒のリトライ内に安定してリッスンしない事例が実機で確認されており(原因未特定)、
-# Packerは失敗するとインスタンスを即座に破棄するため、失敗時にジャーナルログをここで
-# ビルドログに残しておかないと次回以降も原因調査ができない。
-if ! "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation --retry-timeout 30s --sleep 1s; then
-  log "99-verify.sh: goss validate failed, dumping isuride-go/isuride-payment_mock journal"
-  journalctl -u isuride-go -u isuride-payment_mock --no-pager -n 100 || true
+curl -fsSL "${GOSS_URL}" -o "${archive}"
+echo "${GOSS_SHA256}  ${archive}" | sha256sum -c -
+tar -xzf "${archive}" -C "${staging}"
+test "$("${staging}/goss" --version)" = "goss version ${GOSS_VERSION}"
+
+if ! "${staging}/goss" validate -g "${SCRIPT_DIR}/goss.yaml" \
+  --format documentation --retry-timeout 30s --sleep 1s; then
+  log "99-verify.sh: goss validate failed, dumping target journal"
+  journalctl "${journal_args[@]}" --no-pager -n 100 || true
   exit 1
 fi
+
 log "99-verify.sh: goss validate end"
-
-runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" uninstall "goss@${GOSS_VERSION}"
-
 log "99-verify.sh: done"

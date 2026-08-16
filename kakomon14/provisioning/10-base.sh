@@ -5,14 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L1-4
-# set-timezone自体が冪等(既にUTCでも実害なし)なため、事前確認はせず常に実行する。
+# Keep the OS baseline explicit and identical across target recipes. Target
+# services add their own hostname, DNS, and proxy contracts later.
 set_timezone() {
   timedatectl set-timezone UTC
   log "timezone: set to UTC"
 }
 
-# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L13-20
 set_sysctl_port_range() {
   local conf=/etc/sysctl.d/99-isuren.conf
   local content='net.ipv4.ip_local_port_range = 10000 65535'
@@ -21,7 +20,6 @@ set_sysctl_port_range() {
   log "sysctl: ${conf} set"
 }
 
-# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L22-33
 set_limits() {
   local conf=/etc/security/limits.d/99-isuren.conf
   local content
@@ -37,7 +35,8 @@ EOD
   log "limits: ${conf} set"
 }
 
-# 対応: isucon14/provisioning/ansible/roles/base/tasks/main.yml L35-43
+# KAKOMON14's matcher contract needs this local hostname. KAKOMON13 uses
+# PowerDNS and its instance-init service instead, so this remains target-local.
 # ホスト名はxiv.isucon.netではなくxiv.isuren.internalを使う。
 # .internalはICANNが私設ネットワーク専用に予約したTLD(.localと違いmDNSの特殊扱いを受けない)で、
 # webapp/go・frontendにisucon.net依存箇所がないため置き換えても実害がないことを確認済み。

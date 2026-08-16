@@ -5,23 +5,49 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-if ! getent group "${ISUREN_USER}" >/dev/null; then
-  groupadd -g 1100 "${ISUREN_USER}"
-fi
-if ! id -u "${ISUREN_USER}" >/dev/null 2>&1; then
-  useradd -u 1100 -g "${ISUREN_USER}" -d "/home/${ISUREN_USER}" -m -s /bin/bash "${ISUREN_USER}"
-fi
-chmod 0755 "/home/${ISUREN_USER}"
+# Keep the contestant account contract identical across recipes. Access keys,
+# passwords, and machine identity belong to the provider/fresh-boot boundary.
+create_group() {
+  if ! getent group "${ISUREN_USER}" >/dev/null 2>&1; then
+    groupadd -g 1100 "${ISUREN_USER}"
+    log "group: created ${ISUREN_USER}(gid=1100)"
+  else
+    log "group: already exists"
+  fi
+}
 
-# The official image creates an empty .ssh directory and a plaintext login
-# password. This image uses SSM/provider finalizers for access, so neither
-# belongs in the common artifact.
+create_user() {
+  if ! id -u "${ISUREN_USER}" >/dev/null 2>&1; then
+    useradd -u 1100 -g "${ISUREN_USER}" -d "/home/${ISUREN_USER}" -m -s /bin/bash "${ISUREN_USER}"
+    log "user: created ${ISUREN_USER}(uid=1100)"
+  else
+    log "user: already exists"
+  fi
+}
 
-sudoers="/etc/sudoers.d/99-${ISUREN_USER}-user"
-tmp="$(mktemp)"
-trap 'rm -f "${tmp}"' EXIT
-echo "${ISUREN_USER}  ALL=(ALL) NOPASSWD:ALL" >"${tmp}"
-visudo -cf "${tmp}"
-install -m 0440 -o root -g root "${tmp}" "${sudoers}"
+chmod_home() {
+  local home="/home/${ISUREN_USER}"
+  chmod 0755 "${home}"
+  log "home: chmod 755 ${home}"
+}
+
+# The official .ssh directory, plaintext login password, and authorized keys
+# are intentionally not copied into the common image. Provider access owns them.
+set_sudoers() {
+  local conf="/etc/sudoers.d/99-${ISUREN_USER}-user"
+  local content="${ISUREN_USER}  ALL=(ALL) NOPASSWD:ALL"
+  local tmp
+  tmp="$(mktemp)"
+  echo "${content}" >"${tmp}"
+  visudo -cf "${tmp}"
+  install -m 0440 -o root -g root "${tmp}" "${conf}"
+  rm -f "${tmp}"
+  log "sudoers: ${conf} set"
+}
+
+create_group
+create_user
+chmod_home
+set_sudoers
 
 log "20-user.sh: done"

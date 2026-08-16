@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 設定値。環境変数で上書き可能にする
+# Configuration values. Keep the account and optional TLS switch explicit so
+# target-specific steps can use the same provisioning shell contract.
 : "${ISUREN_USER:=isuren}"
 : "${ENABLE_TLS:=false}"
 
@@ -9,8 +10,9 @@ log() {
   echo "[kakomon14] $*"
 }
 
-# 以下はOTel trace化(Mac側のmise-tasks/kakomon14/buildが$BUILD_LOGから事後変換)のための
-# 生データ取得用。EC2側はこれらの値をlog()経由で書き出すだけで、span生成・OTLP送信は行わない。
+# These functions expose raw provisioning telemetry for the target build task
+# to convert after Packer completes. The VM only writes values through log();
+# it never creates spans or sends OTLP data.
 now_ns() {
   date +%s%N
 }
