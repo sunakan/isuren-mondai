@@ -10,6 +10,7 @@ test -d "${mirror}/.git" || {
   exit 1
 }
 test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon14.git"
+test "$(git -C "${mirror}" rev-parse HEAD)" = "53f8b627e040c30ebec600457c6c97da008b84b0"
 test -z "$(git -C "${mirror}" status --short)"
 
 # kakomon14独自: the managed source comparison is limited to Go and SQL;
