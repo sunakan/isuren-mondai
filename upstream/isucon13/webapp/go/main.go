@@ -24,6 +24,7 @@ import (
 
 const (
 	listenPort                     = 8080
+	powerDNSZone                   = "u.isuren.internal"
 	powerDNSSubdomainAddressEnvKey = "ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS"
 )
 
@@ -124,7 +125,7 @@ func main() {
 	e.Logger.SetLevel(echolog.DEBUG)
 	e.Use(middleware.Logger())
 	cookieStore := sessions.NewCookieStore(secret)
-	cookieStore.Options.Domain = "*.u.isuren.internal"
+	cookieStore.Options.Domain = "*." + powerDNSZone
 	e.Use(session.Middleware(cookieStore))
 	// e.Use(middleware.Recover())
 

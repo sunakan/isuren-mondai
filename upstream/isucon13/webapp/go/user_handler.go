@@ -30,6 +30,10 @@ const (
 
 var fallbackImage = "../img/NoImage.jpg"
 
+func powerDNSRecordName(name string) string {
+	return name + "." + powerDNSZone
+}
+
 type UserModel struct {
 	ID             int64  `db:"id"`
 	Name           string `db:"name"`
@@ -256,7 +260,7 @@ func registerHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert user theme: "+err.Error())
 	}
 
-	if out, err := exec.Command("pdnsutil", "add-record", "u.isuren.internal", req.Name, "A", "0", powerDNSSubdomainAddress).CombinedOutput(); err != nil {
+	if out, err := exec.Command("pdnsutil", "add-record", powerDNSZone, powerDNSRecordName(req.Name), "A", "0", powerDNSSubdomainAddress).CombinedOutput(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, string(out)+": "+err.Error())
 	}
 
@@ -321,7 +325,7 @@ func loginHandler(c echo.Context) error {
 	}
 
 	sess.Options = &sessions.Options{
-		Domain: "u.isuren.internal",
+		Domain: powerDNSZone,
 		MaxAge: int(60000),
 		Path:   "/",
 	}

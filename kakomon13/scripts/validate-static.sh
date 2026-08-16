@@ -88,6 +88,17 @@ for expected in \
   rg -F "${expected}" upstream/isucon13 kakomon13/provisioning >/dev/null ||
     fail "hostname contract is missing ${expected}"
 done
+# shellcheck disable=SC2016 # These are exact source strings, not expressions to expand here.
+for expected in \
+  'pdnsutil add-record "${zone}" "${zone}" A 30 "${address}"' \
+  'pdnsutil add-record "${zone}" "pipe.${zone}" A 30 "${address}"' \
+  'pdnsutil add-record "${zone}" "test001.${zone}" A 30 "${address}"'; do
+  grep -qF "${expected}" kakomon13/provisioning/runtime/pdns-zone.sh ||
+    fail "PowerDNS 5 absolute owner contract is missing: ${expected}"
+done
+grep -qF '"pdnsutil", "add-record", powerDNSZone, powerDNSRecordName(req.Name)' \
+  upstream/isucon13/webapp/go/user_handler.go ||
+  fail "dynamic PowerDNS records must use an absolute owner name"
 
 actual_media="$(mktemp)"
 expected_media="$(mktemp)"
@@ -161,6 +172,7 @@ fi
 unformatted="$(gofmt -l \
   upstream/isucon13/webapp/go/main.go \
   upstream/isucon13/webapp/go/user_handler.go \
+  upstream/isucon13/webapp/go/user_handler_test.go \
   upstream/isucon13/bench/cmd/bench/bench.go \
   upstream/isucon13/bench/cmd/bench/supervise.go \
   upstream/isucon13/bench/internal/attacker/dns.go \

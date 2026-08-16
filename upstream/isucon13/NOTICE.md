@@ -26,6 +26,10 @@ immutable mirror of the official repository.
   zone, and frontend Application hostname are changed only from
   `u.isucon.dev` to `u.isuren.internal`. The canonical target is
   `pipe.u.isuren.internal`.
+- The recipe targets PowerDNS 5, which requires absolute owner names for
+  `pdnsutil add-record`. Boot-time records and dynamically registered user
+  records therefore use full names under `u.isuren.internal`; the official
+  PowerDNS 4.8 environment accepted relative owner names.
 - The Vite development server no longer reads the official, distributed TLS
   private key. Production TLS belongs to the recipe's fresh-boot initializer.
 - Three pre-existing trailing spaces in `webapp/go/stats_handler.go` are

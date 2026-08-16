@@ -6,7 +6,11 @@ OFFICIAL_SOURCE_DIR="${KAKOMON13_OFFICIAL_SOURCE_DIR:-${ROOT_DIR}/tmp/all-kakomo
 FRONTEND_MANIFEST="${KAKOMON13_FRONTEND_MANIFEST:-${ROOT_DIR}/kakomon13/dist/frontend.manifest.sha256}"
 stage="$(mktemp -d)"
 state_dir="${KAKOMON13_GO_STATE_DIR:-${stage}/go-state}"
-trap 'rm -rf "${stage}"' EXIT
+cleanup() {
+  chmod -R u+w "${stage}" 2>/dev/null || true
+  rm -rf "${stage}"
+}
+trap cleanup EXIT
 
 export GOTOOLCHAIN=go1.26.6
 export GOPATH="${state_dir}/gopath"
