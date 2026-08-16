@@ -17,7 +17,7 @@
 |---|---|
 | identity | edition、variant、canonical slug、Go版の範囲 |
 | workspace | topic worktreeとmain worktreeの絶対path、branch、base full SHA、target専用の`kakomon*/**`・`upstream/**`・`mise-tasks/**`変更許可path、main統合権限 |
-| audit cache | main checkout配下の絶対path、remote、HEAD、dirty状態 |
+| audit cache | main checkout配下の絶対path、remote、HEAD、dirty状態、official identityとの一致、rsync対象subpath |
 | official source | URL、exact full SHA/tag、license/notice |
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
 | plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
@@ -47,6 +47,7 @@ prompt冒頭でrepositoryの`AGENTS.md`を読み、1〜2行のメタ認知を行
 
 - ファイル作成、worktree内編集、stage、commit、push、dependency install、AWS/Orb/GitHub操作を禁止する。
 - `/Users/user01/works/github.com/sunakan/aws-bastion/isuren-mondai/tmp/all-kakomon/<official-repo-name>`をread-only cacheとして調べる。
+- official repositoryをclone、fetch、pullしない。cacheのremote / full HEAD / clean状態が期待値と違う場合は、cacheを変更せず`evidence-missing`として停止する。
 - official sourceのURL、exact commit、license、Application、benchmark、service、frontend、topology、reset/rebootを監査する。
 - `/Users/user01/works/github.com/matsuu/cloud-init-isucon`からcloud-init/provisioning上の差分候補を調べる。
 - `/Users/user01/works/github.com/matsuu/aws-isucon`からPacker/provider上の差分候補を調べる。
@@ -63,8 +64,10 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 
 - canonical target directoryの`provisioning/`、`cloud-init/`、`packer/`、`scripts/`を作る。
 - 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
-- `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
-- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、対象ごとのsubpathをfrontend artifact buildまたはprovisioningの消費前に公式repositoryのexact commitから直接取得する。取得後は保守対象コードと実ファイルで統合し、取得用checkoutをartifactへ残さない。
+- `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。verified cacheの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
+- 別sessionはofficial repositoryを再clone、fetch、pullしない。cacheのorigin URL、full HEAD、clean状態が期待値と一致しなければ、cacheを変更せず人間による更新待ちとして停止する。
+- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、verified cacheのtarget固有subpathからfrontend artifact buildまたはbundle準備前に`rsync`する。`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
+- cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildへ渡す非commit dataはfile manifest、official commit、SHA-256を持つ固定bundleへ変換し、`tmp/`を実行時依存にしない。
 - `upstream/isucon14/NOTICE.md`、`kakomon14/provisioning/50-source.sh`、`mise-tasks/kakomon14/{refresh-upstream,diff}`は構造上の参考に限る。除外pathとlocal変更はtarget自身の監査で決め、公式更新で保守中の差分を黙って上書きしない。
 - 他targetの`kakomon*/**`、`upstream/**`、`mise-tasks/**`を変更しない。repository-wide fileが必要なら実装を広げずscope expansionとして報告する。`kakomon14/**`とその対応rootは統合済みcommit treeを参照するだけにする。
 - audit cacheと2つの参考repoを変更しない。
@@ -86,7 +89,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 次が揃った場合だけ実装をcommitし、`all-sh-slice-committed`とする。
 
 - official source identityとlicense/noticeが固定されている。
-- targetのmanaged upstreamと公式直接取得データの境界、baseline/local差分、取得subpathが`NOTICE.md`とprovisioningで一致している。
+- targetのmanaged upstreamとcacheからrsyncする非commit dataの境界、baseline/local差分、取得subpath、固定bundle identityが`NOTICE.md`とprovisioningで一致している。
 - `all.sh`の全呼出先が存在し、空stubではなく、順序と依存が監査済みである。
 - ApplicationとbenchmarkのGo build責任が明示されている。
 - frontendが必要ならbuild、hash/manifest、benchmark build、配置の順序が証拠と一致する。

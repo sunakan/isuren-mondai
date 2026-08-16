@@ -33,10 +33,13 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - `N`だけでQualify/Finalが分かれる年は停止し、variantを確定する。
 - 出力directory、branch、artifact、promptで同じcanonical slugを使う。例: `kakomon13`、`kakomon12-qualify`、`kakomon12-final`。
 - 調査cacheはmain checkout配下の絶対pathを使う。例: `/Users/user01/works/github.com/sunakan/aws-bastion/isuren-mondai/tmp/all-kakomon/isucon13`。
-- `tmp/all-kakomon/**`をread-only audit cacheとして扱い、build sourceやartifact provenanceにしない。
+- `tmp/all-kakomon/**`をread-only audit / local import cacheとして扱う。別sessionはofficial repositoryを再cloneせず、必要な本家code、画像・静的asset、`sql/`、初期データをmain checkout側のcacheから`rsync`する。
+- `rsync`前にcacheのorigin URL、full HEAD、clean状態が採用済みofficial identityと一致することを確認する。不一致ならcacheをfetch、pull、checkout、reset、cleanせず、人間によるcache更新待ちとして停止する。
+- cacheからは`.git/`、`node_modules/`、`dist/`等の生成物を搬入せず、対象subpathを明示する。managed sourceのlocal変更を守るため`rsync --delete`を使わず、搬入後に期待file一覧とdiffを確認する。
+- cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するartifact provenanceではない。保守codeはcommit済み`upstream/**`、非commit asset/dataはmanifestとchecksumを持つ固定bundleへ変換し、実行環境が`tmp/`の存在を前提にしない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
 - 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
-- `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するコードtreeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。編集しない画像・静的asset、`sql/`、初期データはcommitせず、frontend artifact buildまたはprovisioningの消費前に公式exact commitから直接取得する。
+- `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するコードtreeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。編集しない画像・静的asset、`sql/`、初期データはcommitせず、frontend artifact buildまたはprovisioningの消費前にverified cacheから固定bundleへ取り込む。
 - `/Users/user01/works/github.com/matsuu/cloud-init-isucon`と`/Users/user01/works/github.com/matsuu/aws-isucon`はreference-onlyとし、毎回HEAD、remote、dirty状態を記録する。dirty差分を採用しない。
 
 ## 並行性を制御する

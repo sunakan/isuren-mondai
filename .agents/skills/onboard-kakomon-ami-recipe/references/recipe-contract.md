@@ -25,14 +25,15 @@ Packer plugin、base image、OS repository、package inventory、frontend artifa
 
 - `upstream/<official-repo-name>/**`を、official URLとexact baseline commit/tagから選択したこちらのmanaged source treeとする。Application、benchmark、frontend等を必要に応じてlocal更新し、公式baseline、取り込み・除外範囲、local差分を`NOTICE.md`へ記録する。
 - managed sourceのbuild identityをisuren-mondaiのexact recipe commit/pathへ固定し、その起点であるofficial URL・baseline commit・license・local差分も追跡する。公式treeと同一だと偽らない。
-- 編集しない画像・静的asset、`sql/`、初期データは原則managed sourceへcommitせず、frontend artifact buildまたはprovisioningが消費前に公式repositoryのexact commitからtarget固有subpathを直接取得する。取得元LICENSEを含め、managed sourceと実ファイルで統合し、取得用checkoutを削除する。
+- 別sessionはofficial repositoryを再clone、fetch、pullしない。main checkout配下の`tmp/all-kakomon/<official-repo-name>`についてorigin URL、full HEAD、clean状態を検証し、一致する場合だけtarget固有subpathを`rsync`する。不一致ならcacheを変更せず、人間による更新待ちとして停止する。
+- 編集しない画像・静的asset、`sql/`、初期データは原則managed sourceへcommitせず、verified cacheからfrontend artifact buildまたはbundle準備前に`rsync`する。`.git/`、`node_modules/`、`dist/`等を除外し、取得元LICENSEを含め、managed sourceと実ファイルで統合する。
 - `upstream/isucon14/NOTICE.md`と`kakomon14/provisioning/50-source.sh`を構造の参考にする。画像・dataの配置はeditionごとに異なるため、除外pathをコピーせずofficial treeから決める。
-- ローカルcloneや`tmp/all-kakomon`をbuild sourceにしない。
+- cacheはlocal搬入元に限り、clean clone、cloud-init、AMI buildが直接参照するbuild sourceにしない。保守codeはcommit済みmanaged source、非commit asset/dataはofficial URL・exact commit・file manifest・SHA-256を持つ固定bundleへ変換する。
 - 参考実装からcopyする場合も、対象editionのofficial provenanceとlicenseを追跡する。
 - recipe commit/digest、upstream revision、base image ID、architecture、runtime lock、frontend identity/checksumをartifact tag/manifestと証拠へ残す。
 - Orb GoldenとAWS AMIを相互変換せず、同じfixed recipeからprovider-native artifactを別々に作る。
 
-target固有のimport/refresh taskは初回取り込みと公式差分監査を支援してよいが、managed sourceのlocal変更を`rsync --delete`等で黙って上書きしない。更新前後のofficial identityとdiffを示し、意図的な更新として扱う。
+target固有のimport/refresh taskはverified cacheからの初回取り込みと公式差分監査を支援してよいが、network clone / fetchを実行せず、managed sourceのlocal変更を`rsync --delete`等で黙って上書きしない。搬入前後のofficial identity、file一覧、diffを示し、意図的な更新として扱う。
 
 ## platformとhostname
 

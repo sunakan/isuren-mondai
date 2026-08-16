@@ -38,11 +38,12 @@
 
 ### provenanceとruntime
 
-- audit cacheをbuild sourceにしていない。
+- audit / import cacheのorigin URL、full HEAD、clean状態を検証し、期待identityと一致する場合だけ対象subpathを`rsync`している。別sessionがclone / fetch / pull / checkout / resetしていない。
+- cacheをclean clone、cloud-init、AMI buildの直接build sourceにせず、保守codeはcommit済みmanaged source、非commit dataはmanifest / checksum固定bundleへ変換している。
 - official URL、full SHA/tag、license/noticeを固定している。
 - managed upstreamが公式baselineから取り込んだ保守対象コードとlocal変更を追跡し、`NOTICE.md`の範囲・除外・provenanceと実treeが一致する。
-- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、公式exact commitとtarget固有subpathから直接取得する。mutable branch、audit cache、由来不明archiveへfallbackしていない。
-- 公式取得データを保守対象コードへ実ファイルで統合し、取得用checkout、不要な`.git`、重複sourceをartifactへ残していない。
+- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、verified cacheのexact commitとtarget固有subpathから`rsync`し、固定bundleへ変換する。mutable branch、由来不明archiveへfallbackしていない。
+- cache由来データを保守対象コードへ実ファイルで統合し、不要な`.git`、生成物、依存directory、重複sourceをartifactへ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
 - OSとarchitectureがUbuntu 26.04 arm64で、Packer build入力がexact base image IDに固定され、amd64・旧Ubuntu・`most_recent`へfallbackしていない。
