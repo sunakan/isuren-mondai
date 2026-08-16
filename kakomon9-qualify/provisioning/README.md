@@ -10,11 +10,12 @@ the official public DB contract at `/home/isuren/env.sh`. `80-frontend.sh` only 
 already verified official public tree; it never invokes Node.js, npm, a package
 manager, minification, or domain replacement.
 
-`85-bench-build.sh` places the benchmark at `/home/isuren/bench` and the
-authoritative-result wrapper at `/home/isuren/run-benchmark`. Its runtime data
-stays under `isucari/initial-data` and `isucari/webapp/public/static`; the
-compile-only `isucari/bench` packages and benchmark module entrypoint are
-removed after a successful build.
+`70-webapp-go.sh` and `85-bench-build.sh` preserve the official relative binary
+paths as `/home/isuren/isucari/webapp/go/isucari` and
+`/home/isuren/isucari/bin/benchmarker`. Benchmark runtime data stays under
+`isucari/initial-data` and `isucari/webapp/public/static`; compile-only
+benchmark packages, the module entrypoint, and Go build caches are removed
+after a successful build. No recipe-specific benchmark wrapper is installed.
 
 `99-verify.sh` downloads Goss 0.4.10 for linux-arm64 using a pinned URL and
 SHA-256, performs image-state checks, then removes it. The durable evidence is

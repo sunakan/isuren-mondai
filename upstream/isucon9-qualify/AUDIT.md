@@ -35,9 +35,9 @@ manifest.
 
 The official benchmark prints its final `{pass,score,campaign,language,messages}`
 JSON to stdout. Declared benchmark failures still return process exit code 0,
-so `kakomon9-qualify/scripts/run-benchmark.sh` treats the final JSON as the
-authority and maps `pass=false` to exit 2. Missing/invalid JSON is exit 3;
-process/infrastructure failure retains its non-zero exit.
+and the recipe intentionally adds no wrapper. Operators and product-level
+callers must treat the last JSON object as authoritative instead of equating
+process exit 0 with benchmark success.
 
 The official contest responsibility boundary was Web1 plus Bench1. The recipe
 is deliberately a one-VM practice topology: MySQL, Go Application, nginx,

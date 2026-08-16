@@ -23,8 +23,8 @@ base_ami=ami-0df1235688731e6cc
 base_image=Ubuntu 26.04 LTS arm64 release serial 20260806
 application=127.0.0.1:8000
 application_environment=/home/isuren/env.sh
-benchmark=/home/isuren/bench
-benchmark_wrapper=/home/isuren/run-benchmark
+benchmark=/home/isuren/isucari/bin/benchmarker
+benchmark_wrapper=none; invoke the official benchmarker directly and inspect its final JSON
 public_hostname=${APP_HOST}
 application_compat_hostname=${APP_COMPAT_HOST}
 payment_hostname_mapping=${PAYMENT_HOSTS}; loopback-resolved but not persistent services
@@ -38,7 +38,7 @@ EOF
 
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" exec -- go version >"${PROVENANCE_DIR}/go-version.txt"
 dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' | LC_ALL=C sort >"${PROVENANCE_DIR}/packages.tsv"
-sha256sum "${APP_ROOT}/bin/isucari" "/home/${ISUREN_USER}/bench" >"${PROVENANCE_DIR}/binaries.sha256"
+sha256sum "${APP_ROOT}/webapp/go/isucari" "${APP_ROOT}/bin/benchmarker" >"${PROVENANCE_DIR}/binaries.sha256"
 find "${PROVENANCE_DIR}" -type f ! -name MANIFEST.sha256 -printf '%P\0' |
   LC_ALL=C sort -z |
   xargs -0 -I{} sha256sum "${PROVENANCE_DIR}/{}" >"${PROVENANCE_DIR}/MANIFEST.sha256"

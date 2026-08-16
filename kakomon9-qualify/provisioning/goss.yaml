@@ -1,5 +1,5 @@
 file:
-  /home/isuren/isucari/bin/isucari:
+  /home/isuren/isucari/webapp/go/isucari:
     exists: true
     filetype: file
     mode: "0755"
@@ -19,14 +19,16 @@ file:
       - "MYSQL_USER=isucari"
       - "MYSQL_DBNAME=isucari"
       - "MYSQL_PASS=isucari"
+  /home/isuren/isucari/bin/benchmarker:
+    exists: true
+    filetype: file
+    mode: "0755"
   /home/isuren/bench:
-    exists: true
-    filetype: file
-    mode: "0755"
+    exists: false
   /home/isuren/run-benchmark:
-    exists: true
-    filetype: file
-    mode: "0755"
+    exists: false
+  /home/isuren/go:
+    exists: false
   /home/isuren/isucari/bench:
     exists: false
   /home/isuren/isucari/cmd:

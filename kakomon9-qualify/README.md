@@ -58,22 +58,35 @@ Only nginx is public. Payment and shipment bind to loopback during a benchmark
 run; they are not persistent services.
 
 The official benchmark node built its binary under
-`/home/isucon/isucari/bin/benchmarker`. This recipe follows the established
-KAKOMON13/14 practice-image layout instead: the final binary is
-`/home/isuren/bench`, its authoritative-result wrapper is
-`/home/isuren/run-benchmark`, and build-only `isucari/bench` source is removed.
-The required runtime assets remain under `isucari/initial-data` and
-`isucari/webapp/public/static`.
+`/home/isucon/isucari/bin/benchmarker`, and the Go Application under
+`/home/isucon/isucari/webapp/go/isucari`. This recipe preserves those relative
+paths under `/home/isuren/isucari`. The required runtime assets remain under
+`isucari/initial-data` and `isucari/webapp/public/static`; therefore replacing
+the `isucari` tree with a home-level `webapp` directory would be incomplete.
+Build-only benchmark source and Go caches are removed after both binaries are
+built.
 
 Run the benchmark as the practice user:
 
 ```bash
-sudo -u isuren /home/isuren/run-benchmark
+sudo -u isuren bash -c '
+  cd /home/isuren/isucari
+  exec ./bin/benchmarker \
+    -target-url http://isucon9.isuren.internal \
+    -target-host isucon9.isuren.internal \
+    -payment-url http://localhost:5555 \
+    -shipment-url http://localhost:7001 \
+    -payment-port 5555 \
+    -shipment-port 7001 \
+    -data-dir initial-data \
+    -static-dir webapp/public/static
+'
 ```
 
-The wrapper preserves the official final JSON on stdout. Exit 0 means that
-JSON had `pass=true`; `pass=false` becomes exit 2, missing/invalid final JSON
-becomes exit 3, and a non-zero benchmark process status is preserved.
+There is no recipe-specific benchmark wrapper in the AMI. The official
+benchmarker prints the authoritative final JSON to stdout but may return exit
+0 even when that JSON contains `pass=false`; callers must inspect the final
+JSON rather than treating process exit 0 alone as success.
 
 ## Frontend exception
 
