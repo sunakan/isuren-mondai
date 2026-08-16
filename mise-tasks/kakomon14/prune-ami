@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="最新のkakomon14 AMI以外のAMIと、紐づくスナップショットを削除する"
+#MISE description="AMIとsnapshotをpruneする (kakomon14独自: 最新1件以外を削除; interactive)"
 #MISE interactive=true
 set -euo pipefail
 
