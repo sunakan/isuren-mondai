@@ -4,16 +4,15 @@ set -euo pipefail
 
 # mise.ami.tomlは非標準ファイル名のためmise lockのプロジェクト探索に引っかからない。
 # かつこのファイルは30-runtime.shの実行先(AMI上のisurenユーザー)ではグローバル設定として
-# 配置されるものなので、-gで同じ扱いをしてlockを生成する(AGENTS.md「mise運用上のハマりどころ」参照)。
+# 配置されるものなので、-gで同じ扱いをしてlockを生成する。
 # ホストの実際のグローバルmise設定を汚さないよう、使い捨てのDockerコンテナ内で完結させる。
 # jdxcode/miseイメージはMISE_CONFIG_DIR=/mise・MISE_DATA_DIR=/miseが焼き込まれており、
-# グローバル設定は~/.config/mise/config.tomlではなく/mise/config.toml(node/pythonのデモ用設定が
-# デフォルトで入っている)を見る。イメージ実行時のみの書き換えなので--rmで揮発しホストには残らない。
+# イメージ実行時のみの書き換えなので--rmで揮発しホストには残らない。
 docker run --rm \
-  -v "$(pwd)/kakomon14/provisioning:/work" \
+  -v "$(pwd)/kakomon13/provisioning:/work" \
   -w /work \
   --entrypoint bash \
   jdxcode/mise:latest \
   -c 'cp mise.ami.toml /mise/config.toml && mise lock -g -p linux-arm64 && cp /mise/mise.lock mise.ami.lock'
 
-echo "kakomon14/provisioning/mise.ami.lock: updated"
+echo "kakomon13/provisioning/mise.ami.lock: updated"
