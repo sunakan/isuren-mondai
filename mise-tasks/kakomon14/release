@@ -18,10 +18,11 @@ require_tag_absent_or_at_head "${TAG}"
 release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 export -n release_gh_token
 unset GH_TOKEN GITHUB_TOKEN
-# kakomon14独自: publish the archive and frontend hash/file manifests.
+# kakomon14独自: publish the archive, archive checksum, and frontend hash/file manifests.
 mise run kakomon14:build-frontend
 GH_TOKEN="${release_gh_token}" scripts/github-release.sh "${TAG}" \
   kakomon14/dist/kakomon14-frontend.tar.gz \
+  kakomon14/dist/kakomon14-frontend.tar.gz.sha256 \
   kakomon14/dist/frontend_hashes.json \
   kakomon14/dist/frontend_files.json
 unset release_gh_token

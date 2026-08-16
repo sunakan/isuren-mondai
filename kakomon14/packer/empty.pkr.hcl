@@ -137,12 +137,18 @@ build {
     ]
   }
 
-  # 80-frontend.sh(FRONTEND_RELEASE_TAG=latest時)が解決した具体的なタグを取得する。
-  # AMIタグ(Frontend)への焼き込みはmise-tasks/kakomon14/buildタスク側で行う
+  # 80-frontend.shが解決した具体的なtagとarchive SHA-256を取得する。
+  # AMIタグ(Frontend/FrontendSHA256)への焼き込みはmise-tasks/kakomon14/buildタスク側で行う
   # (この時点ではAMI IDがまだ存在しないため、tagsブロックに直接は書けない)。
   provisioner "file" {
     source      = "/tmp/kakomon14-frontend-release-tag"
     destination = "${path.root}/frontend-release-tag.txt"
+    direction   = "download"
+  }
+
+  provisioner "file" {
+    source      = "/tmp/kakomon14-frontend-release-sha256"
+    destination = "${path.root}/frontend-release-sha256.txt"
     direction   = "download"
   }
 
@@ -153,6 +159,7 @@ build {
       # ubuntuユーザーのauthorized_keysには、Packerが一時的に使うSSH公開鍵がAMI化後も残る
       # (対応する秘密鍵はPacker側の使い捨てで実害は低いが、公開するAMIに素性不明の鍵を
       # 残したくない)。
+      "sudo rm -f /tmp/kakomon14-frontend-release-tag /tmp/kakomon14-frontend-release-sha256",
       "sudo truncate -s 0 /home/ubuntu/.ssh/authorized_keys",
       # machine-idはcloud-initのSSHホストキー再生成(cc_ssh)と異なりビルド時点の値がそのまま
       # クローンされた全インスタンスに引き継がれる(実機で複数インスタンスが同一machine-idを

@@ -13,14 +13,20 @@ WEBAPP_PUBLIC_DIR="${ISUREN_HOME}/webapp/public"
 # kakomon14/scripts/build-frontend-release.sh・scripts/github-release.sh参照)。
 : "${FRONTEND_RELEASE_REPO_URL:=https://github.com/sunakan/isuren-mondai}"
 : "${FRONTEND_RELEASE_OWNER_REPO:=sunakan/isuren-mondai}"
-# デフォルトはlatest(起動のたびに最新のkakomon14-frontend-*releaseを解決)。
-# タグを明示指定すればそのバージョンにピン留めできる(例: kakomon14-frontend-v1.0.1)。
 : "${FRONTEND_RELEASE_TAG:=latest}"
+[[ "${FRONTEND_RELEASE_TAG}" == "latest" ||
+  "${FRONTEND_RELEASE_TAG}" =~ ^kakomon14-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "エラー: FRONTEND_RELEASE_TAGが不正です。" >&2
+  exit 1
+}
 FRONTEND_RELEASE_DIR="${ISUREN_HOME}/.kakomon14-frontend-release"
+FRONTEND_ARCHIVE="${FRONTEND_RELEASE_DIR}/kakomon14-frontend.tar.gz"
+FRONTEND_CHECKSUM="${FRONTEND_ARCHIVE}.sha256"
 # latest解決後の具体的なタグをPacker側(file provisioner)が回収し、AMIタグに記録するための
 # 置き場所。FRONTEND_RELEASE_TAG=latestだとAMIのディスク中身だけでは実際に焼き込まれた
 # バージョンが分からなくなるため。
 RESOLVED_TAG_FILE="/tmp/kakomon14-frontend-release-tag"
+RESOLVED_SHA256_FILE="/tmp/kakomon14-frontend-release-sha256"
 
 # 1つのリポジトリで複数過去問(kakomon13等)のReleaseを扱うため、GitHubの/releases/latest
 # (タグprefixを問わずリポジトリ全体で最新のものを返す)は使えない。releases一覧(作成日時降順)から
@@ -44,18 +50,26 @@ resolve_frontend_release_tag() {
 # root(cloud-init runcmd)実行のためデフォルトumaskで644になり、ssh_username(ubuntu)からの
 # file provisioner(download)で読める。
 persist_resolved_tag() {
-  echo "${FRONTEND_RELEASE_TAG}" >"${RESOLVED_TAG_FILE}"
+  printf '%s\n' "${FRONTEND_RELEASE_TAG}" >"${RESOLVED_TAG_FILE}"
 }
 
 # sunakan/isuren-mondaiはpublicリポジトリのため、認証なしのcurlでダウンロードできる。
 download_frontend_release() {
   local base_url="${FRONTEND_RELEASE_REPO_URL}/releases/download/${FRONTEND_RELEASE_TAG}"
   runuser -u "${ISUREN_USER}" -- mkdir -p "${FRONTEND_RELEASE_DIR}"
+  runuser -u "${ISUREN_USER}" -- curl -fsSL -o "${FRONTEND_ARCHIVE}" "${base_url}/kakomon14-frontend.tar.gz"
+  runuser -u "${ISUREN_USER}" -- curl -fsSL -o "${FRONTEND_CHECKSUM}" "${base_url}/kakomon14-frontend.tar.gz.sha256"
+  (
+    cd "${FRONTEND_RELEASE_DIR}"
+    sha256sum --check "$(basename "${FRONTEND_CHECKSUM}")"
+  )
   local f
-  for f in kakomon14-frontend.tar.gz frontend_hashes.json frontend_files.json; do
+  for f in frontend_hashes.json frontend_files.json; do
     runuser -u "${ISUREN_USER}" -- curl -fsSL -o "${FRONTEND_RELEASE_DIR}/${f}" "${base_url}/${f}"
   done
-  log "frontend release: downloaded ${FRONTEND_RELEASE_TAG}"
+  FRONTEND_RELEASE_SHA256="$(sha256sum "${FRONTEND_ARCHIVE}" | awk '{print $1}')"
+  printf '%s\n' "${FRONTEND_RELEASE_SHA256}" >"${RESOLVED_SHA256_FILE}"
+  log "frontend release: downloaded ${FRONTEND_RELEASE_TAG} (${FRONTEND_RELEASE_SHA256})"
 }
 
 # rsync --deleteで、前回分の古いファイル(ハッシュ付きファイル名が変わったもの等)を確実に除去する。
@@ -64,7 +78,7 @@ deploy_public() {
   local staging="${FRONTEND_RELEASE_DIR}/public"
   runuser -u "${ISUREN_USER}" -- rm -rf "${staging}"
   runuser -u "${ISUREN_USER}" -- mkdir -p "${staging}" "${WEBAPP_PUBLIC_DIR}"
-  runuser -u "${ISUREN_USER}" -- tar -xzf "${FRONTEND_RELEASE_DIR}/kakomon14-frontend.tar.gz" -C "${staging}"
+  runuser -u "${ISUREN_USER}" -- tar -xzf "${FRONTEND_ARCHIVE}" -C "${staging}"
   # LICENSE: GitHub Release単体配布のアーティファクトとしては同梱している
   # (kakomon14/scripts/build-frontend-release.sh参照)が、nginx配信対象のwebapp/publicには不要
   # (~/isucon14/LICENSEで著作権表示は既に満たしている。50-source.sh参照)。

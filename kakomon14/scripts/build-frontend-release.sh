@@ -8,6 +8,7 @@ FRONTEND_DIR="${REPO_ROOT}/upstream/isucon14/frontend"
 BENCHRUN_DIR="${REPO_ROOT}/upstream/isucon14/bench/benchrun"
 DIST_DIR="${KAKOMON14_DIR}/dist"
 ARTIFACT="${DIST_DIR}/kakomon14-frontend.tar.gz"
+CHECKSUM="${ARTIFACT}.sha256"
 PNPM_WORKSPACE_YAML="${FRONTEND_DIR}/pnpm-workspace.yaml"
 FRONTEND_PUBLIC_DIR="${FRONTEND_DIR}/public"
 # provisioning/50-source.shのISUCON14_REPO_URL/ISUCON14_COMMITと同じ値を使う。
@@ -42,16 +43,21 @@ mise install
 )
 
 mkdir -p "${DIST_DIR}"
-rm -f "${ARTIFACT}"
+rm -f "${ARTIFACT}" "${CHECKSUM}"
 # COPYFILE_DISABLE=1: macOSのtarはデフォルトで拡張属性/リソースフォークを`._*`という
 # AppleDoubleファイルとして同梱してしまう(Linux上のtarでは不要だが無害なので常に設定する)。
 # LICENSE: GitHub Releaseとして単体配布されるアーティファクトになるため、MITライセンスが
 # 求める著作権表示・ライセンス全文の同梱を満たす目的で含める(複数の-C指定はBSD tar/GNU tar
 # どちらも対応)。
 COPYFILE_DISABLE=1 tar -czf "${ARTIFACT}" -C "${FRONTEND_DIR}/build/client" . -C "${REPO_ROOT}/upstream/isucon14" LICENSE
+(
+  cd "${DIST_DIR}"
+  shasum -a 256 "$(basename "${ARTIFACT}")" >"$(basename "${CHECKSUM}")"
+)
 cp "${BENCHRUN_DIR}/frontend_hashes.json" "${DIST_DIR}/frontend_hashes.json"
 cp "${BENCHRUN_DIR}/frontend_files.json" "${DIST_DIR}/frontend_files.json"
 
 echo "built: ${ARTIFACT}"
+echo "built: ${CHECKSUM}"
 echo "built: ${DIST_DIR}/frontend_hashes.json"
 echo "built: ${DIST_DIR}/frontend_files.json"
