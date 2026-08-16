@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# 複数のリリース関連スクリプト(github-release.sh、kakomon14/scripts/build-frontend-release.sh等)
-# で共有するガードレール処理。
+# 過去問ごとのfrontend Release taskとgithub-release.shで共有するガードレール処理。
 
 require_clean_worktree() {
   if [ -n "$(git status --porcelain)" ]; then

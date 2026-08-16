@@ -1,5 +1,5 @@
 [tools]
-node = "lts"
+node = "24.19.0"
 # https://github.com/pnpm/pnpm
-# latestにすると9系が入ったりするため、固定
-pnpm = "11.21"
+# latestにすると9系が入ったりするため、patch versionまで固定
+pnpm = "11.21.0"

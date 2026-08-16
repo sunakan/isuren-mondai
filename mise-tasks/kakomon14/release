@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
-#MISE description="kakomon14のビルド成果物をGitHub Releaseへアップロード(引数: タグ名。例: mise run kakomon14:release kakomon14-frontend-v1.0.0)"
+#MISE description="kakomon14 frontendのdist出力をGitHub Releaseへupload(引数: exact tag)"
 set -euo pipefail
 TAG="${1:?タグ名を指定してください(例: mise run kakomon14:release kakomon14-frontend-v1.0.0)}"
-# 時間のかかるビルドを始める前にタグの重複を検知したいため、depends(常にビルドが先に走る)
-# ではなくここで明示的に順序を制御する。
+[[ "${TAG}" =~ ^kakomon14-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "error: tag must be kakomon14-frontend-vMAJOR.MINOR.PATCH" >&2
+  exit 1
+}
 # shellcheck source=scripts/lib.sh
 source scripts/lib.sh
-require_tag_absent_or_at_head "$TAG"
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
+require_tag_absent_or_at_head "${TAG}"
 
+# pnpmのinstall/buildへRelease書き込み権限を渡さない。tokenはshell変数だけに退避し、
+# GitHub Releaseを作成する子processへだけ環境変数として戻す。
+release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export -n release_gh_token
+unset GH_TOKEN GITHUB_TOKEN
 mise run kakomon14:build-frontend
-scripts/github-release.sh "$TAG" \
+GH_TOKEN="${release_gh_token}" scripts/github-release.sh "${TAG}" \
   kakomon14/dist/kakomon14-frontend.tar.gz \
   kakomon14/dist/frontend_hashes.json \
   kakomon14/dist/frontend_files.json
+unset release_gh_token

@@ -15,8 +15,8 @@ concurrency:
 jobs:
   release:
     name: Build and publish KAKOMON13 frontend
-    # AMIと同じarm64で、KAKOMON13が固定したNode/Yarnのbuildを検証する。
-    runs-on: ubuntu-24.04-arm
+    # AMIと同じUbuntu 26.04 arm64で、KAKOMON13が固定したNode/Yarnのbuildを検証する。
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:
       contents: write # gh release createで、このtagのReleaseとassetを作成するため。
@@ -36,8 +36,8 @@ jobs:
           install: false
           cache: false
 
-      # Yarn 3.2.2でViteをbuildし、manifest・LICENSE入りarchiveを作ってから、
-      # 同じKAKOMON13 tagのGitHub Releaseへuploadする。
+      # ローカル運用と同じtaskでbuildしてから、同じKAKOMON13 tagのGitHub Releaseへuploadする。
+      # taskは依存取得/build中のRelease tokenを遮断し、upload時だけ子processへ渡す。
       - run: mise run kakomon13:release "${GITHUB_REF_NAME}"
         env:
           GH_TOKEN: ${{ github.token }}

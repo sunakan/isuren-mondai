@@ -1,0 +1,5 @@
+# GitHub-hosted Ubuntu 26.04 arm64はPublic Previewとして利用可能だが、actionlint 1.7.12の
+# 組み込みlabel一覧にはまだない。actionlintが追随するまで公式labelを既知として扱う。
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04-arm

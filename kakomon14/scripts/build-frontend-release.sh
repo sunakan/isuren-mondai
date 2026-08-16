@@ -14,14 +14,6 @@ FRONTEND_PUBLIC_DIR="${FRONTEND_DIR}/public"
 ISUCON14_REPO_URL="https://github.com/isucon/isucon14.git"
 ISUCON14_COMMIT="53f8b627e040c30ebec600457c6c97da008b84b0"
 
-# shellcheck source=../../scripts/lib.sh
-source "${REPO_ROOT}/scripts/lib.sh"
-
-# 後続のscripts/github-release.shが正しいコミットにタグ付けできるよう、時間のかかる
-# pnpmビルドを始める前に「コミット済み」「push済み」を確認しておく(ビルド後に気づくと手戻りが大きい)。
-require_clean_worktree
-require_pushed_commit "$(git rev-parse HEAD)"
-
 export MISE_CONFIG_FILE="${SCRIPT_DIR}/mise.toml"
 
 PUBLIC_CHECKOUT_DIR="$(mktemp -d)"
