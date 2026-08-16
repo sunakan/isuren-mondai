@@ -40,6 +40,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - `tmp/all-kakomon/**`はgitignore対象の一時cacheであり、変更許可path、stage、commit、merge payloadに含めない。存在したままでもlocal main統合の妨げにせず、worktree cleanupとともに破棄してよい。
 - cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するprovenanceではない。保守codeだけをcommit済み`upstream/**`へ置く。非commit asset/dataは、公式exact commitからbuild instance内で一時取得してcommit済みfile manifestで検証するか、ignore済み`dist/`で生成してGitHub Release等の外部配布先へexact tagとSHA-256付きで公開する。前者ではlocal `dist/`をPacker入力や必須前処理にせず、どちらでも`tmp/` cacheへ実行時依存しない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
+- target固有のAMI build taskは、KAKOMON14/KAKOMON9-qualifyと同じくcallerの`export`に依存せず、target-ownedなscript・Packer HCL・text input file（例: `kakomon13/scripts/ami-inputs.env`）からreview済みのsource AMI ID、frontend Release tag、published SHA-256を解決する。通常の`mise <canonical-slug>:build`で入力値のregex/identity検証を行い、binaryやarchiveはtext inputへ記録せず、Releaseの発行後にtext identityだけを更新する。
 - 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
 - external frontendをtarget固有workflowで配布する場合は、`.github/workflows/release-<canonical-slug>-frontend.yml`も明示的な変更許可pathへ含める。workflowが必要なのに通常のtarget root外であることを理由に欠落させず、許可がなければscope expansionとして停止する。
 - `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するcode treeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。画像を含むbinary、編集しない静的asset、`sql/`、初期データはcommitせず、frontend buildまたはprovisioningの消費時だけ一時取得・検証する。
