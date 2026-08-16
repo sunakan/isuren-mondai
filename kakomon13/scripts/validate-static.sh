@@ -150,6 +150,20 @@ fi
 grep -qF 'EnvironmentFile=/home/isuren/env.sh' \
   kakomon13/provisioning/systemd/isupipe-go.service
 grep -qF 'source /home/isuren/env.sh' kakomon13/provisioning/runtime/pdns-zone.sh
+instance_init_unit="kakomon13/provisioning/systemd/kakomon13-instance-init.service"
+instance_init_script="kakomon13/provisioning/runtime/instance-init.sh"
+grep -qF 'Wants=network-online.target' "${instance_init_unit}" ||
+  fail "instance-init must request network-online.target"
+grep -qF 'After=network-online.target' "${instance_init_unit}" ||
+  fail "instance-init must run after network-online.target"
+for expected in \
+  'local remaining=120 address' \
+  'ip -4 -o address show scope global' \
+  'ip -4 route show default' \
+  'error: timed out waiting for an IPv4 address and default route'; do
+  grep -qF "${expected}" "${instance_init_script}" ||
+    fail "instance-init bounded network wait is missing: ${expected}"
+done
 for expected in \
   'ISUCON13_MYSQL_DIALCONFIG_NET="tcp"' \
   'ISUCON13_MYSQL_DIALCONFIG_ADDRESS="127.0.0.1"' \

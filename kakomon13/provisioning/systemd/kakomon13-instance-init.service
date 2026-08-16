@@ -1,5 +1,7 @@
 [Unit]
 Description=KAKOMON13 per-instance TLS and runtime identity
+Wants=network-online.target
+After=network-online.target
 Before=nginx.service pdns.service isupipe-go.service kakomon13-pdns-zone.service
 
 [Service]

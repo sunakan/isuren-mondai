@@ -25,9 +25,10 @@ machine. It is therefore absent only from the sealed common artifact.
 
 The common artifact intentionally contains no TLS private key, runtime address,
 machine role, Portal credential, or `isu`. On a clone or fresh EC2 boot,
-`kakomon13-instance-init.service` generates a new self-signed server key and
-certificate for `pipe.u.isuren.internal`; this public practice certificate must
-not be reused for mTLS, Portal authentication, or trusted traffic.
+`kakomon13-instance-init.service` waits for the IPv4 default route and its
+global address, then generates a new self-signed server key and certificate for
+`pipe.u.isuren.internal`; this public practice certificate must not be reused
+for mTLS, Portal authentication, or trusted traffic.
 
 Goss validates the sealed single-host filesystem and service contract. It does
 not establish Orb/AWS recipe, Golden, standalone, fresh-boot, or product Green.

@@ -1,14 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+wait_for_instance_address() {
+  local remaining=120 address default_interface
+
+  while ((remaining > 0)); do
+    default_interface="$(
+      ip -4 route show default |
+        awk '{for (field = 1; field <= NF; field++) if ($field == "dev") { print $(field + 1); exit }}'
+    )"
+    address="$(
+      ip -4 -o address show scope global |
+        awk -v interface="${default_interface}" \
+          '$2 == interface { sub(/\/.*/, "", $4); print $4; exit }'
+    )"
+    if [ -n "${default_interface}" ] && [ -n "${address}" ]; then
+      printf '%s\n' "${address}"
+      return 0
+    fi
+
+    sleep 1
+    remaining=$((remaining - 1))
+  done
+
+  echo "error: timed out waiting for an IPv4 address and default route" >&2
+  return 1
+}
+
 install -d -m 0755 /etc/isuren/kakomon13 /etc/nginx/tls
 address="${KAKOMON13_SUBDOMAIN_ADDRESS:-}"
 if [ -z "${address}" ]; then
-  address="$(hostname -I | awk '{print $1}')"
-fi
-if [ -z "${address}" ]; then
-  echo "error: could not determine the instance address" >&2
-  exit 1
+  address="$(wait_for_instance_address)"
 fi
 
 umask 077
