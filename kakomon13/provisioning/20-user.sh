@@ -50,4 +50,11 @@ create_user
 chmod_home
 set_sudoers
 
+# Create the home-owned mise directories before the runtime step consumes them.
+install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+  "/home/${ISUREN_USER}/.local" \
+  "/home/${ISUREN_USER}/.config" \
+  "/home/${ISUREN_USER}/.local/bin" \
+  "/home/${ISUREN_USER}/.config/mise"
+
 log "20-user.sh: done"
