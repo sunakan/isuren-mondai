@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="tmp/all-kakomon/isucon14を最新化し、upstream/isucon14へ反映する(除外リストの根拠はupstream/isucon14/NOTICE.md参照)"
+#MISE description="official mirrorをrefreshしてmanaged sourceへ反映する (kakomon14独自: NOTICEの除外規則でrsync; external)"
 set -euo pipefail
+
+# kakomon14独自: update the official mirror and copy only the NOTICE.md-managed
+# paths into upstream/isucon14.
 
 SRC="tmp/all-kakomon/isucon14"
 DST="upstream/isucon14"
