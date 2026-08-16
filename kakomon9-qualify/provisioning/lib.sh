@@ -27,7 +27,7 @@ if [ "${APP_ROOT}" != "/home/${ISUREN_USER}/isucari" ]; then
 fi
 
 log() {
-  printf '[kakomon9-qualify] %s\n' "$*"
+  echo "[kakomon9-qualify] $*"
 }
 
 require_root() {

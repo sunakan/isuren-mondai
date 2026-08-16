@@ -102,7 +102,7 @@ build {
       "sudo cloud-init status --wait || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
       "test -f /var/lib/cloud/kakomon9-qualify-provisioned || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
       "echo '--- goss validate output ---'",
-      "sudo sed -n '/\\[kakomon9-qualify\\] 99-verify.sh: goss .* validate start/,/\\[kakomon9-qualify\\] 99-verify.sh: goss validate end/p' /var/log/cloud-init-output.log",
+      "sudo sed -n '/\\[kakomon9-qualify\\] 99-verify.sh: goss validate start/,/\\[kakomon9-qualify\\] 99-verify.sh: goss validate end/p' /var/log/cloud-init-output.log",
       "echo '--- span data ---'",
       "sudo sed -n '/\\[kakomon9-qualify\\] spans: begin/,/\\[kakomon9-qualify\\] spans: end/p' /var/log/cloud-init-output.log",
     ]

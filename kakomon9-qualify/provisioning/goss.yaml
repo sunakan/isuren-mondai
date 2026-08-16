@@ -100,8 +100,13 @@ command:
   architecture:
     exec: "test \"$(dpkg --print-architecture)\" = arm64"
     exit-status: 0
+  mise-version:
+    exec: /home/isuren/.local/bin/mise --version
+    stdout:
+      - "2026.8.6 linux-arm64"
+    exit-status: 0
   go-version:
-    exec: "runuser -u isuren -- /home/isuren/.local/bin/mise exec -- go version"
+    exec: "runuser -u isuren -- env HOME=/home/isuren /home/isuren/.local/bin/mise exec -- go version"
     stdout:
       - "go version go1.26.6 linux/arm64"
     exit-status: 0
