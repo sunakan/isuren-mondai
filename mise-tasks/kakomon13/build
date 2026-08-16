@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="AMIをPackerでbuildする (kakomon13独自: source AMIとfrontend Releaseを固定入力から解決)"
+#MISE description="AMIをPackerでbuildする"
 set -euo pipefail
 
 VPC_ID="$(aws cloudformation describe-stacks \
