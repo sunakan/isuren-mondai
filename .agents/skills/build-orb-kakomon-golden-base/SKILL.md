@@ -17,7 +17,8 @@ AMIのdiskを変換しない。AMIとOrbはexact recipe commit/treeとtarget-loc
 ## 手順
 
 1. `AGENTS.md`と対象の`cloud-init/generate-user-data.py`、`provisioning/all.sh`、
-   `provisioning/goss.yaml`を読む。canonical slugとUbuntu 26.04 arm64対応を確認する。
+   `provisioning/goss.yaml`、Orb adapterの`prepare-cloud-init-user-data.py`を読む。
+   canonical slugとUbuntu 26.04 arm64対応を確認する。
 2. `git status --short`、HEAD、push済みcommit、`orb list --format json`を確認する。
    既存の同名VMがある場合は停止する。上書き・削除・自動renameをしない。
 3. まずread-only dry-runを行う。dry-runも同名Orb VM、dirty worktree、またはupstream
@@ -35,6 +36,12 @@ AMIのdiskを変換しない。AMIとOrbはexact recipe commit/treeとtarget-loc
    ```bash
    GITHUB_TOKEN="$(ghtkn get sunakan/read)" mise orb:build-golden-base kakomon14 --execute
    ```
+
+   Orb imageには`git`がない場合があり、初期cloud-init時点ではIPv4/DNSも未準備になりうる。
+   Orb adapterで`set -eu`を有効化し、IPv4 routeとGitHub DNSを期限付きで待ってから、
+   `apt-get update`と`ca-certificates`/`git`の無条件installを行い、その後にcanonical
+   user-dataの`runcmd`を実行する。これはOrb VM内だけの処理とし、対象generatorやAMI用
+   user-dataへ複製しない。途中失敗を後続cleanupの成功で隠さない。
 
 6. 成功時は`orb-recipe-green`と`orb-golden-green`を分けて報告する。少なくとも
    cloud-init/all.sh/Goss完走、Golden marker、identity scrub、isuren層不在、停止状態を示す。
@@ -60,6 +67,8 @@ Orb Goldenではcloud-initを無効のまま維持する。Bの追加provisionin
 
 - worktreeがdirty、HEADが未push、frontend selectorを実体tag/digestへ解決できない、
   対象recipe/Gossに完全なservice contractがない場合はbuildしない。
+- Orb bootstrapでIPv4 route、DNS、apt、`git --version`のいずれかを確認できない場合は、
+  canonical recipeを開始せずcloud-initを失敗させる。
 - 同名VMが存在する、baseが停止していない、canonical slugでない場合は停止する。
 - build/clone失敗時は診断用VMを勝手に削除しない。名前と失敗gateを報告する。
 - Aへ`isu`、Portal/mTLS credential、environment identity、実秘密を追加しない。

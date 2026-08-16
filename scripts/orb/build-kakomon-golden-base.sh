@@ -16,6 +16,7 @@ cpus="2"
 memory="4G"
 disk="32G"
 default_user="ubuntu"
+recipe_user_data=""
 user_data=""
 build_log=""
 created=false
@@ -51,6 +52,9 @@ fail() {
 }
 
 cleanup() {
+  if [[ -n "${recipe_user_data}" ]]; then
+    rm -f -- "${recipe_user_data}"
+  fi
   if [[ -n "${user_data}" ]]; then
     rm -f -- "${user_data}"
   fi
@@ -277,9 +281,13 @@ if machine_exists "${vm_name}"; then
   fail "同名のOrb VMがすでに存在します。上書き・削除はしません: ${vm_name}"
 fi
 
+recipe_user_data="$(mktemp)"
 user_data="$(mktemp)"
 build_log="$(mktemp)"
-python3 "${target}/cloud-init/generate-user-data.py" --output "${user_data}" >/dev/null
+python3 "${target}/cloud-init/generate-user-data.py" --output "${recipe_user_data}" >/dev/null
+python3 scripts/orb/prepare-cloud-init-user-data.py \
+  --input "${recipe_user_data}" \
+  --output "${user_data}"
 
 printf 'create: %s\n' "${vm_name}"
 build_start_epoch="$(date +%s)"
