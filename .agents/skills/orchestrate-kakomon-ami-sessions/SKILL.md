@@ -26,7 +26,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 4. 統合済み`kakomon14/**`。activeなKAKOMON14 worktreeは所有確認だけにし、内容を参照しない。変更pathとresourceがtargetに重ならず、current target planまたはユーザーが非依存と明示した場合は、その存在だけを実装blockerにしない。
 5. `$onboard-kakomon-ami-recipe`と必要なreference。生成promptでもこのSkillを明示的に使わせる。
 
-採用済みplanと依頼値が衝突したら、どちらかを勝手に選ばない。`decision-required`として実装promptとworktree作成を止める。特にGo、Node.js、OS、architecture、topology、hostname、frontend配布方法を再確認する。ただし、current target planまたはユーザーの最新の明示判断が古い展開順・保留理由を置き換えている場合は、その判断をpromptへ記録し、古い一般順序だけをblockerとして復活させない。
+採用済みplanと依頼値が衝突したら、どちらかを勝手に選ばない。`decision-required`として実装promptとworktree作成を止める。特にGo、Node.js、OS、architecture、AWS region、topology、hostname、frontend配布方法を再確認する。ただし、current target planまたはユーザーの最新の明示判断が古い展開順・保留理由を置き換えている場合は、その判断をpromptへ記録し、古い一般順序だけをblockerとして復活させない。
 
 ## 対象identityを一意にする
 
@@ -64,7 +64,8 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 ## platformとhostnameを固定する
 
 - 全targetの採用platformをUbuntu 26.04 arm64とし、Application、benchmark、OS package、DB/proxy/DNS等をtarget自身で検証する。非互換でもamd64や旧Ubuntuへ自動fallbackせず、component別証拠を示して停止する。
-- base AMIは調査時の検索とbuild入力を分け、artifactではUbuntu 26.04 arm64のexact image IDを固定する。`most_recent`を残さない。
+- AWS regionは全targetで東京`ap-northeast-1`に固定する。profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupを同じregionへ束縛し、AWS CLI設定や環境変数の暗黙値に依存しない。
+- base AMIは`ap-northeast-1`での調査時の検索とbuild入力を分け、artifactでは同regionのUbuntu 26.04 arm64 exact image IDを固定する。`most_recent`、別regionのAMI ID、region fallbackを残さない。
 - upstreamに`isucon.net`、`*.isucon.dev`、`*.isucon.local`等の競技用domainがあれば、元のsubdomain構造を保って`isuren.internal`配下へ写像する。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckをtarget限定patchで一致させる。
 - repository全体の一括置換、旧hostname alias/fallback、既存published identityの上書きを禁止する。
 - 個人練習用の自己署名server key/certificateは、公開テストfixtureと明記し、権限を制限する場合だけcommon imageへ含めてよい。mTLS、Portal認証、信頼済みcertificate、credential-bearing trafficへ流用せず、本物の秘密とmachine/role固有identityは焼き込まない。
@@ -134,5 +135,5 @@ branch名へ必ずcanonical slugを含める。すでに別sessionが所有す�
 - EC2内で`git clone`して試すverify promptはpush後にだけ作る。local-only commitをclone可能と扱わない。
 - `aws-bastion`のcurrent task定義を再読し、namespace入力が実際にtaskへ届くことをread-onlyで確認する。現状の`up-bastion`は`STACK_NAME`を入力として読まず、`mise.toml`の固定`BASTION_STACK_NAME`はshell側の同名変数を上書きするため、専用prefixを指定可能と扱わない。
 - namespace入力を受け取れない場合は外部検証を止め、`BASTION_STACK_NAME = { default = "aws-bastion" }`またはtask argument等へ変更する別scopeを提案する。`mise.local.toml`を黙って作らない。
-- EC2起動やAMI build前に、account、region、namespace、費用上限、TTL、exact stack、cleanup ownerとcommand、秘密の受け渡し、人間承認を確定する。
+- EC2起動やAMI build前に、account、固定region `ap-northeast-1`、namespace、費用上限、TTL、exact stack、cleanup ownerとcommand、秘密の受け渡し、人間承認を確定する。別regionが観測されたら操作を開始しない。
 - AIが対話式cleanupを使えない場合はexact stack nameを指定する手順を別途提示する。cleanup確認まで外部gateを完了扱いにしない。

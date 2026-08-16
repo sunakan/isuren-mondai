@@ -15,11 +15,11 @@
 | step scripts | package、user、source、DB、Application、frontend、benchmark、service等の状態作成 | 他editionの巨大条件分岐、Gossによる状態変更 |
 | `goss.yaml` | file/package/user/service/port/commandとprovenance markerの観測 | 状態作成、multi-node benchmark、reset/reboot、製品E2Eの代替 |
 | `mise.toml`/lock | exact runtime/tool version、architecture別URL/checksum、再現可能なinstall | `latest`、rangeだけのversion、未lock download |
-| Packer | provider-native base、architecture、disk/network/build adapter、cloud-init待機、marker/Goss確認、tag、seal、cleanup | recipe本体の再実装、Orb成功の流用、製品E2E |
+| Packer | provider-native base、AWS region、architecture、disk/network/build adapter、cloud-init待機、marker/Goss確認、tag、seal、cleanup | recipe本体の再実装、暗黙のdefault region、Orb成功の流用、製品E2E |
 | `upstream/<official-repo-name>` | 公式baselineから選んだApplication、benchmark、frontend等のこちらで保守するコード、LICENSE、NOTICE | 編集しない画像・静的asset、`sql/`、初期データ、由来不明binary |
 | `mise-tasks/<canonical-slug>` | target固有のimport/diff、lock、static validation、build/release adapter | 他targetの更新、保守差分の無警告上書き、承認なしの外部gate |
 
-Packer plugin、base image、OS repository、package inventory、frontend artifact、source revision、recipe revisionを入力manifestへ束縛する。`most_recent`等で候補を探す調査段階と、artifact buildへ渡すexact IDを分ける。
+Packer plugin、AWS region `ap-northeast-1`、同regionのbase image、OS repository、package inventory、frontend artifact、source revision、recipe revisionを入力manifestへ束縛する。`most_recent`等で候補を探す調査段階と、artifact buildへ渡すexact IDを分ける。
 
 ## sourceとartifact identity
 
@@ -32,7 +32,7 @@ Packer plugin、base image、OS repository、package inventory、frontend artifa
 - `upstream/isucon14/NOTICE.md`と`kakomon14/provisioning/50-source.sh`を構造の参考にする。画像・dataの配置はeditionごとに異なるため、除外pathをコピーせずofficial treeから決める。
 - cacheはlocal搬入元に限り、clean clone、cloud-init、AMI buildが直接参照するbuild sourceにしない。保守codeはcommit済みmanaged source、非commit asset/dataはofficial URL・exact commit・file manifest・SHA-256を持つ固定bundleへ変換する。
 - 参考実装からcopyする場合も、対象editionのofficial provenanceとlicenseを追跡する。
-- recipe commit/digest、upstream revision、base image ID、architecture、runtime lock、frontend identity/checksumをartifact tag/manifestと証拠へ残す。
+- recipe commit/digest、upstream revision、AWS region `ap-northeast-1`、同regionのbase image ID、architecture、runtime lock、frontend identity/checksumをartifact tag/manifestと証拠へ残す。
 - Orb GoldenとAWS AMIを相互変換せず、同じfixed recipeからprovider-native artifactを別々に作る。
 
 target固有のimport/refresh taskはworktree-local mirrorからの初回取り込みと公式差分監査を支援してよいが、network clone / fetchを実行せず、managed sourceのlocal変更を`rsync --delete`等で黙って上書きしない。搬入前後のofficial identity、file一覧、diffを示し、意図的な更新として扱う。
@@ -40,7 +40,8 @@ target固有のimport/refresh taskはworktree-local mirrorからの初回取り�
 ## platformとhostname
 
 - 新規targetはUbuntu 26.04 arm64を採用値とし、Application、benchmark、OS package、DB/proxy/DNS等をcomponent別にRed/Greenする。非互換時にamd64や旧Ubuntuへ自動fallbackせず、失敗証拠を残して停止する。
-- base imageの検索はaudit/preflightに限定し、Packer build入力にはUbuntu 26.04 arm64のexact image IDを渡す。`most_recent`、architecture違い、旧OSをartifact identityへ残さない。
+- AWS regionを東京`ap-northeast-1`へ固定し、profile、Packer、base image検索、build、tag、fresh boot、product検証、cleanupへ明示する。AWS CLI設定や環境変数の暗黙値をartifact identityにしない。
+- base imageの検索は`ap-northeast-1`でのaudit/preflightに限定し、Packer build入力には同regionのUbuntu 26.04 arm64 exact image IDを渡す。`most_recent`、別regionのAMI ID、architecture違い、旧OSをartifact identityへ残さない。
 - upstreamの`isucon.net`、`*.isucon.dev`、`*.isucon.local`等を監査し、競技用domainがあれば元のsubdomain構造を保って`isuren.internal`配下へ写像する。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckを同じhostname contractにする。
 - domain変更は対象限定patchとして適用元/適用後treeとdigestを記録し、repository全体の一括置換、旧hostname alias/fallback、published ProblemVersion/manifestの同一identity上書きを禁止する。
 - 個人練習用の自己署名server key/certificateは、公開テストfixtureと明記し、file mode、fingerprint、用途を固定する場合だけcommon Golden/AMIへ含めてよい。Public AMIでは秘密でない前提とし、mTLS、Portal認証、信頼済みcertificate、credential-bearing trafficへ流用しない。

@@ -6,7 +6,7 @@
 - official upstream URL、remote、exact commit/tag、license/noticeを確認する。
 - implement worktreeではmain source cacheを検証してから、作成直後にclone全体を同名のworktree-local `tmp/all-kakomon`へ`rsync -a`したことを確認する。bootstrapでは`.git/`を含め、既存宛先と`--delete`を使わない。
 - main source cacheとworktree-local mirrorのremote、full HEAD、clean状態を記録し、expected official identityとの一致を確認する。local mirrorがtop-level Gitでignoreされ、stage、commit、merge payloadに含まれないことも確認する。別sessionはclone / fetch / pullせず、不一致ならcacheを変更せず停止する。
-- 参考実装の出典、revision、想定OS/architecture/providerを分離する。
+- 参考実装の出典、revision、想定OS/architecture/provider/regionを分離する。
 - official treeを、こちらで保守するApplication・benchmark・frontend等のコードと、worktree-local mirrorから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データへ分類し、target固有subpathを列挙する。
 - Go版の範囲をApplication、benchmark、補助service、frontend、OS packageごとに定義する。
 - upstreamのprovisioning、README、inventory、systemd、container構成から正本候補を特定する。
@@ -19,6 +19,7 @@
 - 競技用domainと全参照箇所を列挙し、元のsubdomainを保つ`isuren.internal`写像、TLS SAN、cookie/domain、benchmark target、自己署名fixtureまたは本物の秘密の境界を定義する。
 - architecture固有binary、private registry/image、外部download、build-time network依存を探す。
 - Ubuntu 26.04 arm64でのpackage repository、binary、systemd、kernel/library互換性を調べ、amd64・旧Ubuntu前提をRed項目にする。
+- AWS profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupで`ap-northeast-1`が明示され、別regionのAMI IDや暗黙のdefault regionを使わないことを確認する。
 - upstream指定のGo/frontend/runtimeと統合済みKAKOMON14のexactな採用値・lockを比較する。
 - `latest`、floating tag、range、`most_recent`、未固定package repositoryを列挙する。
 
@@ -51,7 +52,7 @@
 
 - `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerの責任を[recipe実装契約](recipe-contract.md)へ照合する。
 - 手動修正、秘密、role固有identity、builder一時file、mutable inputがimageへ残る経路を探す。
-- source、runtime、frontend、base image、package、tool/pluginのpinとchecksum不足を列挙する。
+- source、runtime、frontend、AWS region、base image、package、tool/pluginのpinとchecksum不足を列挙する。
 - managed upstreamのbaseline/local差分、LICENSE/NOTICE、worktree-local mirrorからrsyncするexact commit/subpath、固定bundleのmanifest/checksum、artifactの`tmp/`非依存を照合する。
 - Orb recipe、Orb Golden、standalone、AMI build、fresh boot、Orb/AWS productを[検証gate](verification-gates.md)へ割り当てる。
 - 各外部gateにnamespace、TTL、費用、cleanup command/owner、残存確認があるか調べる。

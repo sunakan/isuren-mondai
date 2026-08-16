@@ -48,7 +48,8 @@
 - cache由来データを保守対象コードへ実ファイルで統合し、不要な`.git`、生成物、依存directory、重複sourceをartifactへ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
-- OSとarchitectureがUbuntu 26.04 arm64で、Packer build入力がexact base image IDに固定され、amd64・旧Ubuntu・`most_recent`へfallbackしていない。
+- OSとarchitectureがUbuntu 26.04 arm64、AWS regionが`ap-northeast-1`で、profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupのregionが一致している。暗黙のdefault regionへ依存していない。
+- Packer build入力が`ap-northeast-1`のexact base image IDに固定され、別regionのAMI ID、amd64、旧Ubuntu、`most_recent`へfallbackしていない。
 - URL、checksum、config、lock、Goss、provenanceのcross-versionがない。
 - `latest`、`lts`、floating tag、rangeだけのplugin/base image選択がない。
 - target自身のApplication/benchmark validationを確認し、KAKOMON14のrecipe・Orb・AMI証拠をtargetの入口条件や成功証拠へ流用していない。
@@ -70,7 +71,7 @@
 - 実行済みlocal validationをraw resultで確認する。
 - 実行不能な検証は理由と後続gateがある。
 - `all.sh` slice、Orb recipe、Orb Golden、standalone、AMI build、fresh boot、product gateを混同していない。
-- AWS/Orb/GitHub mutationを人間承認なしに行っていない。
+- AWS/Orb/GitHub mutationを人間承認なしに行っていない。AWS操作を実施した場合はregionが`ap-northeast-1`で、cleanupも同regionに限定されている。
 
 ### main統合
 

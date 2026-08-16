@@ -10,13 +10,13 @@
 | provenance | official upstream URL、exact commit/tag、license/notice |
 | audit evidence | main source cacheとworktree-local mirrorの絶対path、HEAD、remote、clean状態、expected official identityとの一致、bootstrap方法、top-level Gitのignore状態、参考実装の絶対pathとprovenance |
 | managed source | `upstream/<official-repo-name>`のbaseline、cacheからrsyncするsubpath、取り込み・除外範囲、local変更、画像・静的asset・`sql/`・初期データbundleのmanifest / checksum |
-| artifact | Ubuntu 26.04 arm64、provider、exact base image ID方針、edition固有recipe identity、非互換時の停止証拠 |
+| artifact | Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、provider、同regionのexact base image ID方針、edition固有recipe identity、非互換時の停止証拠 |
 | hostname/TLS | upstreamの競技用domain、`isuren.internal`写像、DNS/hosts・proxy・SAN・cookie・benchmark整合、自己署名fixtureまたは本物の秘密の境界 |
 | topology | compact topology、canonical topology、各nodeのrole/network/port |
 | benchmark | 配置先、build/実行方法、target指定、result/failureの構造、必要データ |
 | runtime | 統合済みKAKOMON14比較元、upstream指定、採用候補、checksum/lock方針 |
 | frontend | build要否、runtimeの意味、package manager、lockfile、command、生成物、配置先 |
-| operations | Orb/AWS resource namespace、費用上限、TTL、cleanup条件・担当、外部操作の承認範囲 |
+| operations | Orb/AWS resource namespace、AWS region `ap-northeast-1`、費用上限、TTL、同regionでのcleanup条件・担当、外部操作の承認範囲 |
 
 implement worktreeでは、作成直後にmain checkoutのread-only source cacheを検証し、clone全体を同名の`tmp/all-kakomon/<official-repo-name>`へ`rsync -a`する。bootstrapだけは複製先でGit identityを再検証するため`.git/`を含める。複製先はgitignore対象の一時cacheであり、stage、commit、merge payloadに含めない。存在したままのlocal main統合を許し、worktree cleanup時に破棄してよい。
 

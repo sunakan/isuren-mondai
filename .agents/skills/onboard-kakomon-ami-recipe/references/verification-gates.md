@@ -12,14 +12,14 @@
 | `ami-fresh-boot-green` | fresh EC2のidentity、Goss、service、reboot、standalone benchmark、AWS固有bootを確認 | Portal/`isu`製品経路 |
 | `aws-product-green` | versioned AWS profile、canonical topology、Portal/`isu`、mTLS/SSE、result/restart、AWS固有境界、cleanup | 別region/architecture/profile |
 
-各gateへstatus（`not-run`/`blocked`/`failed`/`green`）、recipe digest、artifact ID、architecture/provider、topology、実行時刻、raw evidence、失敗、cleanupを記録する。前段のGreenを後段へコピーしない。dirty debug VMの成功をartifact昇格証拠にしない。
+各gateへstatus（`not-run`/`blocked`/`failed`/`green`）、recipe digest、artifact ID、region、architecture/provider、topology、実行時刻、raw evidence、失敗、cleanupを記録する。AWS gateのregionは`ap-northeast-1`へ固定する。前段のGreenを後段へコピーせず、別regionのGreenも流用しない。dirty debug VMの成功をartifact昇格証拠にしない。
 
 ## 外部操作preflight
 
 Orb/AWS/GitHub等の外部状態を調査または操作する前に、リポジトリ指定のexternal-operation preflight Skillまたは同等の正本手順を適用し、次を確定する。read-only調査も対象に含める。
 
 - 実施するgateと、実施しないgate
-- account/provider/region/architecture
+- account/provider、固定AWS region `ap-northeast-1`、architecture。暗黙のdefault regionを使わない
 - 衝突しないresource namespace、所有session、対象VM/stack/image
 - read-onlyかmutationか、実行command、必要権限
 - 費用見積り・上限、TTL、停止時刻
@@ -27,7 +27,7 @@ Orb/AWS/GitHub等の外部状態を調査または操作する前に、リポジ
 - 秘密をchat、argv、log、artifactへ出さない受け渡し方法
 - 人間の明示承認
 
-どれかが欠ければ外部操作を開始しない。既存resourceを名前の類似だけで再利用・削除しない。別session所有のVM、worktree、AMI、volume、stack、artifactへ触れない。
+どれかが欠ける、またはAWS側で`ap-northeast-1`以外が選ばれている場合は外部操作を開始しない。既存resourceを名前の類似だけで再利用・削除しない。別session所有のVM、worktree、AMI、volume、stack、artifactへ触れない。AWS cleanupも作成時と同じ`ap-northeast-1`へ限定する。
 
 ## lifecycle検証
 

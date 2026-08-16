@@ -22,6 +22,7 @@
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
 | plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
 | runtime | Go、Node.js、package manager、OS、architectureの採用済み値または停止条件 |
+| platform | AWS region `ap-northeast-1`、同regionのexact base AMI ID方針、profile / Packer / build / verify / cleanupのregion一致 |
 | completion | `audit-complete`、`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main` |
 
 ## promptの必須構成
@@ -34,7 +35,7 @@
 4. scope: 許可path、非変更path、外部操作禁止、他session所有物の境界。
 5. evidence hierarchy: official source、audit cache、統合済みKAKOMON14、2つの参考実装を区別すること。
 6. target-specific task: 調査、directory構成、file責任、受け入れ条件。
-7. runtime/frontend policy: exact version、lock、checksum、build順、停止条件。
+7. runtime/frontend/platform policy: exact version、lock、checksum、build順、AWS region、停止条件。
 8. validation: localで安全に実施できる確認とnot-run gate。
 9. Git contract: implement sessionは許可pathだけstage・commitし、条件付きでlocal mainへfast-forward統合する。pushはhuman。
 10. completion report: 変更、証拠、未決、gate、次の安全な一手。
@@ -114,7 +115,8 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 ## OS、architecture、domain
 
 - Ubuntu 26.04 arm64を採用値にし、Application、benchmark、package、DB/proxy/DNS等をtarget自身で検証する。非互換時はamd64・旧Ubuntuへfallbackせず、失敗componentと証拠を報告して停止する。
-- Packerのbase image探索結果をbuild入力へ直接流さず、Ubuntu 26.04 arm64のexact image IDを固定する。`most_recent`、architecture違い、旧OSを許可しない。
+- AWS regionを東京`ap-northeast-1`へ固定し、profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupへ明示する。暗黙のdefault regionや別regionへのfallbackを許可しない。
+- Packerのbase image探索結果をbuild入力へ直接流さず、`ap-northeast-1`のUbuntu 26.04 arm64 exact image IDを固定する。`most_recent`、別regionのAMI ID、architecture違い、旧OSを許可しない。
 - upstreamの競技用domainを列挙し、該当する場合は元のsubdomainを保って`isuren.internal`へ写像する。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckを単一contractにする。
 - target限定patchだけを使い、一括置換、alias、fallback、published identityの上書きをしない。
 - 個人練習用の自己署名server key/certificateをcommon imageへ含める場合は、公開テストfixtureとしてmode、fingerprint、用途を記録する。mTLS、Portal認証、信頼済みcertificate、credential-bearing trafficに使わず、本物の秘密やmachine/role固有identityを含めない。

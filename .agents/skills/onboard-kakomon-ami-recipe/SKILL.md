@@ -40,12 +40,12 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - [検証gate](references/verification-gates.md)を読み、依頼されたgateだけを実施する。
 - 一つの成功を別gateの成功へ読み替えない。gateごとにartifact identity、recipe digest、環境、証拠、cleanupを記録する。
-- Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。
+- Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。AWS regionは東京`ap-northeast-1`へ固定する。
 - 承認のない外部操作、対象不明なcleanup、秘密情報の表示を行わない。
 
 ## 共通停止条件
 
-Ubuntu 26.04 arm64と、競技用domainが存在する場合の`isuren.internal`写像は採用済み共通入力である。古いplanに値がないだけで`decision-required`へ戻さず、互換性を`evidence-missing`として扱う。
+Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、競技用domainが存在する場合の`isuren.internal`写像は採用済み共通入力である。古いplanに値がないだけで`decision-required`へ戻さず、互換性を`evidence-missing`として扱う。
 
 次のいずれかなら、その場で停止し、欠けている証拠または判断を報告する。
 
@@ -58,6 +58,7 @@ Ubuntu 26.04 arm64と、競技用domainが存在する場合の`isuren.internal`
 - managed upstreamと、worktree-local mirrorから`rsync`して固定bundleへ変換する画像・静的asset・`sql/`・初期データの境界、subpath、license、exact commit、manifest / checksumが固定されていない。
 - architecture、provider、compact/canonical topologyの対応が不明である。
 - Ubuntu 26.04 arm64で必要componentが成立せず、amd64・旧Ubuntuへのfallbackを人間判断なしで進めようとしている。
+- profile、Packer、base AMI、build、fresh boot、product検証、cleanupのAWS regionが`ap-northeast-1`へ固定されていない、暗黙のdefault regionに依存している、または別regionへfallbackしようとしている。
 - upstreamに競技用domainがあるのに`isuren.internal`へのtarget限定写像、TLS SAN、自己署名fixtureまたは本物の秘密の境界が固定されていない。
 - benchmarkの実行方法、target、result/failure契約が分からない。
 - frontend buildが必要なのに、生成物、package manager、lockfile、build command、配置先のいずれかが不明である。
