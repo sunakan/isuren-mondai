@@ -34,7 +34,7 @@ runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" sparse-checkout set --co
 runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" fetch --quiet --depth 1 \
   --filter=blob:none origin "${OFFICIAL_COMMIT}"
 runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" checkout --quiet "${OFFICIAL_COMMIT}"
-test "$(git -C "${OFFICIAL_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"
+test "$(runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"
 (
   cd "${OFFICIAL_DIR}"
   sha256sum -c "${OFFICIAL_MANIFEST}"

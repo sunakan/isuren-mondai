@@ -120,6 +120,10 @@ grep -qF 'version = "= 1.8.2"' kakomon13/packer/kakomon13.pkr.hcl
 rg -q 'source_ami\s*=\s*var\.source_ami' kakomon13/packer/kakomon13.pkr.hcl
 rg -q 'FRONTEND_RELEASE_TAG.*exact' kakomon13/provisioning/all.sh
 rg -q 'FRONTEND_RELEASE_SHA256.*exact' kakomon13/provisioning/all.sh
+# shellcheck disable=SC2016 # This is the exact source text required by the contract.
+grep -qF 'test "$(runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"' \
+  kakomon13/provisioning/50-source.sh ||
+  fail "official checkout identity must be verified as its owning user"
 
 if rg -n --glob '*.sh' --glob '*.py' --glob '*.hcl' --glob '*.yaml' \
   'tmp/all-kakomon' kakomon13/provisioning kakomon13/cloud-init kakomon13/packer; then
