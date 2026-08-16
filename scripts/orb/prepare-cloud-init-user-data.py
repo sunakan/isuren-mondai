@@ -29,14 +29,16 @@ while ! ip -4 route show default | grep -q . || ! getent ahostsv4 github.com >/d
   orb_network_wait_seconds=$((orb_network_wait_seconds - 1))
 done""",
     "printf '%s\\n' '[orb-bootstrap] network is ready'",
-    "printf '%s\\n' '[orb-bootstrap] install ca-certificates and git'",
+    "printf '%s\\n' '[orb-bootstrap] install ca-certificates, git, and openssh-server'",
     "apt-get -o Acquire::Retries=5 update",
     (
         "DEBIAN_FRONTEND=noninteractive "
         "apt-get -o Acquire::Retries=5 -o DPkg::Lock::Timeout=120 "
-        "install -y --no-install-recommends ca-certificates git"
+        "install -y --no-install-recommends ca-certificates git openssh-server"
     ),
     "git --version",
+    "test -x /usr/sbin/sshd",
+    "systemctl cat ssh.service >/dev/null",
 ]
 
 

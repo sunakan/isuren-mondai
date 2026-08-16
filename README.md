@@ -24,9 +24,9 @@ mise orb:build-golden-base kakomon14
 GITHUB_TOKEN="$(ghtkn get sunakan/read)" mise orb:build-golden-base kakomon14 --execute
 ```
 
-Orb用user-dataはVM内のIPv4 routeとDNSを期限付きで待ち、`ca-certificates`と`git`を
-常にinstallしてから対象recipeを実行する。このprovider固有bootstrapはAMI用user-dataへは
-混ぜず、downloadとinstallもMacではなくOrb VM内で行う。
+Orb用user-dataはVM内のIPv4 routeとDNSを期限付きで待ち、`ca-certificates`、`git`、
+`openssh-server`を常にinstallしてから対象recipeを実行する。このprovider固有bootstrapは
+AMI用user-dataへは混ぜず、downloadとinstallもMacではなくOrb VM内で行う。
 
 isuren層を追加する作業VMはbaseを直接起動せず、clone-local identityを再生成してから使う。
 

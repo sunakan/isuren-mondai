@@ -346,6 +346,8 @@ source /etc/os-release
 [[ ! -e /etc/systemd/system/isuren-isu.service ]]
 [[ ! -e /etc/systemd/system/isuren-portal.service ]]
 [[ ! -e /opt/isuren-mondai ]]
+test -x /usr/sbin/sshd
+systemctl cat ssh.service >/dev/null
 
 resolved_frontend_tag=none
 resolved_frontend_sha256=none
@@ -389,7 +391,7 @@ rm -f /root/.bash_history /home/*/.bash_history
 install -d -m 0755 "${marker_dir}"
 {
   printf 'KIND=isuren-mondai-kakomon-golden-base\n'
-  printf 'SCHEMA=1\n'
+  printf 'SCHEMA=2\n'
   printf 'TARGET_SLUG=%s\n' "${TARGET_SLUG}"
   printf 'PROJECT_COMMIT=%s\n' "${PROJECT_COMMIT}"
   printf 'RECIPE_TREE=%s\n' "${RECIPE_TREE}"
@@ -403,6 +405,7 @@ install -d -m 0755 "${marker_dir}"
   printf 'ENABLED_SERVICES=%s\n' "${ENABLED_SERVICES_CSV}"
   printf 'RUNNING_SERVICES=%s\n' "${RUNNING_SERVICES_CSV}"
   printf 'PROVISIONING_MARKER_VERIFIED=true\n'
+  printf 'SSH_SERVER_VERIFIED=true\n'
   printf 'CLOUD_INIT_DISABLED=true\n'
   printf 'HOST_IDENTITY_SCRUBBED=true\n'
   printf 'ISUREN_LAYER_ABSENT=true\n'

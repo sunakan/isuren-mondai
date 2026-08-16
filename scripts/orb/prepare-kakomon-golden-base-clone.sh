@@ -130,11 +130,14 @@ clone_marker="/etc/isuren-mondai/${EXPECTED_TARGET_SLUG}-orb-golden-base-clone.e
 # shellcheck disable=SC1090 # root-owned marker created by the Golden builder.
 source "${base_marker}"
 [[ "${KIND}" == isuren-mondai-kakomon-golden-base ]]
-[[ "${SCHEMA}" == 1 ]]
+[[ "${SCHEMA}" == 2 ]]
 [[ "${TARGET_SLUG}" == "${EXPECTED_TARGET_SLUG}" ]]
 [[ "${HOST_IDENTITY_SCRUBBED}" == true ]]
 [[ "${ISUREN_LAYER_ABSENT}" == true ]]
+[[ "${SSH_SERVER_VERIFIED:-}" == true ]]
 [[ -f /etc/cloud/cloud-init.disabled ]]
+test -x /usr/sbin/sshd
+systemctl cat ssh.service >/dev/null
 
 hostnamectl set-hostname "${CLONE_NAME}"
 rm -f /etc/machine-id /var/lib/dbus/machine-id
@@ -217,12 +220,13 @@ base_marker_sha256="$(sha256sum "${base_marker}" | awk '{print $1}')"
 
 {
   printf 'KIND=isuren-mondai-kakomon-golden-base-clone\n'
-  printf 'SCHEMA=1\n'
+  printf 'SCHEMA=2\n'
   printf 'TARGET_SLUG=%s\n' "${TARGET_SLUG}"
   printf 'SOURCE_BASE_MARKER_SHA256=%s\n' "${base_marker_sha256}"
   printf 'MACHINE_ID=%s\n' "${machine_id}"
   printf 'SSH_HOST_KEY_SHA256=%s\n' "${ssh_host_key_sha256}"
   printf 'MYSQL_SERVER_UUID=%s\n' "${mysql_server_uuid}"
+  printf 'SSH_SERVER_VERIFIED=true\n'
   printf 'CLOUD_INIT_DISABLED=true\n'
   printf 'CLONE_IDENTITY_REGENERATED=true\n'
 } >"${clone_marker}"

@@ -1,6 +1,6 @@
 ---
 name: build-orb-kakomon-golden-base
-description: isuren-mondaiのcanonical kakomon recipeをUbuntu 26.04 arm64 Orb VMへcloud-initで一度だけ適用し、Goss完走、入力identity、問題serviceの停止・無効化、cloud-init再実行防止、machine-id・SSH host key・random seed・MySQL UUIDの除去、停止状態を検証した問題専用Golden Baseを作る。kakomonN-golden-baseの新規作成、事前監査、失敗調査、またはbaseからisu層用cloneを準備するときに使う。AMI build、既存VMの単純な起動停止、isuren固有isu層の導入だけには使わない。
+description: isuren-mondaiのcanonical kakomon recipeをUbuntu 26.04 arm64 Orb VMへcloud-initで一度だけ適用し、Goss完走、OpenSSH server、入力identity、問題serviceの停止・無効化、cloud-init再実行防止、machine-id・SSH host key・random seed・MySQL UUIDの除去、停止状態を検証した問題専用Golden Baseを作る。kakomonN-golden-baseの新規作成、事前監査、失敗調査、またはbaseからisu層用cloneを準備するときに使う。AMI build、既存VMの単純な起動停止、isuren固有isu層の導入だけには使わない。
 ---
 
 # Orb Kakomon Golden Base
@@ -37,11 +37,13 @@ AMIのdiskを変換しない。AMIとOrbはexact recipe commit/treeとtarget-loc
    GITHUB_TOKEN="$(ghtkn get sunakan/read)" mise orb:build-golden-base kakomon14 --execute
    ```
 
-   Orb imageには`git`がない場合があり、初期cloud-init時点ではIPv4/DNSも未準備になりうる。
+   Orb imageには`git`や`openssh-server`がない場合があり、初期cloud-init時点では
+   IPv4/DNSも未準備になりうる。
    Orb adapterで`set -eu`を有効化し、IPv4 routeとGitHub DNSを期限付きで待ってから、
-   `apt-get update`と`ca-certificates`/`git`の無条件installを行い、その後にcanonical
-   user-dataの`runcmd`を実行する。これはOrb VM内だけの処理とし、対象generatorやAMI用
-   user-dataへ複製しない。途中失敗を後続cleanupの成功で隠さない。
+   `apt-get update`と`ca-certificates`/`git`/`openssh-server`の無条件installを行い、
+   `sshd`と`ssh.service`を確認してからcanonical user-dataの`runcmd`を実行する。これは
+   Orb VM内だけの処理とし、対象generatorやAMI用user-dataへ複製しない。途中失敗を
+   後続cleanupの成功で隠さない。
 
 6. 成功時は`orb-recipe-green`と`orb-golden-green`を分けて報告する。少なくとも
    cloud-init/all.sh/Goss完走、Golden marker、identity scrub、isuren層不在、停止状態を示す。
@@ -60,6 +62,8 @@ mise orb:prepare-golden-base-clone kakomon14 isuren-kakomon14-golden-next --exec
 random seed、MySQL server UUIDを再生成する。問題serviceはGolden seal時に無効化し、identity
 再生成後にtargetのGoss contractどおり復元する。元のuser-dataをcloneで再実行しないため、
 Orb Goldenではcloud-initを無効のまま維持する。Bの追加provisioningはhost側script/Orb runで行う。
+base marker、`/usr/sbin/sshd`、`ssh.service`をidentity変更前に検証し、OpenSSH serverを持たない
+古いbaseはclone準備へ進めない。
 ここで完成するのはBを作るためのrunning作業VMであり、BのGolden完成を意味しない。isuren層の
 検証、再seal、停止を別gateとして完了する。
 
@@ -67,8 +71,8 @@ Orb Goldenではcloud-initを無効のまま維持する。Bの追加provisionin
 
 - worktreeがdirty、HEADが未push、frontend selectorを実体tag/digestへ解決できない、
   対象recipe/Gossに完全なservice contractがない場合はbuildしない。
-- Orb bootstrapでIPv4 route、DNS、apt、`git --version`のいずれかを確認できない場合は、
-  canonical recipeを開始せずcloud-initを失敗させる。
+- Orb bootstrapでIPv4 route、DNS、apt、`git --version`、`sshd`、`ssh.service`のいずれかを
+  確認できない場合は、canonical recipeを開始せずcloud-initを失敗させる。
 - 同名VMが存在する、baseが停止していない、canonical slugでない場合は停止する。
 - build/clone失敗時は診断用VMを勝手に削除しない。名前と失敗gateを報告する。
 - Aへ`isu`、Portal/mTLS credential、environment identity、実秘密を追加しない。

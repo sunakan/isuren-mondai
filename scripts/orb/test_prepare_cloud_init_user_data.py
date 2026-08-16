@@ -32,6 +32,19 @@ class PrepareCloudConfigTest(unittest.TestCase):
         )
         self.assertEqual(document["runcmd"], original_runcmd)
 
+    def test_installs_and_verifies_openssh_server(self) -> None:
+        commands = MODULE.ORB_BOOTSTRAP_RUNCMD
+
+        self.assertTrue(
+            any(
+                "install -y --no-install-recommends ca-certificates git openssh-server"
+                in command
+                for command in commands
+            )
+        )
+        self.assertIn("test -x /usr/sbin/sshd", commands)
+        self.assertIn("systemctl cat ssh.service >/dev/null", commands)
+
     def test_rejects_missing_runcmd(self) -> None:
         with self.assertRaisesRegex(ValueError, "non-empty runcmd"):
             MODULE.prepare_cloud_config({})
