@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 #MISE description="shellスクリプトをshfmtでフォーマットチェック(取り込んだ本家コードのupstream/配下、参照用clone置き場のtmp/配下は対象外)"
 set -euo pipefail
-# mise-tasks/配下は拡張子なしのbashスクリプトなので、*.shだけでなくパスでも対象に含める。
+# mise-tasks/配下は拡張子なしのbashスクリプトなので、*.shだけでなく実行可能なfile taskを
+# 対象に含める。READMEやcopy用の非実行*.tmplは各template taskの検証へ委ねる。
 # -i 2: shfmtのデフォルトインデントはタブのため、このリポジトリの2スペースインデントに対して
 # 指定なしだと常にタブへの変換を提案してくる(誤検知)。
-find . \( -name '*.sh' -o -path './mise-tasks/*' \) -type f -not -path '*/upstream/*' -not -path '*/tmp/*' -print0 | xargs -0 shfmt -i 2 -d
+scripts=()
+while IFS= read -r -d '' script; do
+  if [[ "${script}" == ./mise-tasks/* && ! -x "${script}" ]]; then
+    continue
+  fi
+  scripts+=("${script}")
+done < <(find . \( -name '*.sh' -o -path './mise-tasks/*' \) -type f \
+  -not -path '*/upstream/*' -not -path '*/tmp/*' -print0)
+
+shfmt -i 2 -d "${scripts[@]}"
