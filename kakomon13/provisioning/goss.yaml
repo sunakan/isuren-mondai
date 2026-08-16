@@ -31,6 +31,9 @@ file:
   /home/isuren/webapp/img/NoImage.jpg:
     exists: true
     filetype: file
+  /home/isuren/webapp/pdns/u.isuren.internal.zone:
+    exists: true
+    filetype: file
   /usr/local/share/isuren-mondai/kakomon13-provenance:
     exists: true
     filetype: file

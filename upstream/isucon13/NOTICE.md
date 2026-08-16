@@ -14,6 +14,15 @@
   image fixtures.
 - `frontend/**`: frontend source and Yarn lock, excluding image assets and
   generated `node_modules` / `dist` trees.
+- `webapp/pdns/u.isuren.internal.zone`: the official `webapp/pdns/u.isucon.dev.zone`
+  full BIND zone file, renamed and with every `u.isucon.dev` occurrence
+  rewritten to `u.isuren.internal`. This is the only source that provisions
+  the full record set (well-known service names plus every official initial
+  user) that the benchmarker's DNS pretest requires; the fresh-boot loader
+  fills in `<ISUCON_SUBDOMAIN_ADDRESS>` and loads the zone with `pdnsutil
+  load-zone`. `webapp/pdns/init_zone.sh` and `named.conf` are not imported:
+  the former is superseded by the recipe's own fresh-boot script and the
+  latter is an unused example left commented out in the official tree.
 
 The import deliberately excludes other Application languages, official
 provisioning, development containers, staff infrastructure, and generated
@@ -23,9 +32,9 @@ immutable mirror of the official repository.
 ## Local changes
 
 - The Application cookie domain and PowerDNS zone calls, benchmark target / DNS
-  zone, and frontend Application hostname are changed only from
-  `u.isucon.dev` to `u.isuren.internal`. The canonical target is
-  `pipe.u.isuren.internal`.
+  zone, frontend Application hostname, and the imported
+  `webapp/pdns/u.isuren.internal.zone` are changed only from `u.isucon.dev` to
+  `u.isuren.internal`. The canonical target is `pipe.u.isuren.internal`.
 - The recipe targets PowerDNS 5, which requires absolute owner names for
   `pdnsutil add-record`. Boot-time records and dynamically registered user
   records therefore use full names under `u.isuren.internal`; the official

@@ -19,6 +19,7 @@ install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${OFFICIAL_DIR}" "${ISUREN_HOME}/webapp" "${ISUREN_HOME}/isucon13"
 
 rsync -a "${UPSTREAM_DIR}/webapp/go/" "${ISUREN_HOME}/webapp/go/"
+rsync -a "${UPSTREAM_DIR}/webapp/pdns/" "${ISUREN_HOME}/webapp/pdns/"
 rsync -a "${UPSTREAM_DIR}/bench/" "${ISUREN_HOME}/isucon13/bench/"
 
 # 画像・SQL等の非managed dataはGitへ置かず、公式exact commitからbuild時に取得する。
