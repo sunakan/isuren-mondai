@@ -34,7 +34,7 @@ set_bashrc() {
 }
 
 # 対応: isucon14/provisioning/ansible/roles/xbuild/tasks/main.yml L27-30(go-install 1.23.2)の代替。
-# バージョンはpreflight-checkの決定(go 1.26.5)に固定。frontendはAMI上でビルドしなくなったため
+# バージョンはpreflight-checkの決定(go 1.26.6)に固定。frontendはAMI上でビルドしなくなったため
 # node/pnpmは不要(kakomon14/scripts/mise.toml側で管理。80-frontend.sh参照)。
 # aws-bastionリポジトリのパスを直接参照せず実体をisurenのホームにコピーするのは、
 # /home/ubuntu配下へのisurenからのアクセス権限に依存させないため、および将来cloud-init化した際に
