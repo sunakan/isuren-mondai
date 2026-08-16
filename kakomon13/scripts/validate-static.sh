@@ -50,6 +50,15 @@ fi
 
 official_manifest="kakomon13/provisioning/official-data.manifest.sha256"
 frontend_asset_manifest="kakomon13/scripts/frontend-assets.manifest.sha256"
+ami_inputs="kakomon13/scripts/ami-inputs.env"
+test -f "${ami_inputs}" || fail "missing KAKOMON13 AMI inputs"
+# shellcheck source=kakomon13/scripts/ami-inputs.env
+source "${ami_inputs}"
+[[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || fail "invalid KAKOMON13 source AMI input"
+[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+  fail "invalid KAKOMON13 frontend Release tag input"
+[[ "${KAKOMON13_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "invalid KAKOMON13 frontend Release SHA-256 input"
 test "$(wc -l <"${official_manifest}" | tr -d ' ')" = 205 || fail "official data manifest count changed"
 test "$(wc -l <"${frontend_asset_manifest}" | tr -d ' ')" = 12 || fail "frontend asset manifest count changed"
 rg -v '^[0-9a-f]{64}  [^[:space:]]+$' "${official_manifest}" "${frontend_asset_manifest}" &&

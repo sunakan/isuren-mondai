@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-#MISE description="exact Ubuntu 26.04 arm64 AMI IDを入力してKAKOMON13 AMIをbuild"
+#MISE description="KAKOMON13 AMIをbuild"
 set -euo pipefail
 
-: "${KAKOMON13_SOURCE_AMI_ID:?set one reviewed Ubuntu 26.04 arm64 AMI ID}"
-: "${KAKOMON13_FRONTEND_RELEASE_TAG:?set one exact kakomon13 frontend release tag}"
-: "${KAKOMON13_FRONTEND_RELEASE_SHA256:?set the exact frontend release archive SHA-256}"
+# Target-local text inputs keep the normal mise task invocation aligned with the
+# other recipes while preserving exact, reviewable AMI and Release identities.
+# shellcheck source=kakomon13/scripts/ami-inputs.env
+source kakomon13/scripts/ami-inputs.env
+
 [[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
   echo "error: KAKOMON13_SOURCE_AMI_ID is not an exact AMI ID" >&2
   exit 1

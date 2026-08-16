@@ -1,9 +1,9 @@
 # KAKOMON13 Packer input boundary
 
-The build accepts one exact `source_ami` value and never performs AMI discovery.
-The caller must resolve and review an Ubuntu 26.04 arm64 Canonical image ID in
-the external-operation preflight. No default, `most_recent`, older OS, or amd64
-fallback exists.
+The Packer template accepts one exact `source_ami` value and never performs AMI
+discovery. The normal `mise kakomon13:build` task loads the reviewed value from
+`kakomon13/scripts/ami-inputs.env`; direct Packer invocations still need to pass
+the value explicitly. No `most_recent`, older OS, or amd64 fallback exists.
 
 The Amazon plugin is fixed to 1.8.2. The AMI tags bind the exact project commit,
 KAKOMON13 tree, official source commit and data-manifest digest, input AMI ID,
