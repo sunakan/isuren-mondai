@@ -42,10 +42,12 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - 同じscript fileを共有せず、`kakomon13/`・`kakomon14/`等のtarget-owned fileをそれぞれ保つ。共通化するのは責務の境界、処理順、関数分割、入力検証、失敗処理、ログ形式、コメント構造とする。
 - 統合済みKAKOMON14の`mise kakomon14:build`をbuild taskの処理形の参照にする。K13へ移す場合も、target固有のsource AMI、frontend Release、公式source、step列、service名、Goss対象は置き換えず、taskの外枠だけを揃える。
+- `mise-tasks/kakomon13/**`・`mise-tasks/kakomon14/**`をtask名で対応付け、既存の`kakomonN:xxx`を一つずつ比較する。同名taskはK13/K14で`#MISE description`の文型も揃え、本文は同じ責務の順序・検証・失敗処理・コメント構造へ寄せる。片方にしかないtaskは無理に追加せず、descriptionへ`kakomonN独自:`と独自である理由を明記する。
+- 変更は一つのtask名（共通taskならK13/K14のペア）ごとに閉じ、依頼にcommitが含まれる場合はその単位で検証して小さくcommitする。stage対象はそのtaskと必要なtarget-owned fileだけに限定し、共通化のために無関係なtaskや共有scriptへ変更を広げない。
 - build host側では、exact inputを検証し、cloud-init用の小さな一時`user-data`をローカル生成してPackerの`user_data_file`へ渡す。生成処理自体にGitHub/AWS取得を入れず、終了時にtrapで一時ファイルを削除する。`packer init`、AWS API、build後のOTel送信は別のhost-side処理として記録する。
 - AMI/EC2側では、User Dataから公式source・package・Release等を取得してよい。`all.sh`は`traceparent`・時刻・ディスク量・step結果などのraw telemetryだけをログへ出し、API keyやOTLP送信をAMIへ持ち込まない。Packer完了後にhost-side taskがbuild logからroot/child spanを作り、元のPacker終了コードを返す。
 - コメントも共通責務の境界、実行順、失敗時の挙動、秘密・生成物の境界を同じ型で書く。ただしofficial provenance、hostname、service、frontend、benchmark等のtarget固有の根拠は、差分を減らすためだけに削除しない。
-- 比較前後で同じrelative pathの一覧、完全一致ファイル数、残したtarget固有差分、差分行数を記録する。差分が減ったことと、target固有契約を壊していないことを別々に確認する。
+- taskごとに変更前後のpaired task diff、descriptionの一致、同じrelative pathの一覧、完全一致ファイル数、残したtarget固有差分、差分行数を記録する。差分が減ったことと、target固有契約を壊していないことを別々に確認する。
 
 ### `verify`
 
