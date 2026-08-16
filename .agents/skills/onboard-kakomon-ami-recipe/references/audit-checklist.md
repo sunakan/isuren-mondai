@@ -6,6 +6,7 @@
 - official upstream URL、remote、exact commit/tag、license/noticeを確認する。
 - ローカルaudit cloneのremote/HEAD/dirty状態を記録し、調査用cacheと明記する。
 - 参考実装の出典、revision、想定OS/architecture/providerを分離する。
+- official treeを、こちらで保守するApplication・benchmark・frontend等のコードと、公式から直接取得する画像・静的asset・`sql/`・初期データへ分類し、target固有subpathを列挙する。
 - Go版の範囲をApplication、benchmark、補助service、frontend、OS packageごとに定義する。
 - upstreamのprovisioning、README、inventory、systemd、container構成から正本候補を特定する。
 
@@ -14,7 +15,9 @@
 - Application、DB、proxy、cache、queue、DNS、TLS、補助service、benchmarkを列挙する。
 - package名、設定、user/group、directory、ownership、environment、systemd依存順を集める。
 - listen address、port、protocol、hostname、DNS/hosts依存、TLS終端と証明書生成責任を調べる。
+- 競技用domainと全参照箇所を列挙し、元のsubdomainを保つ`isuren.internal`写像、TLS SAN、cookie/domain、benchmark target、自己署名fixtureまたは本物の秘密の境界を定義する。
 - architecture固有binary、private registry/image、外部download、build-time network依存を探す。
+- Ubuntu 26.04 arm64でのpackage repository、binary、systemd、kernel/library互換性を調べ、amd64・旧Ubuntu前提をRed項目にする。
 - upstream指定のGo/frontend/runtimeと統合済みKAKOMON14のexactな採用値・lockを比較する。
 - `latest`、floating tag、range、`most_recent`、未固定package repositoryを列挙する。
 
@@ -48,6 +51,7 @@
 - `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerの責任を[recipe実装契約](recipe-contract.md)へ照合する。
 - 手動修正、秘密、role固有identity、builder一時file、mutable inputがimageへ残る経路を探す。
 - source、runtime、frontend、base image、package、tool/pluginのpinとchecksum不足を列挙する。
+- managed upstreamのbaseline/local差分、LICENSE/NOTICE、直接取得データのexact commit/subpath、取得後の実ファイル統合とcheckout cleanupを照合する。
 - Orb recipe、Orb Golden、standalone、AMI build、fresh boot、Orb/AWS productを[検証gate](verification-gates.md)へ割り当てる。
 - 各外部gateにnamespace、TTL、費用、cleanup command/owner、残存確認があるか調べる。
 

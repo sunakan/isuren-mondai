@@ -33,15 +33,19 @@
 ### scopeとGit
 
 - canonical slug、branch、directory、variantが一貫している。
-- target directory外、他の`kakomon*/**`、参考repo、audit cacheに変更がない。
+- 変更がpromptで許可されたtarget専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけに収まり、他target、参考repo、audit cacheに変更がない。
 - staged/unstaged/untrackedを分け、許可pathだけがcommitされている。`git add .`や`git add -A`でscopeを広げていない。
 
 ### provenanceとruntime
 
 - audit cacheをbuild sourceにしていない。
 - official URL、full SHA/tag、license/noticeを固定している。
+- managed upstreamが公式baselineから取り込んだ保守対象コードとlocal変更を追跡し、`NOTICE.md`の範囲・除外・provenanceと実treeが一致する。
+- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、公式exact commitとtarget固有subpathから直接取得する。mutable branch、audit cache、由来不明archiveへfallbackしていない。
+- 公式取得データを保守対象コードへ実ファイルで統合し、取得用checkout、不要な`.git`、重複sourceをartifactへ残していない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
+- OSとarchitectureがUbuntu 26.04 arm64で、Packer build入力がexact base image IDに固定され、amd64・旧Ubuntu・`most_recent`へfallbackしていない。
 - URL、checksum、config、lock、Goss、provenanceのcross-versionがない。
 - `latest`、`lts`、floating tag、rangeだけのplugin/base image選択がない。
 - target自身のApplication/benchmark validationを確認し、KAKOMON14のrecipe・Orb・AMI証拠をtargetの入口条件や成功証拠へ流用していない。
@@ -51,11 +55,12 @@
 - `all.sh`が唯一の実行順の正本で、全stepが存在し、空互換stepがない。
 - failureが非zeroで伝播し、completion markerを失敗時に作らない。
 - user/group、ownership、directory、package、service依存順、port、DB/proxy/DNS/TLSが対象upstreamから導かれている。
+- upstreamに競技用domainがある場合、元のsubdomainを保つ`isuren.internal`写像がDNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckで一致し、一括置換・alias・published identity上書きがない。
 - Applicationとbenchmarkのbuild、配置、実行user/cwd、result/failure契約が分離されている。
 - frontend build、hash/manifest更新、benchmark build、配置順がofficial契約と一致する。
 - cloud-initはfixed recipeを起動する薄いadapterである。
 - Gossは観測だけを行い、reset/reboot/multi-node/product E2Eの代替になっていない。
-- machine-id、SSH/TLS private key、credential、role固有値をartifactへ残さない方針がある。
+- machine-id、SSH host key、credential、role固有値、本物のTLS/mTLS private keyをartifactへ残していない。自己署名server keyを含める場合は公開テストfixtureとしてmode・fingerprint・用途が固定され、認証やcredential-bearing trafficへ流用されない。
 
 ### validationとgate
 

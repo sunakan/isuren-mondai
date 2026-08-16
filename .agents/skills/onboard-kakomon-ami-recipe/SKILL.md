@@ -31,7 +31,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 ### `implement`
 
 - 明示的に承認されたplan、変更許可path、専用worktree、受け入れ条件が揃ってからローカル実装する。
-- `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerを[recipe実装契約](references/recipe-contract.md)どおり分担させる。
+- target専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけを変更し、managed source、cloud-init、`all.sh`、edition固有step、Goss、mise、Packerを[recipe実装契約](references/recipe-contract.md)どおり分担させる。
 - Red/Green、関連lint/test、自己レビューを行う。未決判断や停止条件に到達したら変更を広げない。
 - `implement`は外部環境操作を許可しない。外部検証は別の`verify`承認を要求する。
 
@@ -44,12 +44,17 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 ## 共通停止条件
 
+Ubuntu 26.04 arm64と、競技用domainが存在する場合の`isuren.internal`写像は採用済み共通入力である。古いplanに値がないだけで`decision-required`へ戻さず、互換性を`evidence-missing`として扱う。
+
 次のいずれかなら、その場で停止し、欠けている証拠または判断を報告する。
 
 - editionとQualify/Final等のvariantが一意でない。
 - official URLとexact commit/tagが固定されていない。
 - `tmp/all-kakomon`等のcacheをbuild sourceとして使おうとしている。
+- managed upstreamと、公式から直接取得する画像・静的asset・`sql/`・初期データの境界、subpath、license、exact commitが固定されていない。
 - architecture、provider、compact/canonical topologyの対応が不明である。
+- Ubuntu 26.04 arm64で必要componentが成立せず、amd64・旧Ubuntuへのfallbackを人間判断なしで進めようとしている。
+- upstreamに競技用domainがあるのに`isuren.internal`へのtarget限定写像、TLS SAN、自己署名fixtureまたは本物の秘密の境界が固定されていない。
 - benchmarkの実行方法、target、result/failure契約が分からない。
 - frontend buildが必要なのに、生成物、package manager、lockfile、build command、配置先のいずれかが不明である。
 - mutableな`latest`、floating tag、`most_recent`、幅付きversion制約をartifact入力のまま使う。

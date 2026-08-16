@@ -29,6 +29,14 @@ GoLandがディレクトリ名`vendor`をGoのvendoring規約として誤認識�
 - 各upstreamディレクトリには取り込み元のLICENSEをそのままコピーする。コピーライト行がリポジトリごとに
   異なる(isucon14は「2024 ISUCON14 Contributors」、isucon14-portalは「2022 ISUCON」)ため、
   1つのLICENSEファイルに統合しない
+- `upstream/<取り込み元リポジトリ名>/`は公式sourceの不変mirrorではなく、Application、benchmark、frontend等の
+  自分で保守するコードを置くtreeとする。対象過去問の専用worktree/sessionは、自分のtargetに対応する
+  `upstream/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。公式の起点commit、取り込み範囲、除外範囲、
+  local変更は各upstreamの`NOTICE.md`へ記録し、他過去問の同名pathへは触れない
+- 自分で保守しない画像・静的assetと`sql/`・初期データは原則としてupstreamへcommitせず、過去問ごとに必要pathを
+  特定して、frontend artifact buildまたはprovisioningの消費前に公式repositoryのexact commitから直接取得する。
+  取得元・commit・subpathを固定し、LICENSEを伴う実ファイルとして保守対象コードへmergeする。`upstream/isucon14/NOTICE.md`と
+  `kakomon14/provisioning/50-source.sh`を構造上の参考にするが、除外pathは対象upstreamを監査して個別に決める
 - `packer/`・`provisioning/`・`cloud-init/`等の完全自作物にはisucon側のLICENSEを適用しない
   (このリポジトリ自体のLICENSEに従う)
 - 本家から直接fetchするファイル・値(`0-init.sql`が作る`isucon`DBユーザー、`env.sh`の
@@ -75,6 +83,20 @@ isucon14公式リポジトリから読み取り専用データを直接取得す
 ディレクトリを切ると`ci:shellcheck`のようにコロン区切りの名前空間になる。既存の名前空間は
 `kakomon14:*`(過去問固有)・`packer:*`(Packerインフラ共通)・`ci:*`(lint類)。
 新規タスクもこの分類に沿わせる。
+
+## 新規過去問の共通platform・domain方針
+
+- 新しくkakomon化するAMI recipeはUbuntu 26.04 arm64を採用値とし、Application、benchmark、OS package、
+  補助serviceをtarget自身で検証する。非互換時にamd64や古いUbuntuへ自動fallbackせず、component別の失敗証拠を示して停止する
+- Packerの調査でbase AMI候補を検索してよいが、build入力はUbuntu 26.04 arm64のexact image IDへ固定する。
+  `most_recent`、architecture違い、旧OSをartifact入力へ残さない
+- 本家に`isucon.net`、`*.isucon.dev`、`*.isucon.local`等の競技用domainがある場合は、元のsubdomain構造を保って
+  `isuren.internal`配下へ移す。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckを
+  1つのhostname contractへ束縛し、repository全体の一括置換はしない
+- 個人練習用の自己署名server certificateとprivate keyは、公開テストfixtureであることを明記し、modeを制限する場合に限り
+  common Golden/AMIへ含めてよい。Public AMIでは誰でもprivate keyを取得可能なため、mTLS、Portal認証、信頼済み証明書、
+  credentialを扱う通信には流用しない。これらの本物の秘密とmachine/role固有identityは従来どおりimageへ焼き込まない
+- 既存の公開済みProblemVersion/manifest bytes・digestは書き換えず、新domainは別identityで扱う
 
 ## mise運用上のハマりどころ
 

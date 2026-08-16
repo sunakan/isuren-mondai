@@ -16,7 +16,7 @@
 | 項目 | 内容 |
 |---|---|
 | identity | edition、variant、canonical slug、Go版の範囲 |
-| workspace | topic worktreeとmain worktreeの絶対path、branch、base full SHA、変更許可path、main統合権限 |
+| workspace | topic worktreeとmain worktreeの絶対path、branch、base full SHA、target専用の`kakomon*/**`・`upstream/**`・`mise-tasks/**`変更許可path、main統合権限 |
 | audit cache | main checkout配下の絶対path、remote、HEAD、dirty状態 |
 | official source | URL、exact full SHA/tag、license/notice |
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
@@ -62,8 +62,11 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 ### 変更範囲
 
 - canonical target directoryの`provisioning/`、`cloud-init/`、`packer/`、`scripts/`を作る。
-- このsliceではtarget directory配下だけを変更する。`mise-tasks/**`、`upstream/**`、repository-wide fileが必要なら実装を広げずscope expansionとして報告する。
-- 他の`kakomon*/**`を変更しない。`kakomon14/**`は統合済みcommit treeを参照するだけにする。
+- 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
+- `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
+- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、対象ごとのsubpathをfrontend artifact buildまたはprovisioningの消費前に公式repositoryのexact commitから直接取得する。取得後は保守対象コードと実ファイルで統合し、取得用checkoutをartifactへ残さない。
+- `upstream/isucon14/NOTICE.md`、`kakomon14/provisioning/50-source.sh`、`mise-tasks/kakomon14/{refresh-upstream,diff}`は構造上の参考に限る。除外pathとlocal変更はtarget自身の監査で決め、公式更新で保守中の差分を黙って上書きしない。
+- 他targetの`kakomon*/**`、`upstream/**`、`mise-tasks/**`を変更しない。repository-wide fileが必要なら実装を広げずscope expansionとして報告する。`kakomon14/**`とその対応rootは統合済みcommit treeを参照するだけにする。
 - audit cacheと2つの参考repoを変更しない。
 - 非重複として明示されたactive worktreeは存在だけでblockerにしないが、その内容、branch、artifact、VM、resourceへ触れない。
 
@@ -83,6 +86,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 次が揃った場合だけ実装をcommitし、`all-sh-slice-committed`とする。
 
 - official source identityとlicense/noticeが固定されている。
+- targetのmanaged upstreamと公式直接取得データの境界、baseline/local差分、取得subpathが`NOTICE.md`とprovisioningで一致している。
 - `all.sh`の全呼出先が存在し、空stubではなく、順序と依存が監査済みである。
 - ApplicationとbenchmarkのGo build責任が明示されている。
 - frontendが必要ならbuild、hash/manifest、benchmark build、配置の順序が証拠と一致する。
@@ -100,6 +104,15 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - upstreamがmajor/rangeしか指定しない場合は、互換試験候補を提示して`decision-required`にする。`node = "lts"`や`latest`を採用しない。
 - frontend package managerとversionをupstreamに合わせ、KAKOMON14のpnpmを他editionへ自動移植しない。
 - frontend成果物をAMI外でbuildするかAMI内でbuildするかはcurrent planに従う。生成物、license、exact tag/tree、SHA-256、配置先が欠ければ停止する。
+
+## OS、architecture、domain
+
+- Ubuntu 26.04 arm64を採用値にし、Application、benchmark、package、DB/proxy/DNS等をtarget自身で検証する。非互換時はamd64・旧Ubuntuへfallbackせず、失敗componentと証拠を報告して停止する。
+- Packerのbase image探索結果をbuild入力へ直接流さず、Ubuntu 26.04 arm64のexact image IDを固定する。`most_recent`、architecture違い、旧OSを許可しない。
+- upstreamの競技用domainを列挙し、該当する場合は元のsubdomainを保って`isuren.internal`へ写像する。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckを単一contractにする。
+- target限定patchだけを使い、一括置換、alias、fallback、published identityの上書きをしない。
+- 個人練習用の自己署名server key/certificateをcommon imageへ含める場合は、公開テストfixtureとしてmode、fingerprint、用途を記録する。mTLS、Portal認証、信頼済みcertificate、credential-bearing trafficに使わず、本物の秘密やmachine/role固有identityを含めない。
+- old planでOS、architecture、domainが未決・未記載でも、この共通方針を採用済み入力としてpromptへ記録する。互換性不足は`decision-required`ではなく`evidence-missing`とし、Red/Green失敗時に停止する。
 
 ## Git、セルフレビュー、main統合
 

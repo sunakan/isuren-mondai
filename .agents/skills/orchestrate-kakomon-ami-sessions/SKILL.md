@@ -35,6 +35,8 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - 調査cacheはmain checkout配下の絶対pathを使う。例: `/Users/user01/works/github.com/sunakan/aws-bastion/isuren-mondai/tmp/all-kakomon/isucon13`。
 - `tmp/all-kakomon/**`をread-only audit cacheとして扱い、build sourceやartifact provenanceにしない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
+- 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
+- `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するコードtreeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。編集しない画像・静的asset、`sql/`、初期データはcommitせず、frontend artifact buildまたはprovisioningの消費前に公式exact commitから直接取得する。
 - `/Users/user01/works/github.com/matsuu/cloud-init-isucon`と`/Users/user01/works/github.com/matsuu/aws-isucon`はreference-onlyとし、毎回HEAD、remote、dirty状態を記録する。dirty差分を採用しない。
 
 ## 並行性を制御する
@@ -44,7 +46,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - current target planまたはユーザーの明示的な再優先順位付けを、古い一般的な展開順より優先する。明示判断のない依存gateを「worktreeが分かれている」だけで迂回しない。
 - active worktreeがあっても、targetの変更path・artifact・VM・resource namespaceと重ならなければ、それだけで停止しない。所有外worktreeの内容や生成物には触れない。
 - 最初の3問は独立recipeを保ち、共通libraryを先回りして作らない。
-- 他の`kakomon*/**`、特に`kakomon14/**`を変更しない。repository-wide変更が必要なら別planへ分離する。
+- 他targetの`kakomon*/**`、`upstream/**`、`mise-tasks/**`、特にKAKOMON14の対応pathを変更しない。repository-wide変更が必要なら別planへ分離する。
 
 ## runtime方針を固定する
 
@@ -54,6 +56,15 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - 統合済みKAKOMON14のruntime config/lockは構造上の比較元に限る。KAKOMON14のApplication、benchmark、Goss、Orb、AMI再検証を、独立targetのrepository-only audit/実装の入口条件にしない。
 - 各targetがGo 1.26.6のofficial URL・architecture別SHA-256・config/lockを独立に固定し、Applicationとbenchmarkをtarget自身のvalidationで確認する。KAKOMON14の成功・失敗証拠を流用しない。
 - Node.jsは対象upstreamの証拠からexact versionを決める。`latest`、`lts`、major/rangeだけの指定をartifact入力にしない。
+
+## platformとhostnameを固定する
+
+- 全targetの採用platformをUbuntu 26.04 arm64とし、Application、benchmark、OS package、DB/proxy/DNS等をtarget自身で検証する。非互換でもamd64や旧Ubuntuへ自動fallbackせず、component別証拠を示して停止する。
+- base AMIは調査時の検索とbuild入力を分け、artifactではUbuntu 26.04 arm64のexact image IDを固定する。`most_recent`を残さない。
+- upstreamに`isucon.net`、`*.isucon.dev`、`*.isucon.local`等の競技用domainがあれば、元のsubdomain構造を保って`isuren.internal`配下へ写像する。DNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckをtarget限定patchで一致させる。
+- repository全体の一括置換、旧hostname alias/fallback、既存published identityの上書きを禁止する。
+- 個人練習用の自己署名server key/certificateは、公開テストfixtureと明記し、権限を制限する場合だけcommon imageへ含めてよい。mTLS、Portal認証、信頼済みcertificate、credential-bearing trafficへ流用せず、本物の秘密とmachine/role固有identityは焼き込まない。
+- 古いtarget planにOS、architecture、domain方針が未記載であることだけを`decision-required`にしない。この共通方針を採用済み入力とし、互換性を`evidence-missing`としてRed/Greenする。planが別の採用値を明記している場合だけ衝突として停止する。
 
 ## モデルと推論レベルを提案する
 

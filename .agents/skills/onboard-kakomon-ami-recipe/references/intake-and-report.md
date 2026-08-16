@@ -9,7 +9,9 @@
 | identity | edition、Qualify/Final等のvariant、Go版など対象実装 |
 | provenance | official upstream URL、exact commit/tag、license/notice |
 | audit evidence | ローカルaudit cloneの絶対pathとHEAD/remote、参考実装の絶対pathとprovenance |
-| artifact | architecture、provider、OS/base image方針、edition固有recipe identity |
+| managed source | `upstream/<official-repo-name>`のbaseline、取り込み・除外範囲、local変更、公式から直接取得する画像・静的asset・`sql/`・初期データのsubpath |
+| artifact | Ubuntu 26.04 arm64、provider、exact base image ID方針、edition固有recipe identity、非互換時の停止証拠 |
+| hostname/TLS | upstreamの競技用domain、`isuren.internal`写像、DNS/hosts・proxy・SAN・cookie・benchmark整合、自己署名fixtureまたは本物の秘密の境界 |
 | topology | compact topology、canonical topology、各nodeのrole/network/port |
 | benchmark | 配置先、build/実行方法、target指定、result/failureの構造、必要データ |
 | runtime | 統合済みKAKOMON14比較元、upstream指定、採用候補、checksum/lock方針 |
