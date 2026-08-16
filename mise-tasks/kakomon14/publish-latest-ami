@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="最新のkakomon14 AMIとスナップショットをPublicに公開する"
+#MISE description="AMIとsnapshotをPublic公開する (kakomon14独自: 最新AMIを公開; interactive)"
 #MISE interactive=true
 set -euo pipefail
 
