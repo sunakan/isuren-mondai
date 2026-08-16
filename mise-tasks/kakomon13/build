@@ -56,7 +56,8 @@ export FRONTEND_RELEASE_TAG="${KAKOMON13_FRONTEND_RELEASE_TAG}"
 user_data="$(mktemp)"
 python3 kakomon13/cloud-init/generate-user-data.py --output "${user_data}"
 
-packer init kakomon13/packer/kakomon13.pkr.hcl
+cd kakomon13/packer
+packer init kakomon13.pkr.hcl
 BUILD_LOG="$(mktemp)"
 trap 'rm -f "${BUILD_LOG}" "${user_data}" frontend-release-tag.txt frontend-release-sha256.txt' EXIT
 
@@ -74,7 +75,7 @@ packer build \
   -var "user_data_file=${user_data}" \
   -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
   -var "recipe_tree=${RECIPE_TREE}" \
-  kakomon13/packer/kakomon13.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
+  kakomon13.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
 BUILD_END_EPOCH="$(date +%s)"
 
 if [ "${BUILD_EXIT}" -eq 0 ]; then
