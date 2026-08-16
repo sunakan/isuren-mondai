@@ -16,7 +16,7 @@
 
 ## verify開始前のartifact gate
 
-外部VM/EC2へ変更を加える前に、local worktreeがcleanで、検証対象recipe commitがremote repositoryからexact SHAで取得可能であることを確認する。local HEADとremote mainの完全一致は要求しない。recipeがexternal frontendを要求する場合だけremote tag/公開Release/期待asset/published SHA-256を確認し、workflowまたはReleaseがない場合は`blocked`としてpartial provisioningを始めない。
+外部VM/EC2へ変更を加える前に、local worktreeがcleanで、検証対象recipe commitがremote repositoryからexact SHAで取得可能であることを確認する。local HEADとremote mainの完全一致は要求しない。recipeがexternal frontendを要求する場合だけremote tag/公開Release/期待asset/published SHA-256を確認し、target-scoped `latest` selectorなら実際に解決されたtag/digestも記録する。workflowまたはReleaseがない場合は`blocked`としてpartial provisioningを始めない。
 
 local `dist/`、別targetのRelease、過去のdownload済みarchiveを代用しない。公式source/dataやofficial prebuilt frontendをbuild instance内でexact identityから取得する契約と、こちらでfrontendをbuildしてCI/Release配布する契約を別々に守る。前者ではlocal `dist/`が存在しなくても正常とする。
 

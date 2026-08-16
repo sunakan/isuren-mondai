@@ -6,10 +6,12 @@ that data against `official-data.manifest.sha256`; `tmp/all-kakomon` is never
 read by cloud-init or Packer.
 
 The frontend is built outside the image with Node 24.19.0 and Yarn 3.2.2 and is
-not tracked by Git. Provisioning requires an exact GitHub Release tag and
-archive SHA-256, verifies the archive and its internal file manifest, copies
-that manifest into the benchmark source, builds the benchmark with Go 1.26.6,
-and only then installs the frontend and data into their final locations.
+not tracked by Git. Provisioning resolves the target-scoped `latest` selector
+to a `kakomon13-frontend-*` GitHub Release, verifies the archive with its
+published outer SHA-256 asset and internal file manifest, copies that manifest
+into the benchmark source, builds the benchmark with Go 1.26.6, and only then
+installs the frontend and data into their final locations. The resolved tag and
+archive digest are persisted for provenance and the AMI build host.
 Go is installed and invoked through the same home-owned mise layout as
 KAKOMON14; `/opt/go-*` and `/usr/local/bin/go` are not part of this recipe.
 The mise v2026.8.6 Linux arm64 binary is fetched on the image builder from its

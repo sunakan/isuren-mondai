@@ -6,20 +6,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 # Build inputs are validated before any target step changes the image. This
-# keeps the provisioning log and completion marker bound to exact identities.
+# keeps the provisioning log and completion marker bound to the exact recipe
+# commit and the target-scoped frontend Release selector.
 : "${RECIPE_COMMIT:?RECIPE_COMMIT must be the full project commit}"
-: "${FRONTEND_RELEASE_TAG:?FRONTEND_RELEASE_TAG must be an exact release tag}"
-: "${FRONTEND_RELEASE_SHA256:?FRONTEND_RELEASE_SHA256 must be an exact SHA-256}"
+: "${FRONTEND_RELEASE_TAG:=latest}"
 [[ "${RECIPE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
   echo "error: RECIPE_COMMIT is not a full lowercase Git SHA" >&2
   exit 1
 }
-[[ "${FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+[[ "${FRONTEND_RELEASE_TAG}" == "latest" ||
+  "${FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
   echo "error: FRONTEND_RELEASE_TAG is invalid" >&2
-  exit 1
-}
-[[ "${FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
-  echo "error: FRONTEND_RELEASE_SHA256 is invalid" >&2
   exit 1
 }
 

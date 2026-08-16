@@ -27,7 +27,7 @@
 - Ubuntu 26.04 arm64でのpackage repository、binary、systemd、kernel/library互換性を調べ、amd64・旧Ubuntu前提をRed項目にする。
 - AWS profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupで`ap-northeast-1`が明示され、別regionのAMI IDや暗黙のdefault regionを使わないことを確認する。
 - upstream指定のGo/frontend/runtimeと統合済みKAKOMON14のexactな採用値・lockを比較する。
-- `latest`、floating tag、range、`most_recent`、未固定package repositoryを列挙する。
+- `latest`、floating tag、range、`most_recent`、未固定package repositoryを列挙する。target-scoped `latest` selectorは、候補prefix、解決後のtag、asset/checksumまたはpublished digest、provenance/AMI tagへの記録を別途確認する。
 
 ## 3. frontend
 
@@ -37,7 +37,7 @@
 - package manager、lockfile、workspace設定、install/build command、環境変数を確認する。
 - 生成物、hash/file manifest、archive、license、配置先、配信service、cache invalidationを確認する。
 - buildをAMI内、ローカル/CI、release artifactのどこで行うかと、そのexact identity/checksumを確認する。
-- CI/Release配布ならtarget固有workflow、tag filter、asset名、公開Release/digestのverify入口を確認する。build scriptだけをdelivery完成としない。
+- CI/Release配布ならtarget固有workflow、tag filter、asset名、公開Release/digestのverify入口を確認する。`latest`を使う場合はtarget prefixだけを候補にし、解決後のtag/digestを記録する。build scriptだけをdelivery完成としない。
 - prebuilt frontendならsource URL、full commit、Git tree、file manifest、SHA-256、license、配置先を固定し、生成済みfileをbyte-for-byte扱う。HTML/bundleがservice workerを登録しているか、CDN/絶対domain参照がruntime到達可能かを区別し、dormant referenceを文字列だけで削除・置換しない。activeな絶対domain依存は再buildや一括置換で回避せず停止条件にする。
 
 ## 4. benchmarkとresult

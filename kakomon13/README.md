@@ -7,16 +7,17 @@ initial data are not tracked by Git. Provisioning retrieves required paths from
 the exact official commit and verifies the committed file manifest. The
 frontend is built outside the image with Node 24.19.0 and Yarn 3.2.2: Vite
 writes `upstream/isucon13/frontend/dist/`, while release files are assembled in
-the ignored `kakomon13/dist/` directory and distributed through an exact-tagged
+the ignored `kakomon13/dist/` directory and distributed through a target-scoped
 GitHub Release.
 
 ## AMI build
 
 The normal build command loads the reviewed Ubuntu 26.04 arm64 source AMI and
-the exact frontend Release tag/SHA-256 from
+the target-scoped frontend Release selector from
 `kakomon13/scripts/ami-inputs.env`; no environment-variable export is needed.
-When promoting a new source image or frontend Release, update that text file
-after the external identity has been reviewed and published.
+The default `latest` selector resolves only `kakomon13-frontend-*` Releases
+inside the AMI build. The resolved tag and archive SHA-256 are verified,
+recorded in provenance, and added to the AMI tags.
 
 ## Frontend Release
 
@@ -31,8 +32,8 @@ The workflow fetches the non-managed image assets from the exact official
 commit inside its runner; no local artifact upload is required.
 
 The Release contains `kakomon13-frontend.tar.gz`, its outer SHA-256 file, and
-the frontend file manifest. The archive digest is recorded in
-`kakomon13/scripts/ami-inputs.env` for the AMI build.
+the frontend file manifest. The AMI build downloads the outer checksum asset,
+then records the resolved tag and digest after successful verification.
 
 ## Hostname and external-media boundary
 

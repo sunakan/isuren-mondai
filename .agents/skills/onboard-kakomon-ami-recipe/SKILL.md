@@ -50,6 +50,8 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 - AMI/EC2側では、User Dataから公式source・package・Release等を取得してよい。`all.sh`は`traceparent`・時刻・ディスク量・step結果などのraw telemetryだけをログへ出し、API keyやOTLP送信をAMIへ持ち込まない。Packer完了後にhost-side taskがbuild logからroot/child spanを作り、元のPacker終了コードを返す。
 - `all.sh`のraw telemetry prefix/marker、PackerのGoss/span抽出範囲、host-side OTel parserは一つのlog contractとして扱う。ログ文言やtarget prefixを変更したら、抽出範囲とparserのfixture/静的検証も同じtask単位で更新する。
 - コメントも共通責務の境界、実行順、失敗時の挙動、秘密・生成物の境界を同じ型で書く。ただしofficial provenance、hostname、service、frontend、benchmark等のtarget固有の根拠は、差分を減らすためだけに削除しない。
+- frontend Release selectorはtarget prefix単位で解決する。KAKOMON13とKAKOMON14はそれぞれ`kakomon13-frontend-*`・`kakomon14-frontend-*`だけを候補にし、version番号やtag名を過去問間で揃える必要はない。各targetに一つ以上のtarget固有Releaseがあればよく、別targetのReleaseを代用しない。
+- `latest`を採用するtargetは、AMI側でtarget prefixから具体的なtagを解決し、Releaseのasset/checksumまたはpublished digestで検証してから配置する。解決後のtag・artifact digestをprovenanceとAMI/build-hostの観測境界へ記録し、repository全体の`/releases/latest`や記録なしの可変downloadは使わない。
 - taskごとに変更前後のpaired task diff、descriptionの一致、同じrelative pathの一覧、完全一致ファイル数、残したtarget固有差分、差分行数を記録する。差分が減ったことと、target固有契約を壊していないことを別々に確認する。
 - Go test等のlocal validationがhost cacheの権限で失敗した場合は、コード失敗と断定せず、task専用の一時`GOCACHE`で再実行して結果を分けて記録する。
 
@@ -57,7 +59,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - [検証gate](references/verification-gates.md)を読み、依頼されたgateだけを実施する。
 - 一つの成功を別gateの成功へ読み替えない。gateごとにartifact identity、recipe digest、環境、証拠、cleanupを記録する。
-- external frontendを使う場合は検証対象recipe commitがremoteから取得可能で、target固有Release asset/digestが存在することをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。local mainとremote mainの完全一致は要求しない。
+- external frontendを使う場合は検証対象recipe commitがremoteから取得可能で、target固有Release asset/digestが存在することをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。`latest` selectorの場合はtarget prefixでの解決結果と実asset digestを確認する。local mainとremote mainの完全一致は要求しない。
 - Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。AWS regionは東京`ap-northeast-1`へ固定する。
 - 承認のない外部操作、対象不明なcleanup、秘密情報の表示を行わない。
 
@@ -81,7 +83,7 @@ Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、競技用domainが存在す�
 - benchmarkの実行方法、target、result/failure契約が分からない。
 - frontendをこちらでbuildするのか、official prebuiltをbyte-for-byte使うのかが未分類である。buildが必要なら生成物、package manager、lockfile、build command、配置先のいずれかが不明、prebuiltならexact commit/tree/file manifest/SHA-256/licenseまたはruntime外部依存の調査が不足している。
 - external frontend配布なのに、target固有workflow、remote exact tag、期待asset、published SHA-256のいずれかがなく、外部verifyを開始しようとしている。
-- mutableな`latest`、floating tag、`most_recent`、幅付きversion制約をartifact入力のまま使う。
+- target prefix・resolved tag・asset digestの記録/検証がないmutableな`latest`、floating tag、`most_recent`、幅付きversion制約をartifact入力のまま使う。target-scoped `latest` selector自体は、解決後のidentityをprovenance/AMI tagへ残す場合に限り採用できる。
 - 未統合KAKOMON14や別worktreeの値に依存する。
 - 外部操作のpreflight、承認、費用・TTL・cleanup境界が欠けている。
 

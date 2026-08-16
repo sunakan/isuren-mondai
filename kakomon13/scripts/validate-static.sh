@@ -17,6 +17,7 @@ while IFS= read -r path; do
   case "${path}" in
     kakomon13/* | upstream/isucon13/* | mise-tasks/kakomon13/*) ;;
     .github/workflows/release-kakomon13-frontend.yml) ;;
+    .agents/skills/onboard-kakomon-ami-recipe/*) ;;
     .agents/skills/orchestrate-kakomon-ami-sessions/*) ;;
     *) fail "changed path is outside the approved roots: ${path}" ;;
   esac
@@ -55,10 +56,9 @@ test -f "${ami_inputs}" || fail "missing KAKOMON13 AMI inputs"
 # shellcheck source=kakomon13/scripts/ami-inputs.env
 source "${ami_inputs}"
 [[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || fail "invalid KAKOMON13 source AMI input"
-[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" == "latest" ||
+  "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
   fail "invalid KAKOMON13 frontend Release tag input"
-[[ "${KAKOMON13_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] ||
-  fail "invalid KAKOMON13 frontend Release SHA-256 input"
 test "$(wc -l <"${official_manifest}" | tr -d ' ')" = 205 || fail "official data manifest count changed"
 test "$(wc -l <"${frontend_asset_manifest}" | tr -d ' ')" = 12 || fail "frontend asset manifest count changed"
 rg -v '^[0-9a-f]{64}  [^[:space:]]+$' "${official_manifest}" "${frontend_asset_manifest}" &&
@@ -191,8 +191,13 @@ if rg -n 'most_recent|= "(?:latest|lts)"|version\s*=\s*"~>' \
 fi
 grep -qF 'version = "= 1.8.2"' kakomon13/packer/kakomon13.pkr.hcl
 rg -q 'source_ami\s*=\s*var\.source_ami' kakomon13/packer/kakomon13.pkr.hcl
-rg -q 'FRONTEND_RELEASE_TAG.*exact' kakomon13/provisioning/all.sh
-rg -q 'FRONTEND_RELEASE_SHA256.*exact' kakomon13/provisioning/all.sh
+# shellcheck disable=SC2016 # This is the literal default selector contract.
+grep -qF ': "${FRONTEND_RELEASE_TAG:=latest}"' kakomon13/provisioning/all.sh
+grep -qF 'kakomon13-frontend-' kakomon13/provisioning/60-frontend.sh
+grep -qF 'kakomon13-frontend.tar.gz.sha256' kakomon13/provisioning/60-frontend.sh
+grep -qF 'RESOLVED_SHA256_FILE' kakomon13/provisioning/60-frontend.sh
+grep -qF '/tmp/kakomon13-frontend-release-tag' kakomon13/packer/kakomon13.pkr.hcl
+grep -qF '/tmp/kakomon13-frontend-release-sha256' kakomon13/packer/kakomon13.pkr.hcl
 # shellcheck disable=SC2016 # This is the exact source text required by the contract.
 grep -qF 'test "$(runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"' \
   kakomon13/provisioning/50-source.sh ||

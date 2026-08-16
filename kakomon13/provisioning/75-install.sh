@@ -10,6 +10,15 @@ ISUREN_HOME="/home/${ISUREN_USER}"
 STAGING_DIR="${ISUREN_HOME}/.kakomon13-staging"
 PUBLIC_DIR="${ISUREN_HOME}/webapp/public"
 OFFICIAL_MANIFEST="${SCRIPT_DIR}/official-data.manifest.sha256"
+RESOLVED_TAG_FILE="/tmp/kakomon13-frontend-release-tag"
+RESOLVED_SHA256_FILE="/tmp/kakomon13-frontend-release-sha256"
+
+test -s "${RESOLVED_TAG_FILE}"
+test -s "${RESOLVED_SHA256_FILE}"
+FRONTEND_RELEASE_TAG="$(cat "${RESOLVED_TAG_FILE}")"
+FRONTEND_RELEASE_SHA256="$(cat "${RESOLVED_SHA256_FILE}")"
+[[ "${FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+[[ "${FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
 
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${PUBLIC_DIR}" "${ISUREN_HOME}/webapp/sql" "${ISUREN_HOME}/webapp/img"

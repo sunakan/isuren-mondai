@@ -13,17 +13,16 @@ CLONE_DIR = "/opt/isuren-mondai"
 PROVISIONING_DIR = f"{CLONE_DIR}/kakomon13/provisioning"
 
 
-def build_cloud_config(
-    commit: str, traceparent: str, frontend_release_tag: str, frontend_release_sha256: str
-) -> dict:
+def build_cloud_config(commit: str, traceparent: str, frontend_release_tag: str) -> dict:
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("PROJECT_COMMIT must be a full lowercase Git SHA")
     if traceparent and not re.fullmatch(r"00-[0-9a-f]{32}-[0-9a-f]{16}-01", traceparent):
         raise ValueError("TRACEPARENT has an invalid format")
-    if not re.fullmatch(r"kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+", frontend_release_tag):
-        raise ValueError("FRONTEND_RELEASE_TAG must be one exact semantic-version tag")
-    if not re.fullmatch(r"[0-9a-f]{64}", frontend_release_sha256):
-        raise ValueError("FRONTEND_RELEASE_SHA256 must be one exact lowercase SHA-256")
+    if not (
+        frontend_release_tag == "latest"
+        or re.fullmatch(r"kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+", frontend_release_tag)
+    ):
+        raise ValueError("FRONTEND_RELEASE_TAG must be latest or one exact semantic-version tag")
     return {
         "runcmd": [
             f"git init --quiet {CLONE_DIR}",
@@ -33,7 +32,6 @@ def build_cloud_config(
             (
                 f"env RECIPE_COMMIT={commit} TRACEPARENT={traceparent} "
                 f"FRONTEND_RELEASE_TAG={frontend_release_tag} "
-                f"FRONTEND_RELEASE_SHA256={frontend_release_sha256} "
                 f"bash {PROVISIONING_DIR}/all.sh"
             ),
             f"rm -rf {CLONE_DIR}",
@@ -49,7 +47,6 @@ def main() -> None:
         os.environ["PROJECT_COMMIT"],
         os.environ.get("TRACEPARENT", ""),
         os.environ["FRONTEND_RELEASE_TAG"],
-        os.environ["FRONTEND_RELEASE_SHA256"],
     )
     args.output.write_text(
         "#cloud-config\n" + yaml.safe_dump(config, allow_unicode=True, sort_keys=False, width=4096)

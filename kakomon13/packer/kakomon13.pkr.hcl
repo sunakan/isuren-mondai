@@ -44,22 +44,6 @@ variable "recipe_tree" {
   type = string
 }
 
-variable "frontend_release_tag" {
-  type = string
-  validation {
-    condition     = can(regex("^kakomon13-frontend-v[0-9]+\\.[0-9]+\\.[0-9]+$", var.frontend_release_tag))
-    error_message = "Frontend release tag must be one exact kakomon13 semantic-version tag."
-  }
-}
-
-variable "frontend_release_sha256" {
-  type = string
-  validation {
-    condition     = can(regex("^[0-9a-f]{64}$", var.frontend_release_sha256))
-    error_message = "Frontend release SHA-256 must be one exact lowercase digest."
-  }
-}
-
 locals {
   build_time    = timestamp()
   name          = "isuren/kakomon13-${formatdate("YYYYMMDD'T'hhmmss", local.build_time)}Z"
@@ -72,8 +56,6 @@ locals {
     SourceAMI    = var.source_ami
     OS           = "ubuntu-26.04-resolute-arm64"
     Architecture = "arm64"
-    FrontendTag  = var.frontend_release_tag
-    FrontendSHA  = var.frontend_release_sha256
     OfficialData = "5c2ffa78c28cfc4600a8f4bb38a5d0980ed770da7260b6a0c2f89c1f3e2fe043"
     Timestamp    = local.timestamp_jst
   }
@@ -116,10 +98,25 @@ build {
     ]
   }
 
+  # 60-frontend.shが解決した具体的なtagとarchive SHA-256をbuild hostへ戻し、
+  # AMI作成後にmise taskがFrontend/FrontendSHA256 tagとして記録する。
+  provisioner "file" {
+    source      = "/tmp/kakomon13-frontend-release-tag"
+    destination = "${path.root}/frontend-release-tag.txt"
+    direction   = "download"
+  }
+
+  provisioner "file" {
+    source      = "/tmp/kakomon13-frontend-release-sha256"
+    destination = "${path.root}/frontend-release-sha256.txt"
+    direction   = "download"
+  }
+
   provisioner "shell" {
     inline = [
       "test ! -e /etc/nginx/tls/pipe.u.isuren.internal.key",
       "test ! -e /home/isuren/env.sh",
+      "sudo rm -f /tmp/kakomon13-frontend-release-tag /tmp/kakomon13-frontend-release-sha256",
       "sudo truncate -s 0 /home/ubuntu/.ssh/authorized_keys",
       "sudo truncate -s 0 /etc/machine-id",
       "sudo rm -f /etc/ssh/ssh_host_*",

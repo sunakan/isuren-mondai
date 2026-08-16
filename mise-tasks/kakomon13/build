@@ -36,23 +36,20 @@ ROOT_SPAN_ID="$(openssl rand -hex 8)"
 TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
 export TRACEPARENT
 
-# Target-local text inputs keep the AMI and frontend Release identity exact and reviewable.
+# Target-local text inputs keep the source AMI exact and the frontend Release
+# selector target-scoped and reviewable.
 # shellcheck source=kakomon13/scripts/ami-inputs.env
 source kakomon13/scripts/ami-inputs.env
 [[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
   echo "error: KAKOMON13_SOURCE_AMI_ID is not an exact AMI ID" >&2
   exit 1
 }
-[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" == "latest" ||
+  "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
   echo "error: KAKOMON13_FRONTEND_RELEASE_TAG is invalid" >&2
   exit 1
 }
-[[ "${KAKOMON13_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
-  echo "error: KAKOMON13_FRONTEND_RELEASE_SHA256 is invalid" >&2
-  exit 1
-}
 export FRONTEND_RELEASE_TAG="${KAKOMON13_FRONTEND_RELEASE_TAG}"
-export FRONTEND_RELEASE_SHA256="${KAKOMON13_FRONTEND_RELEASE_SHA256}"
 
 # user-dataはprovisioning/配下から再生成可能なためGit管理していない。ビルドのたびに最新化し、
 # 生成し忘れによる古いrecipeでのビルドを防ぐ。
@@ -61,7 +58,7 @@ python3 kakomon13/cloud-init/generate-user-data.py --output "${user_data}"
 
 packer init kakomon13/packer/kakomon13.pkr.hcl
 BUILD_LOG="$(mktemp)"
-trap 'rm -f "${BUILD_LOG}" "${user_data}"' EXIT
+trap 'rm -f "${BUILD_LOG}" "${user_data}" frontend-release-tag.txt frontend-release-sha256.txt' EXIT
 
 # buildログを画面に出しつつファイルにも残す(AMI ID抽出・span化のため)。
 # packer buildのexit codeをOTel送信のために明示的に捕まえた上でtaskを継続させる。
@@ -77,10 +74,33 @@ packer build \
   -var "user_data_file=${user_data}" \
   -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
   -var "recipe_tree=${RECIPE_TREE}" \
-  -var "frontend_release_tag=${FRONTEND_RELEASE_TAG}" \
-  -var "frontend_release_sha256=${FRONTEND_RELEASE_SHA256}" \
   kakomon13/packer/kakomon13.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
 BUILD_END_EPOCH="$(date +%s)"
+
+if [ "${BUILD_EXIT}" -eq 0 ]; then
+  AMI_ID="$(grep -oE 'ami-[0-9a-f]+' "${BUILD_LOG}" | tail -n1)"
+  if [ -z "${AMI_ID}" ] || [ ! -s frontend-release-tag.txt ] || [ ! -s frontend-release-sha256.txt ]; then
+    echo "error: Packer succeeded but resolved frontend identity is missing" >&2
+    BUILD_EXIT=1
+  else
+    RESOLVED_TAG="$(cat frontend-release-tag.txt)"
+    RESOLVED_SHA256="$(cat frontend-release-sha256.txt)"
+    if [[ ! "${RESOLVED_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+      [[ ! "${RESOLVED_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "error: resolved KAKOMON13 frontend identity is invalid" >&2
+      BUILD_EXIT=1
+    else
+      if ! aws ec2 create-tags --region ap-northeast-1 --resources "${AMI_ID}" \
+        --tags \
+          "Key=Frontend,Value=https://github.com/sunakan/isuren-mondai/releases/tag/${RESOLVED_TAG}" \
+          "Key=FrontendSHA256,Value=${RESOLVED_SHA256}"; then
+        BUILD_EXIT=1
+      else
+        echo "AMI tagged: Frontend=${RESOLVED_TAG} FrontendSHA256=${RESOLVED_SHA256}"
+      fi
+    fi
+  fi
+fi
 
 # trace送信はPacker build完了後に行う。送信の成否はBUILD_EXITに影響させない
 # (otel_span/otel_emit_provisioning_spansは失敗しても呼び出し元を落とさない設計)。
