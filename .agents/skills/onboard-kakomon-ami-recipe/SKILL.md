@@ -1,6 +1,6 @@
 ---
 name: onboard-kakomon-ami-recipe
-description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、本家filesystem構成、サービス、runtime/mise、frontend Release、benchmark、topology、seal/reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・PackerとOrb/AWSの独立gateへ段階化する。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、fresh VM/EC2検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
+description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、本家filesystem構成、サービス、runtime/mise、frontend Release、benchmark、topology、seal/reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・PackerとOrb/AWSの独立gateへ段階化する。既存recipe間の共通責務について、別targetのファイルを共有せず処理形・コメント・build host/AMI観測境界を揃える作業にも使う。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、fresh VM/EC2検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
 ---
 
 # 過去問AMI recipeをonboardingする
@@ -35,6 +35,17 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 - target専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけを変更し、managed source、cloud-init、`all.sh`、edition固有step、Goss、mise、Packerを[recipe実装契約](references/recipe-contract.md)どおり分担させる。
 - Red/Green、関連lint/test、自己レビューを行う。未決判断や停止条件に到達したら変更を広げない。
 - `implement`は外部環境操作を許可しない。外部検証は別の`verify`承認を要求する。
+
+## 既存recipe間の共通処理を揃える
+
+既存targetの比較で「問題固有差分ではないのに処理形が違う」箇所を見つけたら、次の方針で差分を減らす。
+
+- 同じscript fileを共有せず、`kakomon13/`・`kakomon14/`等のtarget-owned fileをそれぞれ保つ。共通化するのは責務の境界、処理順、関数分割、入力検証、失敗処理、ログ形式、コメント構造とする。
+- 統合済みKAKOMON14の`mise kakomon14:build`をbuild taskの処理形の参照にする。K13へ移す場合も、target固有のsource AMI、frontend Release、公式source、step列、service名、Goss対象は置き換えず、taskの外枠だけを揃える。
+- build host側では、exact inputを検証し、cloud-init用の小さな一時`user-data`をローカル生成してPackerの`user_data_file`へ渡す。生成処理自体にGitHub/AWS取得を入れず、終了時にtrapで一時ファイルを削除する。`packer init`、AWS API、build後のOTel送信は別のhost-side処理として記録する。
+- AMI/EC2側では、User Dataから公式source・package・Release等を取得してよい。`all.sh`は`traceparent`・時刻・ディスク量・step結果などのraw telemetryだけをログへ出し、API keyやOTLP送信をAMIへ持ち込まない。Packer完了後にhost-side taskがbuild logからroot/child spanを作り、元のPacker終了コードを返す。
+- コメントも共通責務の境界、実行順、失敗時の挙動、秘密・生成物の境界を同じ型で書く。ただしofficial provenance、hostname、service、frontend、benchmark等のtarget固有の根拠は、差分を減らすためだけに削除しない。
+- 比較前後で同じrelative pathの一覧、完全一致ファイル数、残したtarget固有差分、差分行数を記録する。差分が減ったことと、target固有契約を壊していないことを別々に確認する。
 
 ### `verify`
 
