@@ -41,11 +41,14 @@
 
 - main checkoutのsource cacheを検証後、worktree作成直後にclone全体を同名のworktree-local mirrorへ`rsync -a`し、このbootstrapだけは`.git/`を含めている。両cacheのorigin URL、full HEAD、clean状態がofficial identityと一致し、既存宛先や`--delete`を使っていない。
 - bootstrap後のaudit/importはworktree-local mirrorだけから行い、main source cacheを変更・直接利用していない。別sessionがclone / fetch / pull / checkout / reset / cleanでcacheを補正していない。
-- cacheをclean clone、cloud-init、AMI buildの直接build sourceにせず、保守codeはcommit済みmanaged source、非commit dataはmanifest / checksum固定bundleへ変換している。
+- cacheをclean clone、cloud-init、AMI buildの直接build sourceにせず、保守codeだけをcommit済みmanaged sourceにしている。非commit dataは公式exact commitから一時取得してcommit済みmanifestで検証するか、外部Releaseのexact tagとSHA-256へ固定している。
 - official URL、full SHA/tag、license/noticeを固定している。
 - managed upstreamが公式baselineから取り込んだ保守対象コードとlocal変更を追跡し、`NOTICE.md`の範囲・除外・provenanceと実treeが一致する。
-- 編集しない画像・静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、worktree-local mirrorのexact commitとtarget固有subpathから`rsync`し、固定bundleへ変換する。mutable branch、由来不明archiveへfallbackしていない。
-- cache由来データを保守対象コードへ実ファイルで統合し、不要な`.git`、生成物、依存directory、重複sourceをartifactへ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
+- 画像を含むbinary、編集しない静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、worktree-local mirrorのexact commitとtarget固有subpathから一時stagingへ`rsync`している。clean clone側は公式exact commitまたは外部Release exact tag/SHA-256から再取得でき、mutable branchや由来不明archiveへfallbackしていない。
+- build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryがGit管理下にない。生成物はignore済み`dist/`または一時directoryにあり、manifest、checksum、provenanceのtext metadataだけがcommitされている。
+- working treeやbuild先に配置された画像・binaryは、ignore対象であり、stage・commit・merge payloadに含まれていない。配置されていること自体をfindingにしない。
+- binaryまたは成果物のGit管理が必要・望ましいと判断された場合、実装sessionが追加・stage・commit前に停止して人間へ相談している。相談なしにGit管理していたら`blocking`とする。
+- cache由来データを保守対象codeへ実ファイルで統合せず、不要な`.git`、生成物、依存directory、重複sourceを配布物へ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
 - OSとarchitectureがUbuntu 26.04 arm64、AWS regionが`ap-northeast-1`で、profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupのregionが一致している。暗黙のdefault regionへ依存していない。

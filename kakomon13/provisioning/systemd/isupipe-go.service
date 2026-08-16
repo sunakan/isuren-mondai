@@ -1,0 +1,17 @@
+[Unit]
+Description=KAKOMON13 Go Application
+After=mysql.service kakomon13-instance-init.service kakomon13-pdns-zone.service
+Requires=mysql.service kakomon13-instance-init.service kakomon13-pdns-zone.service
+
+[Service]
+WorkingDirectory=/home/isuren/webapp/go
+EnvironmentFile=/etc/isuren/kakomon13/runtime.env
+User=isuren
+Group=isuren
+ExecStart=/home/isuren/webapp/go/isupipe
+ExecStop=/bin/kill -s QUIT $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

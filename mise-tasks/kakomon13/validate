@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="KAKOMON13 recipeのsource/release/domain/order/static contractを検証"
+set -euo pipefail
+kakomon13/scripts/validate-static.sh

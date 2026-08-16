@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="worktree-local official mirrorとKAKOMON13 managed sourceの差分を表示"
+set -euo pipefail
+
+mirror=tmp/all-kakomon/isucon13
+test -d "${mirror}/.git" || {
+  echo "error: worktree-local mirror is missing" >&2
+  exit 1
+}
+test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon13.git"
+test "$(git -C "${mirror}" rev-parse HEAD)" = "8f6afdc3603f0c661368de4659a7240862f59623"
+test -z "$(git -C "${mirror}" status --short)"
+
+diff -ru "${mirror}/webapp/go" upstream/isucon13/webapp/go || true
+diff -ru \
+  --exclude=Dockerfile.dev \
+  --exclude=Dockerfile.prod \
+  --exclude=images \
+  --exclude=NoImage.jpg \
+  "${mirror}/bench" upstream/isucon13/bench || true
+diff -ru \
+  --exclude=node_modules \
+  --exclude=dist \
+  --exclude=img \
+  --exclude=ISUPipe_yoko_color.png \
+  "${mirror}/frontend" upstream/isucon13/frontend || true

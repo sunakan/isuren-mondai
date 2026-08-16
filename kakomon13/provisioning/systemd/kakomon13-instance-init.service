@@ -1,0 +1,11 @@
+[Unit]
+Description=KAKOMON13 per-instance TLS and runtime identity
+Before=nginx.service pdns.service isupipe-go.service kakomon13-pdns-zone.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/kakomon13-instance-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

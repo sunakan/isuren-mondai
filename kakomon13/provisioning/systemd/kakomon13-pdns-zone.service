@@ -1,0 +1,13 @@
+[Unit]
+Description=KAKOMON13 authoritative DNS zone
+After=mysql.service pdns.service kakomon13-instance-init.service
+Requires=mysql.service pdns.service kakomon13-instance-init.service
+Before=isupipe-go.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/kakomon13-pdns-zone
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

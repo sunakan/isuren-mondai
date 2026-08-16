@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="worktree-local公式sourceのidentityとKAKOMON13 file manifestを検証"
+set -euo pipefail
+kakomon13/scripts/verify-official-source.sh

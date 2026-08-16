@@ -70,8 +70,10 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - canonical target directoryの`provisioning/`、`cloud-init/`、`packer/`、`scripts/`を作る。
 - 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
 - `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。worktree-local mirrorの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
-- 編集しない画像・静的asset、`sql/`、初期データはupstreamへcommitせず、worktree-local mirrorのtarget固有subpathからfrontend artifact buildまたはbundle準備前に`rsync`する。このimportでは`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
-- cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildへ渡す非commit dataはfile manifest、official commit、SHA-256を持つ固定bundleへ変換し、`tmp/`を実行時依存にしない。
+- 画像を含むbinary、編集しない静的asset、`sql/`、初期データはupstreamへcommitせず、worktree-local mirrorのtarget固有subpathからfrontend buildまたは検証用stagingへ一時的に`rsync`する。このimportでは`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
+- cacheはlocal搬入元に限る。clean clone、cloud-init、AMI buildが必要とする非commit dataは、公式exact commitから一時取得してcommit済みfile manifestで検証する。frontend等の生成物はignore済み`dist/`へ出力して外部Releaseで配布し、exact tagとSHA-256をbuild入力にする。`tmp/`を実行時依存にしない。
+- build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryをGit管理下へ追加しない。manifest、checksum、provenanceのtext metadataだけはcommitしてよい。Git管理が必要または望ましいと判断した場合は追加・stage・commit前に停止し、対象file、理由、外部配布またはexact source取得の代替案を示して人間へ相談する。
+- 画像や他のbinaryのworking tree / build先への配置は許可するが、配置先がignore対象であり、stage・commit・merge payloadへ入らないことを確認させる。
 - `upstream/isucon14/NOTICE.md`、`kakomon14/provisioning/50-source.sh`、`mise-tasks/kakomon14/{refresh-upstream,diff}`は構造上の参考に限る。除外pathとlocal変更はtarget自身の監査で決め、公式更新で保守中の差分を黙って上書きしない。
 - 他targetの`kakomon*/**`、`upstream/**`、`mise-tasks/**`を変更しない。repository-wide fileが必要なら実装を広げずscope expansionとして報告する。`kakomon14/**`とその対応rootは統合済みcommit treeを参照するだけにする。
 - source cache、worktree-local mirror、2つの参考repoを変更しない。
@@ -93,7 +95,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 次が揃った場合だけ実装をcommitし、`all-sh-slice-committed`とする。
 
 - official source identityとlicense/noticeが固定されている。
-- targetのmanaged upstreamとcacheからrsyncする非commit dataの境界、baseline/local差分、取得subpath、固定bundle identityが`NOTICE.md`とprovisioningで一致している。
+- targetのmanaged upstreamと非commit dataの境界、baseline/local差分、取得subpath、official exact commit、file manifestまたは外部Releaseのexact tag/SHA-256が`NOTICE.md`とbuild/provisioningで一致している。
 - `all.sh`の全呼出先が存在し、空stubではなく、順序と依存が監査済みである。
 - ApplicationとbenchmarkのGo build責任が明示されている。
 - frontendが必要ならbuild、hash/manifest、benchmark build、配置の順序が証拠と一致する。
@@ -110,7 +112,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - Node.jsは「本家に合わせる」を数字の推測で済ませない。`package.json`、`packageManager`、lockfile、CI、`.node-version`等からexact versionを特定する。
 - upstreamがmajor/rangeしか指定しない場合は、互換試験候補を提示して`decision-required`にする。`node = "lts"`や`latest`を採用しない。
 - frontend package managerとversionをupstreamに合わせ、KAKOMON14のpnpmを他editionへ自動移植しない。
-- frontend成果物をAMI外でbuildするかAMI内でbuildするかはcurrent planに従う。生成物、license、exact tag/tree、SHA-256、配置先が欠ければ停止する。
+- frontend成果物をAMI外でbuildするかAMI内でbuildするかはcurrent planに従う。生成物はGit管理せずignore済み`dist/`または一時directoryへ置く。license、exact tag/tree、SHA-256、外部配布先、配置先が欠ければ停止する。
 
 ## OS、architecture、domain
 

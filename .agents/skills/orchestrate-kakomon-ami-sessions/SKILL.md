@@ -35,12 +35,15 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - main checkout配下のsource cacheを絶対pathで固定する。例: `/Users/user01/works/github.com/sunakan/aws-bastion/isuren-mondai/tmp/all-kakomon/isucon13`。
 - implement worktreeを作った直後、source cacheのorigin URL、full HEAD、clean状態を検証し、worktreeの`tmp/all-kakomon/<official-repo-name>`へclone全体を`rsync -a`する。このbootstrapだけは複製先でもidentityを再検証できるよう`.git/`を含め、`--delete`を使わない。
 - source cacheが期待identityと違う、複製先が既に存在する、または複製後のorigin / HEAD / clean状態が一致しない場合は停止する。clone、fetch、pull、checkout、reset、cleanで補正しない。
-- worktree-local cache mirrorをread-only audit / import sourceにし、以後main checkout側のcacheはidentity再確認以外のcontent audit / importに使わない。managed sourceや固定bundleへ搬入するときは対象subpathを明示し、`.git/`、`node_modules/`、`dist/`等を除外する。
+- worktree-local cache mirrorをread-only audit / import sourceにし、以後main checkout側のcacheはidentity再確認以外のcontent audit / importに使わない。managed sourceまたは一時build/provisioning stagingへ搬入するときは対象subpathを明示し、`.git/`、`node_modules/`、`dist/`等を除外する。
 - `tmp/all-kakomon/**`はgitignore対象の一時cacheであり、変更許可path、stage、commit、merge payloadに含めない。存在したままでもlocal main統合の妨げにせず、worktree cleanupとともに破棄してよい。
-- cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するartifact provenanceではない。保守codeはcommit済み`upstream/**`、非commit asset/dataはmanifestとchecksumを持つ固定bundleへ変換し、実行環境が`tmp/`の存在を前提にしない。
+- cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するprovenanceではない。保守codeだけをcommit済み`upstream/**`へ置く。非commit asset/dataは、公式exact commitからbuild/provisioning時に一時取得してcommit済みfile manifestで検証するか、ignore済み`dist/`で生成してGitHub Release等の外部配布先へexact tagとSHA-256付きで公開する。実行環境が`tmp/`の存在を前提にしない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
 - 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
-- `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するコードtreeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。編集しない画像・静的asset、`sql/`、初期データはcommitせず、frontend artifact buildまたはprovisioningの消費前にworktree-local mirrorから固定bundleへ取り込む。
+- `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するcode treeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。画像を含むbinary、編集しない静的asset、`sql/`、初期データはcommitせず、frontend buildまたはprovisioningの消費時だけ一時取得・検証する。
+- build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryを、このprojectのGit管理下へ追加しない。生成物はignore済み`dist/`または一時directoryに置き、配布が必要ならGitHub Release等の外部配布先を使う。manifest、checksum、provenanceのtext metadataはGit管理してよい。
+- 画像や他のbinaryがworking treeやbuild先へ配置されること自体は許可する。禁止するのはGitでの追跡であり、配置先がignore対象であることと、stage/commit/merge payloadへ入らないことを確認する。
+- binaryまたは成果物をGit管理したい、あるいはその方がよいと判断した場合は、追加・stage・commitを行わず作業を停止し、対象file、理由、代替案を示して人間へ相談する。利便性やclean clone再現性を理由にこの停止条件を迂回しない。
 - `/Users/user01/works/github.com/matsuu/cloud-init-isucon`と`/Users/user01/works/github.com/matsuu/aws-isucon`はreference-onlyとし、毎回HEAD、remote、dirty状態を記録する。dirty差分を採用しない。
 
 ## 並行性を制御する

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="公式cacheとdist frontend manifestでApplication/benchmarkをGo 1.26.6 test/build"
+set -euo pipefail
+kakomon13/scripts/test-go.sh

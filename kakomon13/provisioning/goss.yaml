@@ -1,0 +1,143 @@
+file:
+  /home/isuren:
+    exists: true
+    filetype: directory
+    mode: "0755"
+  /home/isuren/LICENSE:
+    exists: true
+    filetype: file
+  /home/isuren/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/webapp/go/isupipe:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/webapp/public/index.html:
+    exists: true
+    filetype: file
+  /home/isuren/webapp/sql/init.sql:
+    exists: true
+    filetype: file
+  /home/isuren/webapp/img/NoImage.jpg:
+    exists: true
+    filetype: file
+  /usr/local/share/isuren-mondai/kakomon13-provenance:
+    exists: true
+    filetype: file
+    contains:
+      - "official_commit=8f6afdc3603f0c661368de4659a7240862f59623"
+      - "official_data_manifest_sha256=[0-9a-f]{64}"
+      - "frontend_release_tag=kakomon13-frontend-v[0-9]+\\.[0-9]+\\.[0-9]+"
+      - "frontend_release_sha256=[0-9a-f]{64}"
+      - "hostname=pipe.u.isuren.internal"
+  /usr/local/share/isuren-mondai/kakomon13-packages.tsv:
+    exists: true
+    filetype: file
+  /usr/local/share/isuren-mondai/kakomon13-packages.tsv.sha256:
+    exists: true
+    filetype: file
+  /etc/systemd/resolved.conf.d/kakomon13.conf:
+    exists: true
+    filetype: file
+    contains:
+      - "DNSStubListener=no"
+  /etc/nginx/sites-enabled/isupipe.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /etc/nginx/sites-available/isupipe.conf
+  /etc/nginx/tls/pipe.u.isuren.internal.key:
+    exists: false
+  /etc/nginx/tls/pipe.u.isuren.internal.crt:
+    exists: false
+  /etc/isuren/kakomon13/runtime.env:
+    exists: false
+  /etc/isuren/kakomon13/mysql.cnf:
+    exists: false
+  /home/isuren/.kakomon13-staging:
+    exists: false
+  /usr/local/libexec/kakomon13-instance-init:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /usr/local/libexec/kakomon13-pdns-zone:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /usr/local/libexec/kakomon13-reset:
+    exists: true
+    filetype: file
+    mode: "0755"
+
+group:
+  isuren:
+    exists: true
+    gid: 1100
+
+user:
+  isuren:
+    exists: true
+    uid: 1100
+    groups:
+      - isuren
+      - pdns
+
+package:
+  mysql-server:
+    installed: true
+  nginx:
+    installed: true
+  pdns-server:
+    installed: true
+  pdns-backend-mysql:
+    installed: true
+
+service:
+  mysql:
+    enabled: true
+    running: false
+  nginx:
+    enabled: true
+    running: false
+  pdns:
+    enabled: true
+    running: false
+  isupipe-go:
+    enabled: true
+    running: false
+  kakomon13-instance-init:
+    enabled: true
+    running: false
+  kakomon13-pdns-zone:
+    enabled: true
+    running: false
+
+command:
+  architecture:
+    exec: uname -m
+    stdout:
+      - aarch64
+    exit-status: 0
+  go-version:
+    exec: /usr/local/bin/go version
+    stdout:
+      - "go version go1.26.6 linux/arm64"
+    exit-status: 0
+  timezone:
+    exec: timedatectl show -p Timezone --value
+    stdout:
+      - UTC
+    exit-status: 0
+  nginx-hostname-contract:
+    exec: grep -F 'server_name *.u.isuren.internal' /etc/nginx/sites-available/isupipe.conf
+    exit-status: 0
+  tls-san-contract:
+    exec: grep -F 'DNS:pipe.u.isuren.internal,DNS:u.isuren.internal,DNS:*.u.isuren.internal' /usr/local/libexec/kakomon13-instance-init
+    exit-status: 0
+  recipe-commit-recorded:
+    exec: grep -E '^recipe_commit=[0-9a-f]{40}$' /usr/local/share/isuren-mondai/kakomon13-provenance
+    exit-status: 0
+  package-inventory-integrity:
+    exec: cd /usr/local/share/isuren-mondai && sha256sum -c kakomon13-packages.tsv.sha256
+    exit-status: 0

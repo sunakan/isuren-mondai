@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="kakomon13 frontendのdist出力をGitHub Releaseへupload(引数: exact tag)"
+set -euo pipefail
+TAG="${1:?タグ名を指定してください(例: mise run kakomon13:release kakomon13-frontend-v1.0.0)}"
+[[ "${TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "error: tag must be kakomon13-frontend-vMAJOR.MINOR.PATCH" >&2
+  exit 1
+}
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_tag_absent_or_at_head "${TAG}"
+
+mise run kakomon13:build-frontend
+scripts/github-release.sh "${TAG}" \
+  kakomon13/dist/kakomon13-frontend.tar.gz \
+  kakomon13/dist/kakomon13-frontend.tar.gz.sha256 \
+  kakomon13/dist/frontend.manifest.sha256

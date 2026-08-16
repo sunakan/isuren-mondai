@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Node 24.19.0/Yarn 3.2.2でfrontendをdist/へbuild"
+set -euo pipefail
+kakomon13/scripts/build-frontend-release.sh

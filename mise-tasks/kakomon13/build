@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#MISE description="exact Ubuntu 26.04 arm64 AMI IDを入力してKAKOMON13 AMIをbuild"
+set -euo pipefail
+
+: "${KAKOMON13_SOURCE_AMI_ID:?set one reviewed Ubuntu 26.04 arm64 AMI ID}"
+: "${KAKOMON13_FRONTEND_RELEASE_TAG:?set one exact kakomon13 frontend release tag}"
+: "${KAKOMON13_FRONTEND_RELEASE_SHA256:?set the exact frontend release archive SHA-256}"
+[[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
+  echo "error: KAKOMON13_SOURCE_AMI_ID is not an exact AMI ID" >&2
+  exit 1
+}
+[[ "${KAKOMON13_FRONTEND_RELEASE_TAG}" =~ ^kakomon13-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "error: KAKOMON13_FRONTEND_RELEASE_TAG is invalid" >&2
+  exit 1
+}
+[[ "${KAKOMON13_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "error: KAKOMON13_FRONTEND_RELEASE_SHA256 is invalid" >&2
+  exit 1
+}
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_clean_worktree
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+require_pushed_commit "${PROJECT_COMMIT}"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:kakomon13")"
+
+VPC_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
+  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+export PROJECT_COMMIT TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export FRONTEND_RELEASE_TAG="${KAKOMON13_FRONTEND_RELEASE_TAG}"
+export FRONTEND_RELEASE_SHA256="${KAKOMON13_FRONTEND_RELEASE_SHA256}"
+user_data="$(mktemp)"
+trap 'rm -f "${user_data}"' EXIT
+python3 kakomon13/cloud-init/generate-user-data.py --output "${user_data}"
+
+packer init kakomon13/packer/kakomon13.pkr.hcl
+packer build \
+  -var "region=ap-northeast-1" \
+  -var "source_ami=${KAKOMON13_SOURCE_AMI_ID}" \
+  -var "vpc_id=${VPC_ID}" \
+  -var "subnet_id=${SUBNET_ID}" \
+  -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \
+  -var "user_data_file=${user_data}" \
+  -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
+  -var "recipe_tree=${RECIPE_TREE}" \
+  -var "frontend_release_tag=${FRONTEND_RELEASE_TAG}" \
+  -var "frontend_release_sha256=${FRONTEND_RELEASE_SHA256}" \
+  kakomon13/packer/kakomon13.pkr.hcl
