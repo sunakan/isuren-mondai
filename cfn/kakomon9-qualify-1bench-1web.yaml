@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  AmiId:
+    Type: AWS::EC2::Image::Id
+  # スペース区切りのGitHubユーザー名(複数人で練習可能)
+  # AllowedPatternはGitHubのユーザー名規則(英数字・ハイフン、先頭/末尾ハイフン不可)を強制
+  # 個人練習の場合は1つでもOK
+  # 入力なしでも SSM Session Manager 経由でも接続可能
+  GithubUsers:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[A-Za-z0-9](-?[A-Za-z0-9])*( [A-Za-z0-9](-?[A-Za-z0-9])*)*$'
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.42.1.0/24
+      MapPublicIpOnLaunch: true
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  BenchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: kakomon9-qualify bench role (SSH from anywhere, all traffic within the VPC)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: SSH from anywhere
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - Description: All traffic from within the VPC
+          IpProtocol: -1
+          CidrIp: 10.42.0.0/16
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: kakomon9-qualify web role (SSH/HTTP/HTTPS from anywhere, all traffic within the VPC)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: SSH from anywhere
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - Description: HTTP from anywhere
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: HTTPS from anywhere
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: All traffic from within the VPC
+          IpProtocol: -1
+          CidrIp: 10.42.0.0/16
+
+  # EC2 への SSM Session Manager 経由の接続を許容
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  Web1Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultPublicRoute
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: c8g.large
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      PrivateIpAddress: 10.42.1.11
+      SecurityGroupIds:
+        - !Ref WebSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+            Encrypted: true
+      MetadataOptions:
+        HttpTokens: required
+      Tags:
+        - Key: Name
+          Value: kakomon9-qualify-web1
+        - Key: Role
+          Value: web
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+
+          install -d -m 0700 -o isuren -g isuren /home/isuren/.ssh
+          TMP_KEYS="$(mktemp)"
+          for u in ${GithubUsers}; do
+            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >> "$TMP_KEYS"
+          done
+          if [ -s "$TMP_KEYS" ]; then
+            install -m 0600 -o isuren -g isuren "$TMP_KEYS" /home/isuren/.ssh/authorized_keys
+          fi
+          rm -f "$TMP_KEYS"
+
+  BenchInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultPublicRoute
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: c8g.large
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      PrivateIpAddress: 10.42.1.10
+      SecurityGroupIds:
+        - !Ref BenchSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+            Encrypted: true
+      MetadataOptions:
+        HttpTokens: required
+      Tags:
+        - Key: Name
+          Value: kakomon9-qualify-bench
+        - Key: Role
+          Value: bench
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+
+          install -d -m 0700 -o isuren -g isuren /home/isuren/.ssh
+          TMP_KEYS="$(mktemp)"
+          for u in ${GithubUsers}; do
+            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >> "$TMP_KEYS"
+          done
+          if [ -s "$TMP_KEYS" ]; then
+            install -m 0600 -o isuren -g isuren "$TMP_KEYS" /home/isuren/.ssh/authorized_keys
+          fi
+          rm -f "$TMP_KEYS"
+
+          for svc in isucari-go nginx mysql; do
+            systemctl disable --now "$svc"
+          done
