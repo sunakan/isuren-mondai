@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#MISE description="official mirrorとmanaged sourceの差分を表示"
+set -euo pipefail
+
+# The official mirror is read-only evidence; diff exit 1 means differences,
+# not a task failure.
+mirror=tmp/all-kakomon/isucon9-qualify
+test -d "${mirror}/.git" || {
+  echo "error: worktree-local mirror is missing" >&2
+  exit 1
+}
+test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon9-qualify.git"
+test "$(git -C "${mirror}" rev-parse HEAD)" = "ab4aba2b41b5f32d33c90f6b65b4bc8664e80af0"
+test -z "$(git -C "${mirror}" status --short)"
+
+# kakomon9-qualify独自: frontend、SQL、初期データ、release archiveはmanaged sourceへ
+# commitせず、AMI側でexact identityを取得・検証するため、この比較から除外する。
+diff -ru \
+  --exclude=Dockerfile \
+  --exclude=Dockerfile-payment \
+  --exclude=Dockerfile-shipment \
+  --exclude=run.sh \
+  "${mirror}/bench" upstream/isucon9-qualify/bench || true
+diff -ru "${mirror}/cmd/bench" upstream/isucon9-qualify/cmd/bench || true
+diff -ru \
+  --exclude=Dockerfile \
+  --exclude=.gitignore \
+  "${mirror}/webapp/go" upstream/isucon9-qualify/webapp/go || true
+diff -u "${mirror}/go.mod" upstream/isucon9-qualify/go.mod || true
+diff -u "${mirror}/go.sum" upstream/isucon9-qualify/go.sum || true
