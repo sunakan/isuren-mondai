@@ -60,6 +60,7 @@ auditの推奨案は`recommendation`と明記し、採用済み入力やGreen条
 ### plan報告
 
 - edition/variant固有の変更pathと非変更path
+- 利用するtemplate、意図的に省略するoptional template、コピー後のtarget ownership
 - 依存順、Red/Green、検証回数、受け入れ条件
 - 固定する入力manifestとartifact identity
 - 各gateの入口条件、出口証拠、cleanup

@@ -1,6 +1,6 @@
 ---
 name: onboard-kakomon-ami-recipe
-description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、本家filesystem構成、サービス、runtime/mise、frontend Release、benchmark、topology、seal/reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・PackerとOrb/AWSの独立gateへ段階化する。既存recipe間の共通責務について、別targetのファイルを共有せず処理形・コメント・build host/AMI観測境界を揃える作業にも使う。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、fresh VM/EC2検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
+description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、本家filesystem構成、サービス、runtime/mise、frontend Release、benchmark、topology、seal/reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・PackerとOrb/AWSの独立gateへ段階化する。既存recipe間の共通責務について、別targetのファイルを共有せず処理形・コメント・build host/AMI観測境界を揃える作業や、kakomon-templからtarget-owned skeletonを作るときにも使う。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、fresh VM/EC2検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
 ---
 
 # 過去問AMI recipeをonboardingする
@@ -33,14 +33,31 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - 明示的に承認されたplan、変更許可path、専用worktree、受け入れ条件が揃ってからローカル実装する。
 - target専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけを変更し、managed source、cloud-init、`all.sh`、edition固有step、Goss、mise、Packerを[recipe実装契約](references/recipe-contract.md)どおり分担させる。
+- template保守が明示された場合だけ`kakomon-templ/**`・`mise-tasks/kakomon-templ/**`を変更許可pathへ加える。target実装のついでにtemplateへ逆流させず、template変更とtarget変更を別の検証・commit単位にする。
 - Red/Green、関連lint/test、自己レビューを行う。未決判断や停止条件に到達したら変更を広げない。
 - `implement`は外部環境操作を許可しない。外部検証は別の`verify`承認を要求する。
+
+## copy-oriented templateを使う
+
+新規targetのplan/implementまたは既存recipeの整形では、次の順でtemplateを使う。
+
+1. `kakomon-templ/README.md`、`kakomon-templ/provisioning/README.md`、`mise-tasks/kakomon-templ/README.md`を読む。
+2. `mise run kakomon-templ:check`を実行し、非実行mode、placeholder、shell構文、ShellCheck、shfmtがGreenなcopy sourceだけを使う。
+3. targetのaudit証拠に対応する`.tmpl`だけをコピーする。不要なMySQL/nginx extensionやfrontend/AWS/upstream taskを対称性のために追加せず、ファイルごと省略する。
+4. コピー先から`.tmpl`を外し、`__KAKOMON_SLUG__`・他の`__...__`・`TODO`・fail-closed guardをすべてtarget固有の根拠で置換する。mise taskには`#MISE description`を付け、独自taskなら`kakomonN独自:`と理由を明記し、実行modeとtask discoveryを確認する。
+5. provisioningの`all.sh`へ実在stepだけを明示順で列挙し、optional extensionを存在確認で暗黙実行しない。target-owned source、service、domain、frontend、benchmark、Goss、seal契約を追加する。
+6. コピー後のfileをtarget自身でGit管理し、cloud-init、Packer、runtimeから`kakomon-templ/**`を直接source、symlink、参照しない。
+7. templateとtarget証拠が衝突したらtarget証拠を優先し、意図的な差分をREADME/NOTICE、description、検証へ残す。templateを正解としてofficial契約を上書きしない。
+
+template更新を既存targetへ自動伝播させない。共通責務の改善を見つけた場合はtemplate単体を
+`kakomon-templ:check`で検証・commitし、各targetへの反映はpaired diffとtarget gateを持つ別作業にする。
 
 ## 既存recipe間の共通処理を揃える
 
 既存targetの比較で「問題固有差分ではないのに処理形が違う」箇所を見つけたら、次の方針で差分を減らす。
 
 - 同じscript fileを共有せず、`kakomon13/`・`kakomon14/`等のtarget-owned fileをそれぞれ保つ。共通化するのは責務の境界、処理順、関数分割、入力検証、失敗処理、ログ形式、コメント構造とする。
+- まず対応する`kakomon-templ/provisioning/*.tmpl`または`mise-tasks/kakomon-templ/*.tmpl`を比較基準にする。templateにない問題固有処理はtarget-owned step/taskへ残し、templateへedition分岐を追加して差分を隠さない。
 - 統合済みKAKOMON14の`mise kakomon14:build`をbuild taskの処理形の参照にする。K13へ移す場合も、target固有のsource AMI、frontend Release、公式source、step列、service名、Goss対象は置き換えず、taskの外枠だけを揃える。
 - `mise-tasks/kakomon13/**`・`mise-tasks/kakomon14/**`をtask名で対応付け、既存の`kakomonN:xxx`を一つずつ比較する。同名taskはK13/K14で`#MISE description`の文型も揃え、本文は同じ責務の順序・検証・失敗処理・コメント構造へ寄せる。片方にしかないtaskは無理に追加せず、descriptionへ`kakomonN独自:`と独自である理由を明記する。
 - taskの有無は対称性ではなくfrontend/sourceの配布方式とtaskの責務で決める。official prebuilt frontendをAMI内で取得するtargetへ、実際にはbuildしない`build-frontend`やRelease upload taskを形だけ追加しない。必要ならlocal inspection用のprepare/verify taskだけを独自taskとして残し、normal buildの入力にはしない。

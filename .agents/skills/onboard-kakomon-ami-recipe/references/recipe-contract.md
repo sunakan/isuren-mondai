@@ -6,6 +6,8 @@
 
 実体のない互換stepを作らない。`all.sh`を実行順の正本とし、step名は対象serviceの責任を表す。3問の実測差分が揃ったら共通化候補を必ずレビューするが、共通化自体は必須としない。
 
+`kakomon-templ/**`と`mise-tasks/kakomon-templ/**`は、実測済みの共通責務を新しいtargetへコピーするためのsource skeletonとする。生成後のfileはtargetが所有し、templateへruntime依存しない。template変更を既存targetへ自動伝播せず、target証拠とgateを持つ別作業で反映する。
+
 ## file別の責任
 
 | file | 責任 | 持たせない責任 |
@@ -18,6 +20,7 @@
 | Packer | provider-native base、AWS region、architecture、disk/network/build adapter、cloud-init待機、marker/Goss確認、tag、seal、cleanup | recipe本体の再実装、暗黙のdefault region、Orb成功の流用、製品E2E |
 | `upstream/<official-repo-name>` | 公式baselineから選んだApplication、benchmark、frontend等のこちらで保守するコード、LICENSE、NOTICE | 編集しない画像・静的asset、`sql/`、初期データ、由来不明binary |
 | `mise-tasks/<canonical-slug>` | target固有のimport/diff、lock、static validation、build/release adapter | 他targetの更新、保守差分の無警告上書き、承認なしの外部gate |
+| `kakomon-templ` / `mise-tasks/kakomon-templ` | copy-onlyの共通責務、非実行skeleton、local static check | runtime参照、edition分岐、target固有identity、既存targetへの自動伝播 |
 
 Packer plugin、AWS region `ap-northeast-1`、同regionのbase image、OS repository、package inventory、frontend artifact、source revision、recipe revisionを入力manifestへ束縛する。`most_recent`等で候補を探す調査段階と、artifact buildへ渡すexact IDを分ける。
 

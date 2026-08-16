@@ -61,6 +61,7 @@
 
 ## 6. recipe gap分析
 
+- `kakomon-templ`と`mise-tasks/kakomon-templ`から適用候補と省略候補を責務単位で列挙し、target固有証拠との衝突、templateへのruntime参照が生じないcopy/ownership境界を確認する。
 - `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerの責任を[recipe実装契約](recipe-contract.md)へ照合する。
 - official inputをAMI内取得する場合、network/archive tool導入がfetch stepより先であること、`all.sh`の実順とstep番号が矛盾しないこと、local `dist`やPacker file upload待ちが残らないことを確認する。
 - 手動修正、秘密、role固有identity、builder一時file、mutable inputがimageへ残る経路を探す。
