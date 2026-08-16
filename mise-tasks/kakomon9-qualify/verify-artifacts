@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="Optionally verify a locally prepared kakomon9-qualify dist tree"
+#MISE description="prepared artifact manifestを検証する (kakomon9-qualify独自: local dist/を対象; optional)"
 set -euo pipefail
 exec kakomon9-qualify/scripts/verify-artifacts.sh
