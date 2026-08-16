@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="frontendをbuildしてdist/へ出力する (kakomon14独自: Node 24.19.0/pnpm 11.21.0と公式publicを使用)"
+#MISE description="frontendをbuildしてdist/へ出力する"
 set -euo pipefail
 
 # Keep the task wrapper target-local while using the paired recipe's frontend
