@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#MISE description=".git履歴内の大きいblobをサイズ降順Top10表示(既知の大きいpathはデフォルト除外し----の下に表示。引数に正規表現を渡すと追加除外可能。例: mise run repo-size '^upstream/')"
+set -euo pipefail
+
+# isucon13のbench向けデータ定義ファイル。意図して大きい既知のファイルのため常時除外する。
+KNOWN_EXCLUDE_REGEX='^upstream/isucon13/bench/internal/scheduler/(reservation_pool|user_pool|livestreams_pool|initial_ngword_pool|livecomment_pool)\.go$'
+EXTRA_EXCLUDE_REGEX="${1:-}"
+
+if [ -n "$EXTRA_EXCLUDE_REGEX" ]; then
+  COMBINED_EXCLUDE_REGEX="(${KNOWN_EXCLUDE_REGEX})|(${EXTRA_EXCLUDE_REGEX})"
+else
+  COMBINED_EXCLUDE_REGEX="$KNOWN_EXCLUDE_REGEX"
+fi
+
+ALL="$(git rev-list --objects --all |
+  git cat-file --batch-check='%(objecttype) %(objectsize) %(rest)' |
+  awk '$1 == "blob" { size=$2; $1=$2=""; sub(/^ +/, ""); print size"\t"$0 }')"
+
+INCLUDED="$(echo "$ALL" | awk -F'\t' -v re="$COMBINED_EXCLUDE_REGEX" '$2 !~ re')"
+EXCLUDED="$(echo "$ALL" | awk -F'\t' -v re="$COMBINED_EXCLUDE_REGEX" '$2 ~ re')"
+
+format_size() {
+  awk -F'\t' '{
+    bytes = $1
+    split("B KB MB GB", units, " ")
+    i = 1
+    while (bytes >= 1024 && i < 4) {
+      bytes /= 1024
+      i++
+    }
+    printf "%.1f%s\t%s\n", bytes, units[i], $2
+  }'
+}
+
+# sort|headの組み合わせはheadの早期終了でsortがSIGPIPEを受け、pipefailによりtask全体が
+# 失敗扱いになるため、この行だけpipefailを無効化する。
+(
+  set +o pipefail
+  echo "$INCLUDED" |
+    sort -t$'\t' -k1 -rn |
+    head -n 10 |
+    format_size |
+    column -t -s $'\t'
+)
+
+if [ -n "$EXCLUDED" ]; then
+  echo "----ランキングから除外したファイル"
+  echo "$EXCLUDED" |
+    sort -t$'\t' -k1 -rn |
+    format_size |
+    column -t -s $'\t'
+fi
