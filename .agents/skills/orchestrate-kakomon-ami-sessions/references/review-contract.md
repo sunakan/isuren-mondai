@@ -46,14 +46,17 @@
 - managed upstreamが公式baselineから取り込んだ保守対象コードとlocal変更を追跡し、`NOTICE.md`の範囲・除外・provenanceと実treeが一致する。
 - 画像を含むbinary、編集しない静的asset、`sql/`、初期データをmanaged upstreamへcommitせず、worktree-local mirrorのexact commitとtarget固有subpathから一時stagingへ`rsync`している。clean clone側は公式exact commitまたは外部Release exact tag/SHA-256から再取得でき、mutable branchや由来不明archiveへfallbackしていない。
 - build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryがGit管理下にない。生成物はignore済み`dist/`または一時directoryにあり、manifest、checksum、provenanceのtext metadataだけがcommitされている。
+- staged diffのbinary表示、追加fileのsize/type、`git ls-files`を確認し、`artifacts/`、`dist/`、frontend build出力が追跡されていない。すでにcommit済みbinaryを独断でhistory rewrite・reset・削除していない。
 - working treeやbuild先に配置された画像・binaryは、ignore対象であり、stage・commit・merge payloadに含まれていない。配置されていること自体をfindingにしない。
 - binaryまたは成果物のGit管理が必要・望ましいと判断された場合、実装sessionが追加・stage・commit前に停止して人間へ相談している。相談なしにGit管理していたら`blocking`とする。
 - cache由来データを保守対象codeへ実ファイルで統合せず、不要な`.git`、生成物、依存directory、重複sourceを配布物へ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
+- official contestant homeとsystemd unitを基準に、username写像後も`env.sh`、Application、benchmark、licenseの相対pathを保っている。配置差はREADME/NOTICE/Gossで意図的差分として説明され、偶発的な独自`runtime.env`やbuild-only checkout/GOPATH残留がない。
 - OSとarchitectureがUbuntu 26.04 arm64、AWS regionが`ap-northeast-1`で、profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupのregionが一致している。暗黙のdefault regionへ依存していない。
 - Packer build入力が`ap-northeast-1`のexact base image IDに固定され、別regionのAMI ID、amd64、旧Ubuntu、`most_recent`へfallbackしていない。
 - URL、checksum、config、lock、Goss、provenanceのcross-versionがない。
+- mise config/lockがmetadataだけでなく実際のinstallとApplication/benchmark buildに使われる。mise自体もexact URL/checksumへ固定され、`runuser`経路はfull pathとHOMEを明示し、並行する`/opt/go-*`や`/usr/local/bin/go`導入を残していない。
 - `latest`、`lts`、floating tag、rangeだけのplugin/base image選択がない。
 - target自身のApplication/benchmark validationを確認し、KAKOMON14のrecipe・Orb・AMI証拠をtargetの入口条件や成功証拠へ流用していない。
 
@@ -65,8 +68,10 @@
 - upstreamに競技用domainがある場合、元のsubdomainを保つ`isuren.internal`写像がDNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckで一致し、一括置換・alias・published identity上書きがない。
 - Applicationとbenchmarkのbuild、配置、実行user/cwd、result/failure契約が分離されている。
 - frontend build、hash/manifest更新、benchmark build、配置順がofficial契約と一致する。
+- external frontend配布ならtarget固有workflow、target限定tag filter、asset名、manifest/licenseが揃う。repository slice完了とremote Release発行を分け、Release未発行の状態を外部verify-readyにしていない。
 - cloud-initはfixed recipeを起動する薄いadapterである。
 - Gossは観測だけを行い、reset/reboot/multi-node/product E2Eの代替になっていない。
+- seal直後とfresh boot後を別stateとして検証し、clone固有env/TLS/identityはseal時不在・boot後再生成になっている。同じGoss specへ矛盾する二状態を要求していない。
 - machine-id、SSH host key、credential、role固有値、本物のTLS/mTLS private keyをartifactへ残していない。自己署名server keyを含める場合は公開テストfixtureとしてmode・fingerprint・用途が固定され、認証やcredential-bearing trafficへ流用されない。
 
 ### validationとgate
@@ -75,6 +80,7 @@
 - 実行不能な検証は理由と後続gateがある。
 - `all.sh` slice、Orb recipe、Orb Golden、standalone、AMI build、fresh boot、product gateを混同していない。
 - AWS/Orb/GitHub mutationを人間承認なしに行っていない。AWS操作を実施した場合はregionが`ap-northeast-1`で、cleanupも同regionに限定されている。
+- 外部verify開始前にremote main、必要なRelease asset/digest、account、resource ID、AMI ID、instance type、architecture、OS、SSM Onlineを確認している。入力不足時にpartial provisioningでinstanceを汚していない。
 
 ### main統合
 

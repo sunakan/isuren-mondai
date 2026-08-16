@@ -21,6 +21,22 @@
 
 Packer plugin、AWS region `ap-northeast-1`、同regionのbase image、OS repository、package inventory、frontend artifact、source revision、recipe revisionを入力manifestへ束縛する。`most_recent`等で候補を探す調査段階と、artifact buildへ渡すexact IDを分ける。
 
+## upstreamのfilesystem構成を保つ
+
+official provisioningからcontestant home、Application、benchmark、environment file、runtime、license、serviceの最終配置を一覧化する。`/home/isucon`を`/home/isuren`へ読み替える場合も、相対pathとfile名を可能な限り保つ。独自の`/etc/.../runtime.env`等へ移す前に、officialの`env.sh`やsystemd `EnvironmentFile=`を正本として扱う。
+
+意図的な差だけをtarget README/NOTICEとGossへ明記する。少なくとも次を区別する。
+
+- username/domain等の採用済み写像
+- xbuild等をmiseへ置き換えるruntime modernization
+- architecture依存名を外したbenchmark binary名
+- SSM/provider finalizerへ委ねる`.ssh`、password、machine/role identity
+- build後に不要なbenchmark checkout、staging、GOPATH/cache
+
+buildにだけ使う`~/isuconN`や`~/go`を完成artifactの仕様にしない。最終binaryへembed済みまたはfinal pathへcopy済みならsealで削除し、Gossで不在を観測する。逆にApplicationがruntime時に相対参照するsource/dataを推測で消さず、service cwdとsource codeから必要性を確認する。
+
+clone固有値を含むofficial `env.sh`はfile名とkeyを保ち、fresh boot finalizerで再生成する。sealed common artifactでは不在、fresh boot後は正しいowner/mode/valueで存在するという二状態を別々に検証する。sealed Goss specをそのままreboot後へ再利用して矛盾させない。
+
 ## sourceとartifact identity
 
 - `upstream/<official-repo-name>/**`を、official URLとexact baseline commit/tagから選択したこちらのmanaged source treeとする。Application、benchmark、frontend等を必要に応じてlocal更新し、公式baseline、取り込み・除外範囲、local差分を`NOTICE.md`へ記録する。
@@ -58,6 +74,10 @@ target固有のimport/refresh taskはworktree-local mirrorからの初回取り�
 
 Goとfrontend runtimeを可能な限り統合済みKAKOMON14へ揃えることは目標であり、互換性証拠や再現性より優先しない。Applicationとbenchmarkでversionを分ける場合は理由と両方のidentityを残す。
 
+mise config/lockをchecksum metadata置き場にするだけで、別途`/opt/go-*`や`/usr/local/bin/go`を手動導入しない。mise自体もexact version、official URL、architecture、SHA-256を固定してcontestant home配下へinstallし、Applicationとbenchmarkの両buildを同じ`mise exec -- go`経路へ通す。
+
+`runuser`は`.bashrc`を読まないため、provisioning/Gossではmise binaryのfull pathと`HOME=/home/<user>`を明示する。interactive shell用activationは補助であり、無人buildの正しさをPATHやshell初期化へ依存させない。Gossでmise version、config/lock、Go versionを観測し、旧runtime pathが残らない静的契約も置く。
+
 auditではupstream準拠値、KAKOMON14整合候補、最小compatible候補を比較してよいが、採用versionを確定しない。planでも互換性証拠または人間の判断が欠ける候補は未決のまま残し、implementの入力へ昇格しない。
 
 ## frontend停止条件
@@ -75,8 +95,12 @@ frontend buildが必要なら、次をすべて特定するまでimplementへ進
 - 配置先、配信service
 - build場所とartifactのexact tag/digest/checksum
 
+AMI外のCI/Release buildを採用する場合、target固有GitHub Actions workflow、target限定tag filter、asset名、manifest/licenseまでrepository実装へ含める。build scriptやignore済み`dist/`だけで配布可能とみなさない。外部verify前にremote tag、公開Release、asset digestをread-onlyで確認し、未発行ならlocal artifactや別target Releaseで迂回せず停止する。
+
 ## seal境界
 
 Golden/AMIへmachine-id、hostname、SSH host private key、本物のTLS/mTLS private key、random seed、cloud-init instance cache、credential、build log、一時checkout、Portal/`isu`/Environment/role固有設定を残さない。上記契約を満たす自己署名server key/certificateは公開テストfixtureとして残してよい。固定source、build済みApplication/benchmark/frontend、初期DB、package inventory、license/notice、artifact/recipe digestは残す。
 
 clone/fresh boot後のidentity、秘密、role固有service、Portal接続はfinalizerの責任とし、共通recipeへ混ぜない。
+
+seal直後とfresh boot後を別stateとして定義する。seal/Gossではservice停止、clone固有env/TLS/identity不在、一時checkout/cache不在を確認する。reboot後はfinalizer完走、env/TLS再生成、enabled/running、DNS/port/HTTP、data保持を確認する。片方のspecで両状態を同時に要求しない。

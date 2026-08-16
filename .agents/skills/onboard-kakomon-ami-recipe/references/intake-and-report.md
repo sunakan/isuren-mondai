@@ -15,8 +15,8 @@
 | topology | compact topology、canonical topology、各nodeのrole/network/port |
 | benchmark | 配置先、build/実行方法、target指定、result/failureの構造、必要データ |
 | runtime | 統合済みKAKOMON14比較元、upstream指定、採用候補、checksum/lock方針 |
-| frontend | build要否、runtimeの意味、package manager、lockfile、command、生成物、配置先 |
-| operations | Orb/AWS resource namespace、AWS region `ap-northeast-1`、費用上限、TTL、同regionでのcleanup条件・担当、外部操作の承認範囲 |
+| frontend | build要否、runtimeの意味、package manager、lockfile、command、生成物、配置先、target固有workflow/tag/asset/digest |
+| operations | Orb/AWS resource namespace、AWS region `ap-northeast-1`、費用上限、TTL、同regionでのcleanup条件・担当、外部操作の承認範囲、remote main/Release readiness |
 
 implement worktreeでは、作成直後にmain checkoutのread-only source cacheを検証し、clone全体を同名の`tmp/all-kakomon/<official-repo-name>`へ`rsync -a`する。bootstrapだけは複製先でGit identityを再検証するため`.git/`を含める。複製先はgitignore対象の一時cacheであり、stage、commit、merge payloadに含めない。存在したままのlocal main統合を許し、worktree cleanup時に破棄してよい。
 

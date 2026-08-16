@@ -1,6 +1,6 @@
 ---
 name: orchestrate-kakomon-ami-sessions
-description: isuren-mondaiのルートセッションとして、ISUCON過去問ごとのGo版AMI recipe作業を専用worktreeと別Codexセッションへ安全に引き渡す。対象・variant・plan依存・worktree所有を監査し、別セッション用prompt、現行モデルと推論レベルの推奨、成果レビュー、別セッションによる限定stage・commit・local main統合、人間pushのgateを管理する。kakomonNまたはkakomonN-qualify/finalの新規recipeを並行調査したいとき、実装セッションを準備したいとき、all.shまでの差分やmain統合可否をレビューしたいときに使う。
+description: isuren-mondaiのルートセッションとして、ISUCON過去問ごとのGo版AMI recipe作業を専用worktreeと別Codexセッションへ安全に引き渡す。対象・variant・plan依存・worktree所有を監査し、別セッション用prompt、現行モデルと推論レベルの推奨、成果レビュー、限定stage・commit・local main統合、人間push、frontend Release、fresh VM/EC2 verifyのhandoff gateを管理する。kakomonNまたはkakomonN-qualify/finalの新規recipeを並行調査したいとき、実装セッションを準備したいとき、all.shまでの差分・main統合・外部検証readyをレビューしたいときに使う。
 ---
 
 # 過去問AMIセッションを制御する
@@ -25,6 +25,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 3. 対象edition/variantのcurrent planと、その`status`、`depends_on`、`conflicts_with`、変更許可path。
 4. 統合済み`kakomon14/**`。activeなKAKOMON14 worktreeは所有確認だけにし、内容を参照しない。変更pathとresourceがtargetに重ならず、current target planまたはユーザーが非依存と明示した場合は、その存在だけを実装blockerにしない。
 5. `$onboard-kakomon-ami-recipe`と必要なreference。生成promptでもこのSkillを明示的に使わせる。
+6. external frontend配布またはAWS/Orb verifyへ進む場合は[Releaseと外部verifyのhandoff契約](references/release-and-verify-preflight.md)。
 
 採用済みplanと依頼値が衝突したら、どちらかを勝手に選ばない。`decision-required`として実装promptとworktree作成を止める。特にGo、Node.js、OS、architecture、AWS region、topology、hostname、frontend配布方法を再確認する。ただし、current target planまたはユーザーの最新の明示判断が古い展開順・保留理由を置き換えている場合は、その判断をpromptへ記録し、古い一般順序だけをblockerとして復活させない。
 
@@ -40,6 +41,7 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - cacheは搬入元であり、clean clone、cloud-init、AMI buildが参照するprovenanceではない。保守codeだけをcommit済み`upstream/**`へ置く。非commit asset/dataは、公式exact commitからbuild/provisioning時に一時取得してcommit済みfile manifestで検証するか、ignore済み`dist/`で生成してGitHub Release等の外部配布先へexact tagとSHA-256付きで公開する。実行環境が`tmp/`の存在を前提にしない。
 - official upstream URL、full commit SHAまたはexact tag、license/noticeを確定し、recipeから再取得できるようにする。
 - 実装scopeはcanonical targetの`kakomon*/**`に加え、対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を含める。別targetの同名rootやrepository-wide fileへ広げない。
+- external frontendをtarget固有workflowで配布する場合は、`.github/workflows/release-<canonical-slug>-frontend.yml`も明示的な変更許可pathへ含める。workflowが必要なのに通常のtarget root外であることを理由に欠落させず、許可がなければscope expansionとして停止する。
 - `upstream/<official-repo-name>/**`は公式sourceを起点にこちらが保守するcode treeとし、公式baseline、取り込み・除外範囲、local変更を`NOTICE.md`へ記録する。画像を含むbinary、編集しない静的asset、`sql/`、初期データはcommitせず、frontend buildまたはprovisioningの消費時だけ一時取得・検証する。
 - build成果物、release archive、固定bundle、画像、音声、動画、font、database dump等のbinaryを、このprojectのGit管理下へ追加しない。生成物はignore済み`dist/`または一時directoryに置き、配布が必要ならGitHub Release等の外部配布先を使う。manifest、checksum、provenanceのtext metadataはGit管理してよい。
 - 画像や他のbinaryがworking treeやbuild先へ配置されること自体は許可する。禁止するのはGitでの追跡であり、配置先がignore対象であることと、stage/commit/merge payloadへ入らないことを確認する。
@@ -63,6 +65,13 @@ description: isuren-mondaiのルートセッションとして、ISUCON過去問
 - 統合済みKAKOMON14のruntime config/lockは構造上の比較元に限る。KAKOMON14のApplication、benchmark、Goss、Orb、AMI再検証を、独立targetのrepository-only audit/実装の入口条件にしない。
 - 各targetがGo 1.26.6のofficial URL・architecture別SHA-256・config/lockを独立に固定し、Applicationとbenchmarkをtarget自身のvalidationで確認する。KAKOMON14の成功・失敗証拠を流用しない。
 - Node.jsは対象upstreamの証拠からexact versionを決める。`latest`、`lts`、major/rangeだけの指定をartifact入力にしない。
+
+## frontend配布をverify入口から逆算する
+
+- frontendをCI/Release配布するtargetでは、build scriptだけでなくtarget固有workflow、tag filter、asset名、manifest/licenseをrepository sliceの受け入れ条件にする。
+- `all-sh-slice-committed`、remote Release発行、外部verify readinessを別状態にする。人間push後にremote main、tag、Release asset、published digestをread-onlyで確認するまでEC2/VMへprovisioningを開始しない。
+- Releaseが欠ける場合は既存local `dist/`や別targetのartifactで迂回せず、EC2を変更する前に停止する。
+- 詳細とbinaryのstage検査は[Releaseと外部verifyのhandoff契約](references/release-and-verify-preflight.md)に従う。
 
 ## platformとhostnameを固定する
 
@@ -123,12 +132,14 @@ branch名へ必ずcanonical slugを含める。すでに別sessionが所有す�
 - まずblocking finding、次にmajor/minor finding、最後に良い点と安全な次の一手を示す。
 - findingがなければ明言し、残る未検証gateを列挙する。
 - `all.sh`が存在するだけで完成にしない。呼び出すすべてのstep、mise identity、source provenance、Goss、frontend/benchmark順、fail-fastを確認する。
+- external frontendの場合はtarget固有release workflowの存在とtag/asset契約を確認し、未発行Releaseをverify-readyと報告しない。
 - 実施していないOrb、Golden、standalone、AMI、fresh boot、product gateを`not-run`のまま保つ。
 
 ## Git統合と外部検証を分ける
 
 - 別セッションへtargetの変更許可pathだけを明示し、検証後の`git add -- <exact paths>`と`git commit`を追加の人間確認なしで許可する。`git add .`、`git add -A`、許可path外のstageを禁止する。
 - commit前にstatus、staged stat、staged full diff、`git diff --staged --check`を確認させる。無関係な既存差分をcommitへ含めない。
+- commit前に[Releaseと外部verifyのhandoff契約](references/release-and-verify-preflight.md)のbinary tracking gateも実施する。画像・archive・build出力の配置とGit追跡を混同しない。
 - commit後に[review契約](references/review-contract.md)でセルフレビューし、blocking/major findingが残らず、必要validationがGreenの場合だけ`ready-to-merge-main`とする。
 - main統合直前にremoteをread-onlyで更新し、main worktreeのclean状態、ahead/behind、他sessionのactive owner、resource guard、topicとの差分を再確認する。mainまたはtopicに所有不明の差分があれば停止する。
 - topicがcurrent mainを含まない場合はtopic worktreeでmainをmergeし、競合なしの場合だけ同じvalidationとセルフレビューを再実施する。競合を推測で解決しない。
@@ -136,6 +147,7 @@ branch名へ必ずcanonical slugを含める。すでに別sessionが所有す�
 - 統合後にtopic HEADがmainのancestorであること、mainのstatus、HEAD、変更範囲を確認して`merged-to-main`と報告する。worktreeやbranchを自動削除しない。
 - AIはpushしない。人間がpushし、remoteにexact main commitが存在することを確認する。
 - EC2内で`git clone`して試すverify promptはpush後にだけ作る。local-only commitをclone可能と扱わない。
+- external frontendなら、remote main同期だけでなくtargetのRelease assetとpublished digestが存在するまでverify promptを実行可能扱いにしない。
 - `aws-bastion`のcurrent task定義を再読し、namespace入力が実際にtaskへ届くことをread-onlyで確認する。現状の`up-bastion`は`STACK_NAME`を入力として読まず、`mise.toml`の固定`BASTION_STACK_NAME`はshell側の同名変数を上書きするため、専用prefixを指定可能と扱わない。
 - namespace入力を受け取れない場合は外部検証を止め、`BASTION_STACK_NAME = { default = "aws-bastion" }`またはtask argument等へ変更する別scopeを提案する。`mise.local.toml`を黙って作らない。
 - EC2起動やAMI build前に、account、固定region `ap-northeast-1`、namespace、費用上限、TTL、exact stack、cleanup ownerとcommand、秘密の受け渡し、人間承認を確定する。別regionが観測されたら操作を開始しない。

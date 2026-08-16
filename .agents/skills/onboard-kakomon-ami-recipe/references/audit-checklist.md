@@ -15,9 +15,11 @@
 
 - Application、DB、proxy、cache、queue、DNS、TLS、補助service、benchmarkを列挙する。
 - package名、設定、user/group、directory、ownership、environment、systemd依存順を集める。
+- officialのcontestant home treeとsystemd unitから、`env.sh`、Application、benchmark、runtime、licenseの相対pathを一覧化する。username写像以外の配置差は意図的差分か欠落かを分類する。
 - listen address、port、protocol、hostname、DNS/hosts依存、TLS終端と証明書生成責任を調べる。
 - 競技用domainと全参照箇所を列挙し、元のsubdomainを保つ`isuren.internal`写像、TLS SAN、cookie/domain、benchmark target、自己署名fixtureまたは本物の秘密の境界を定義する。
 - architecture固有binary、private registry/image、外部download、build-time network依存を探す。
+- Ubuntu採用versionでservice CLI/packageのmajor versionとsyntaxを確認する。別Ubuntu/旧recipeのcommandをコピーせず、PowerDNS等のowner-name/zone semanticsを実機または公式version証拠でRed/Greenする。
 - Ubuntu 26.04 arm64でのpackage repository、binary、systemd、kernel/library互換性を調べ、amd64・旧Ubuntu前提をRed項目にする。
 - AWS profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupで`ap-northeast-1`が明示され、別regionのAMI IDや暗黙のdefault regionを使わないことを確認する。
 - upstream指定のGo/frontend/runtimeと統合済みKAKOMON14のexactな採用値・lockを比較する。
@@ -30,6 +32,7 @@
 - package manager、lockfile、workspace設定、install/build command、環境変数を確認する。
 - 生成物、hash/file manifest、archive、license、配置先、配信service、cache invalidationを確認する。
 - buildをAMI内、ローカル/CI、release artifactのどこで行うかと、そのexact identity/checksumを確認する。
+- CI/Release配布ならtarget固有workflow、tag filter、asset名、公開Release/digestのverify入口を確認する。build scriptだけをdelivery完成としない。
 
 ## 4. benchmarkとresult
 
@@ -52,6 +55,8 @@
 
 - `cloud-init`、`all.sh`、edition固有step、`goss.yaml`、`mise.toml`/lock、Packerの責任を[recipe実装契約](recipe-contract.md)へ照合する。
 - 手動修正、秘密、role固有identity、builder一時file、mutable inputがimageへ残る経路を探す。
+- miseが実際のinstall/build経路か、単なるversion metadataかを区別する。mise binary自体のpin、`runuser`時のHOME/full path、Application/benchmark両方の`mise exec`、旧`/opt`/`/usr/local` runtime残留を確認する。
+- seal直後とfresh boot後のfile/service契約を分け、clone固有`env.sh`、TLS、DNS addressがsealed artifactへ残らずreboot後に再生成されることを確認する。
 - source、runtime、frontend、AWS region、base image、package、tool/pluginのpinとchecksum不足を列挙する。
 - managed upstreamのbaseline/local差分、LICENSE/NOTICE、worktree-local mirrorからrsyncするexact commit/subpath、固定bundleのmanifest/checksum、artifactの`tmp/`非依存を照合する。
 - Orb recipe、Orb Golden、standalone、AMI build、fresh boot、Orb/AWS productを[検証gate](verification-gates.md)へ割り当てる。

@@ -22,8 +22,9 @@
 | references | integrated KAKOMON14、cloud-init-isucon、aws-isuconのpath、HEAD、dirty状態 |
 | plan gate | current target plan ID、status、依存、競合、ユーザーの明示的な再優先順位付け、implementation readiness |
 | runtime | Go、Node.js、package manager、OS、architectureの採用済み値または停止条件 |
+| frontend delivery | target固有workflow path、tag filter、asset名、manifest/license、remote Release/digest gate |
 | platform | AWS region `ap-northeast-1`、同regionのexact base AMI ID方針、profile / Packer / build / verify / cleanupのregion一致 |
-| completion | `audit-complete`、`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main` |
+| completion | `audit-complete`、`all-sh-slice-committed`、`ready-to-merge-main`、`merged-to-main`、`frontend-release-published`、`verify-ready` |
 
 ## promptの必須構成
 
@@ -68,6 +69,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - 以後のcontent audit / importはworktree-local mirrorだけをread-onlyで使い、main checkout側のsource cacheはidentity再確認以外に使わない。official repositoryのclone、fetch、pull、checkout、reset、cleanも行わない。
 - `tmp/all-kakomon/**`は一時cacheであり、変更許可path、stage、commit、merge payloadに含めない。cacheがworktreeに残っていてもmain統合のblockerにせず、worktree cleanup時に破棄してよい。
 - canonical target directoryの`provisioning/`、`cloud-init/`、`packer/`、`scripts/`を作る。
+- external frontend配布を採用する場合は、`.github/workflows/release-<canonical-slug>-frontend.yml`をexact変更許可pathへ含める。target root外だからと欠落させず、許可がなければscope expansionとして停止する。
 - 対応する`upstream/<official-repo-name>/**`と`mise-tasks/<canonical-slug>/**`を作成・更新してよい。3つのtarget専用rootをpromptへexact pathで列挙する。
 - `upstream/<official-repo-name>/**`にはApplication、benchmark、frontend等のこちらで保守するコードを置く。worktree-local mirrorの対象subpathから`rsync`し、公式baseline commit、取り込み・除外範囲、local変更を`LICENSE`と`NOTICE.md`で追跡する。
 - 画像を含むbinary、編集しない静的asset、`sql/`、初期データはupstreamへcommitせず、worktree-local mirrorのtarget固有subpathからfrontend buildまたは検証用stagingへ一時的に`rsync`する。このimportでは`.git/`、生成物、依存directoryを除外し、`rsync --delete`を使わない。
@@ -113,6 +115,7 @@ current planが実装可能で、専用worktreeと変更許可pathが確定し�
 - upstreamがmajor/rangeしか指定しない場合は、互換試験候補を提示して`decision-required`にする。`node = "lts"`や`latest`を採用しない。
 - frontend package managerとversionをupstreamに合わせ、KAKOMON14のpnpmを他editionへ自動移植しない。
 - frontend成果物をAMI外でbuildするかAMI内でbuildするかはcurrent planに従う。生成物はGit管理せずignore済み`dist/`または一時directoryへ置く。license、exact tag/tree、SHA-256、外部配布先、配置先が欠ければ停止する。
+- CI/Release配布ではbuild scriptだけを完成扱いにしない。target固有workflow、target限定tag filter、期待asset名を実装し、人間push後のremote Release/digest確認を外部verifyの入口にする。
 
 ## OS、architecture、domain
 

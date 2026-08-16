@@ -1,6 +1,6 @@
 ---
 name: onboard-kakomon-ami-recipe
-description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、サービス、runtime、frontend、benchmark、topology、reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・mise・PackerとOrb/AWSの独立gateへ段階化する。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
+description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植・監査するときに、official provenance、本家filesystem構成、サービス、runtime/mise、frontend Release、benchmark、topology、seal/reset/rebootを調べ、過去問固有のcloud-init・all.sh・Goss・PackerとOrb/AWSの独立gateへ段階化する。新しいedition/Qualify/Finalのaudit、実装計画、recipe実装、fresh VM/EC2検証計画または検証開始前に使う。既定はaudit-onlyとし、既存AMIの単純なbuild・削除や一般的なAWS/Orb操作だけには使わない。
 ---
 
 # 過去問AMI recipeをonboardingする
@@ -40,6 +40,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 
 - [検証gate](references/verification-gates.md)を読み、依頼されたgateだけを実施する。
 - 一つの成功を別gateの成功へ読み替えない。gateごとにartifact identity、recipe digest、環境、証拠、cleanupを記録する。
+- external frontendを使う場合はremote mainとtarget固有Release asset/digestをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。
 - Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。AWS regionは東京`ap-northeast-1`へ固定する。
 - 承認のない外部操作、対象不明なcleanup、秘密情報の表示を行わない。
 
@@ -62,6 +63,7 @@ Ubuntu 26.04 arm64、AWS region `ap-northeast-1`、競技用domainが存在す�
 - upstreamに競技用domainがあるのに`isuren.internal`へのtarget限定写像、TLS SAN、自己署名fixtureまたは本物の秘密の境界が固定されていない。
 - benchmarkの実行方法、target、result/failure契約が分からない。
 - frontend buildが必要なのに、生成物、package manager、lockfile、build command、配置先のいずれかが不明である。
+- external frontend配布なのに、target固有workflow、remote exact tag、期待asset、published SHA-256のいずれかがなく、外部verifyを開始しようとしている。
 - mutableな`latest`、floating tag、`most_recent`、幅付きversion制約をartifact入力のまま使う。
 - 未統合KAKOMON14や別worktreeの値に依存する。
 - 外部操作のpreflight、承認、費用・TTL・cleanup境界が欠けている。
