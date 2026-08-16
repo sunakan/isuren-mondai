@@ -66,12 +66,14 @@ locals {
   }
 }
 
+# AMI buildではfrontendをビルドせず、事前取得したofficial artifactを配置する。
+# AMI build hostはt4g.small(2vCPU/2GiB)を採用する。実行時のインスタンスタイプとは別の設定である。
 source "amazon-ebs" "kakomon9_qualify" {
   ami_name        = local.name
   ami_description = "kakomon9-qualify Go practice environment provisioned by cloud-init"
   region          = var.region
   source_ami      = var.source_ami
-  instance_type   = "t4g.medium"
+  instance_type   = "t4g.small"
   ssh_username    = "ubuntu"
 
   vpc_id               = var.vpc_id

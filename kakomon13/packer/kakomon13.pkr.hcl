@@ -62,14 +62,13 @@ locals {
 }
 
 # AMI buildではfrontendをビルドせず、事前ビルド済みReleaseを取得する。
-# 現在は2vCPU/4GiBのt4g.mediumを採用している。t4g.smallへ下げる場合は、Go/DB/benchmark
-# provisioningをfresh buildで検証してから変更する。
+# AMI build hostはt4g.small(2vCPU/2GiB)を採用する。実行時のインスタンスタイプとは別の設定である。
 source "amazon-ebs" "kakomon13" {
   ami_name             = local.name
   ami_description      = "kakomon13 Go practice environment provisioned by cloud-init"
   region               = var.region
   source_ami           = var.source_ami
-  instance_type        = "t4g.medium"
+  instance_type        = "t4g.small"
   ssh_username         = "ubuntu"
   vpc_id               = var.vpc_id
   subnet_id            = var.subnet_id
