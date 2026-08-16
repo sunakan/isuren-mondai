@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="Optionally prepare exact ISUCON9 inputs into ignored dist/ for local inspection"
+#MISE description="official inputをdist/へprepareする (kakomon9-qualify独自: prebuilt frontend/AMI artifactをlocal inspection用に生成; optional)"
 set -euo pipefail
 exec kakomon9-qualify/scripts/prepare-artifacts.sh
