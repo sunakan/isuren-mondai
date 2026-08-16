@@ -14,6 +14,8 @@ fi
 test "$(id -u "${ISUREN_USER}")" = "${ISUREN_UID}"
 test "$(id -g "${ISUREN_USER}")" = "${ISUREN_GID}"
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+  "/home/${ISUREN_USER}/.local" \
+  "/home/${ISUREN_USER}/.config" \
   "/home/${ISUREN_USER}/.local/bin" \
   "/home/${ISUREN_USER}/.config/mise" \
   "${APP_ROOT}"

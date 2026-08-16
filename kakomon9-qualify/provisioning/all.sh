@@ -6,7 +6,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 require_root
 
+# Ubuntu mounts /tmp as a RAM-backed tmpfs. The official release bundles are
+# larger than the available tmpfs on the practice instances, so keep all
+# mktemp/unzip/package temporary files on the root-backed volume instead.
+RECIPE_TMPDIR=/var/tmp/isuren-mondai-kakomon9-qualify
+rm -rf "${RECIPE_TMPDIR}"
+install -d -m 1777 "${RECIPE_TMPDIR}"
+export TMPDIR="${RECIPE_TMPDIR}"
+
 log "all.sh: start"
+log "provisioning.all: temp_dir=${TMPDIR}"
 log "spans: begin"
 log "provisioning.all: disk_total_bytes=$(disk_total_bytes)"
 log "provisioning.all: start_ns=$(now_ns) disk_before=$(disk_used_bytes)"
@@ -43,5 +52,6 @@ run_step 90-nginx.sh
 run_step 95-provenance.sh
 run_step 99-verify.sh
 
+rm -rf "${RECIPE_TMPDIR}"
 touch /var/lib/cloud/kakomon9-qualify-provisioned
 log "all.sh: done"

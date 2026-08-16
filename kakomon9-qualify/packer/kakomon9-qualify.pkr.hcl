@@ -74,22 +74,25 @@ source "amazon-ebs" "kakomon9_qualify" {
 build {
   sources = ["source.amazon-ebs.kakomon9_qualify"]
 
-  # cloud-init waits for this local dist upload. No artifact is downloaded from
-  # a floating ref by the instance.
+  # /tmp is a RAM-backed tmpfs on Ubuntu 26.04 and cannot hold the fixed
+  # release bundle. Stage the upload on the root-backed ubuntu home instead.
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/kakomon9-qualify-dist"]
+    inline = [
+      "rm -rf /home/ubuntu/kakomon9-qualify-dist",
+      "mkdir -p /home/ubuntu/kakomon9-qualify-dist",
+    ]
   }
 
   provisioner "file" {
     source      = "${path.root}/../dist/"
-    destination = "/tmp/kakomon9-qualify-dist"
+    destination = "/home/ubuntu/kakomon9-qualify-dist"
   }
 
   provisioner "shell" {
     inline = [
       "sudo install -d -m 0755 /opt/isuren-artifacts",
       "sudo rm -rf /opt/isuren-artifacts/kakomon9-qualify",
-      "sudo mv /tmp/kakomon9-qualify-dist /opt/isuren-artifacts/kakomon9-qualify",
+      "sudo mv /home/ubuntu/kakomon9-qualify-dist /opt/isuren-artifacts/kakomon9-qualify",
       "sudo touch /opt/isuren-artifacts/kakomon9-qualify.ready",
       "sudo cloud-init status --wait || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
       "test -f /var/lib/cloud/kakomon9-qualify-provisioned || (sudo tail -n 500 /var/log/cloud-init-output.log; exit 1)",
