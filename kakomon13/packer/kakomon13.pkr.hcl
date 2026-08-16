@@ -116,7 +116,10 @@ build {
 
   provisioner "shell" {
     inline = [
-      "test ! -e /etc/nginx/tls/pipe.u.isuren.internal.key",
+      # TLS証明書は固定のワイルドカード証明書として意図的にsealed imageへ残す
+      # (95-seal.sh参照)。ここでは95-seal.shの削除処理が両方とも実行されたことだけ確認する。
+      "test -e /etc/nginx/tls/pipe.u.isuren.internal.key",
+      "test -e /etc/nginx/tls/pipe.u.isuren.internal.crt",
       "test ! -e /home/isuren/env.sh",
       "sudo rm -f /tmp/kakomon13-frontend-release-tag /tmp/kakomon13-frontend-release-sha256",
       "sudo truncate -s 0 /home/ubuntu/.ssh/authorized_keys",

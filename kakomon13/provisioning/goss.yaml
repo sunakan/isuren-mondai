@@ -58,10 +58,15 @@ file:
     exists: true
     filetype: symlink
     linked-to: /etc/nginx/sites-available/isupipe.conf
+  # 95-seal.sh: 固定のワイルドカード証明書として意図的にsealed imageへ残す(README.md参照)
   /etc/nginx/tls/pipe.u.isuren.internal.key:
-    exists: false
+    exists: true
+    filetype: file
+    mode: "0600"
   /etc/nginx/tls/pipe.u.isuren.internal.crt:
-    exists: false
+    exists: true
+    filetype: file
+    mode: "0644"
   /home/isuren/env.sh:
     exists: false
   /etc/isuren/kakomon13/mysql.cnf:

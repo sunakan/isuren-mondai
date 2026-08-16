@@ -55,11 +55,19 @@ The static contract rejects new occurrences outside the six reviewed files.
 | canonical/product | Web 3 + dedicated Bench 1 | Portal/provider product path | outside this repository slice |
 
 The common image contains the Application services and a benchmark binary but
-no role assignment. A later provider finalizer selects the role. TLS server
-key/certificate and runtime address are generated after clone/fresh boot and
-are absent from the sealed image. The self-signed certificate is only a public
-practice fixture; a standalone Bench node must receive the Web trust anchor
-through its separately approved finalizer. It is not an mTLS or Portal key.
+no role assignment. A later provider finalizer selects the role. The runtime
+address (`env.sh`, PowerDNS zone) is generated after clone/fresh boot and is
+absent from the sealed image.
+
+The TLS server key/certificate is a fixed wildcard pair generated once at AMI
+build time and intentionally retained in the sealed image, so every clone
+shares the same key without a separate trust-anchor distribution step. This
+follows the official ISUCON13 operator practice, which shipped one shared
+wildcard certificate (with its private key) to every contestant in
+`provisioning/ansible/roles/nginx/files/etc/nginx/tls`. It is a public
+practice fixture for a single time-boxed (~8h) competition over dummy data;
+it is not an mTLS or Portal key and must never be reused for trusted
+production traffic.
 
 The installed home layout follows the official `/home/isucon` structure with
 the account name translated to `/home/isuren`: Application files live below

@@ -6,9 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 systemctl stop nginx pdns mysql isupipe-go kakomon13-pdns-zone kakomon13-instance-init
+# TLS証明書はここでは削除せず、90-services.shが生成したものをsealed imageへ残す。
+# standalone bench nodeがWeb側の自己署名証明書を信頼するには、本来fresh boot後に
+# trust anchorを別途配布する必要があるが(README.md参照)、本家isucon13自体が固定の
+# ワイルドカード証明書(秘密鍵ごと)を全競技者に配布して運用していたため、それに倣う。
 rm -f \
-  /etc/nginx/tls/pipe.u.isuren.internal.crt \
-  /etc/nginx/tls/pipe.u.isuren.internal.key \
   "/home/${ISUREN_USER}/env.sh" \
   /etc/isuren/kakomon13/mysql.cnf
 mysql_datadir=/var/lib/mysql
