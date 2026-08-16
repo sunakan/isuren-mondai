@@ -60,8 +60,10 @@ mise orb:prepare-golden-base-clone kakomon14 isuren-kakomon14-golden-next --exec
 
 この処理はsource baseを起動・変更せず、clone側でhostname、machine-id、SSH host key、
 random seed、MySQL server UUIDを再生成する。問題serviceはGolden seal時に無効化し、identity
-再生成後にtargetのGoss contractどおり復元する。元のuser-dataをcloneで再実行しないため、
-Orb Goldenではcloud-initを無効のまま維持する。Bの追加provisioningはhost側script/Orb runで行う。
+再生成後にIPv4 default routeと、そのinterfaceのglobal IPv4を期限付きで待ってから、targetの
+Goss contractどおり復元する。問題serviceとSSHのenabled/active状態を検証できた場合だけ
+clone markerを作成して`prepared`を返す。元のuser-dataをcloneで再実行しないため、Orb Goldenでは
+cloud-initを無効のまま維持する。Bの追加provisioningはhost側script/Orb runで行う。
 base marker、`/usr/sbin/sshd`、`ssh.service`をidentity変更前に検証し、OpenSSH serverを持たない
 古いbaseはclone準備へ進めない。
 ここで完成するのはBを作るためのrunning作業VMであり、BのGolden完成を意味しない。isuren層の
@@ -73,6 +75,8 @@ base marker、`/usr/sbin/sshd`、`ssh.service`をidentity変更前に検証し�
   対象recipe/Gossに完全なservice contractがない場合はbuildしない。
 - Orb bootstrapでIPv4 route、DNS、apt、`git --version`、`sshd`、`ssh.service`のいずれかを
   確認できない場合は、canonical recipeを開始せずcloud-initを失敗させる。
+- clone準備でIPv4 default routeと対応するglobal IPv4を期限内に確認できない場合は、問題serviceを
+  復元せず失敗し、cloneを診断用に残す。identity再生成後の自動restartで迂回しない。
 - 同名VMが存在する、baseが停止していない、canonical slugでない場合は停止する。
 - build/clone失敗時は診断用VMを勝手に削除しない。名前と失敗gateを報告する。
 - Aへ`isu`、Portal/mTLS credential、environment identity、実秘密を追加しない。

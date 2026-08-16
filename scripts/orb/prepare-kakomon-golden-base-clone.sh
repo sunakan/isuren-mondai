@@ -153,6 +153,38 @@ install -d -m 0700 /var/lib/systemd
 dd if=/dev/urandom of=/var/lib/systemd/random-seed bs=512 count=1 status=none
 chmod 0600 /var/lib/systemd/random-seed
 
+clone_ipv4_address=""
+wait_for_clone_ipv4_network() {
+  local remaining=120 default_interface address
+
+  while ((remaining > 0)); do
+    default_interface="$(
+      ip -4 route show default |
+        awk '{for (field = 1; field <= NF; field++) if ($field == "dev") { print $(field + 1); exit }}'
+    )"
+    address="$(
+      ip -4 -o address show scope global |
+        awk -v interface="${default_interface}" \
+          '$2 == interface { sub(/\/.*/, "", $4); print $4; exit }'
+    )"
+    if [[ -n "${default_interface}" && -n "${address}" ]]; then
+      clone_ipv4_address="${address}"
+      printf 'clone network is ready: interface=%s address=%s\n' \
+        "${default_interface}" "${clone_ipv4_address}"
+      return 0
+    fi
+
+    sleep 1
+    remaining=$((remaining - 1))
+  done
+
+  printf 'error: clone IPv4 address or default route was not ready within 120 seconds\n' >&2
+  return 1
+}
+
+command -v ip >/dev/null
+wait_for_clone_ipv4_network
+
 IFS=, read -r -a target_services <<<"${TARGET_SERVICES}"
 if [[ -n "${ENABLED_SERVICES}" ]]; then
   IFS=, read -r -a enabled_services <<<"${ENABLED_SERVICES}"
@@ -227,6 +259,7 @@ base_marker_sha256="$(sha256sum "${base_marker}" | awk '{print $1}')"
   printf 'SSH_HOST_KEY_SHA256=%s\n' "${ssh_host_key_sha256}"
   printf 'MYSQL_SERVER_UUID=%s\n' "${mysql_server_uuid}"
   printf 'SSH_SERVER_VERIFIED=true\n'
+  printf 'IPV4_NETWORK_VERIFIED=true\n'
   printf 'CLOUD_INIT_DISABLED=true\n'
   printf 'CLONE_IDENTITY_REGENERATED=true\n'
 } >"${clone_marker}"

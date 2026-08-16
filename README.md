@@ -29,6 +29,8 @@ Orb用user-dataはVM内のIPv4 routeとDNSを期限付きで待ち、`ca-certifi
 AMI用user-dataへは混ぜず、downloadとinstallもMacではなくOrb VM内で行う。
 
 isuren層を追加する作業VMはbaseを直接起動せず、clone-local identityを再生成してから使う。
+clone adapterはIPv4 default routeと、そのinterfaceのglobal IPv4を期限付きで待ち、
+問題serviceとSSHの状態を検証できた場合だけ`prepared`を返す。
 
 ```bash
 mise orb:prepare-golden-base-clone kakomon14 isuren-kakomon14-golden-next

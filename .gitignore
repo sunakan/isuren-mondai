@@ -1,4 +1,6 @@
 tmp/
+# ローカルPythonテストが生成するimport bytecode cache。
+__pycache__/
 # generate-user-data.pyの生成物(git cloneするcommit SHAを埋め込むだけの、都度再生成が前提の
 # ビルド成果物。コミットのたびに中身が変わるためコミット対象から外す)
 kakomon14/cloud-init/user-data.yaml
