@@ -124,6 +124,19 @@ rg -q 'FRONTEND_RELEASE_SHA256.*exact' kakomon13/provisioning/all.sh
 grep -qF 'test "$(runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"' \
   kakomon13/provisioning/50-source.sh ||
   fail "official checkout identity must be verified as its owning user"
+# shellcheck disable=SC2016 # This is the exact source text required by the contract.
+grep -qF '= "goss version ${GOSS_VERSION}"' kakomon13/provisioning/99-verify.sh ||
+  fail "Goss version output contract is stale"
+if rg -n '^[[:space:]]+contains:' kakomon13/provisioning/goss.yaml; then
+  fail "deprecated literal Goss file.contains contract remains"
+fi
+for expected in \
+  '/^official_data_manifest_sha256=[0-9a-f]{64}$/' \
+  '/^frontend_release_tag=kakomon13-frontend-v[0-9]+[.][0-9]+[.][0-9]+$/' \
+  '/^frontend_release_sha256=[0-9a-f]{64}$/'; do
+  grep -qF "${expected}" kakomon13/provisioning/goss.yaml ||
+    fail "Goss provenance regex is missing: ${expected}"
+done
 
 if rg -n --glob '*.sh' --glob '*.py' --glob '*.hcl' --glob '*.yaml' \
   'tmp/all-kakomon' kakomon13/provisioning kakomon13/cloud-init kakomon13/packer; then

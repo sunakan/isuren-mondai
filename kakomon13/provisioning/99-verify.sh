@@ -16,7 +16,7 @@ log "99-verify.sh: goss validate start"
 curl -fsSL "${GOSS_URL}" -o "${archive}"
 echo "${GOSS_SHA256}  ${archive}" | sha256sum -c -
 tar -xzf "${archive}" -C "${staging}"
-test "$("${staging}/goss" --version)" = "goss version v${GOSS_VERSION}"
+test "$("${staging}/goss" --version)" = "goss version ${GOSS_VERSION}"
 "${staging}/goss" validate -g "${SCRIPT_DIR}/goss.yaml" --format documentation
 log "99-verify.sh: goss validate end"
 log "99-verify.sh: done"

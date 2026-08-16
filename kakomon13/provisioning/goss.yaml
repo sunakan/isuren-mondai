@@ -26,12 +26,12 @@ file:
   /usr/local/share/isuren-mondai/kakomon13-provenance:
     exists: true
     filetype: file
-    contains:
-      - "official_commit=8f6afdc3603f0c661368de4659a7240862f59623"
-      - "official_data_manifest_sha256=[0-9a-f]{64}"
-      - "frontend_release_tag=kakomon13-frontend-v[0-9]+\\.[0-9]+\\.[0-9]+"
-      - "frontend_release_sha256=[0-9a-f]{64}"
-      - "hostname=pipe.u.isuren.internal"
+    contents:
+      - "/^official_commit=8f6afdc3603f0c661368de4659a7240862f59623$/"
+      - "/^official_data_manifest_sha256=[0-9a-f]{64}$/"
+      - "/^frontend_release_tag=kakomon13-frontend-v[0-9]+[.][0-9]+[.][0-9]+$/"
+      - "/^frontend_release_sha256=[0-9a-f]{64}$/"
+      - "/^hostname=pipe[.]u[.]isuren[.]internal$/"
   /usr/local/share/isuren-mondai/kakomon13-packages.tsv:
     exists: true
     filetype: file
@@ -41,7 +41,7 @@ file:
   /etc/systemd/resolved.conf.d/kakomon13.conf:
     exists: true
     filetype: file
-    contains:
+    contents:
       - "DNSStubListener=no"
   /etc/nginx/sites-enabled/isupipe.conf:
     exists: true
