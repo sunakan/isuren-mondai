@@ -52,7 +52,7 @@
 - cache由来データを保守対象codeへ実ファイルで統合せず、不要な`.git`、生成物、依存directory、重複sourceを配布物へ残していない。`rsync --delete`でmanaged sourceのlocal変更を黙って上書きしていない。
 - dirty reference diffや公開AMIをsource provenanceへ昇格していない。
 - ApplicationとbenchmarkがGo 1.26.6であり、Node.js、package manager、OS、architectureがcurrent adopted planと一致する。
-- official contestant homeとsystemd unitを基準に、username写像後も`env.sh`、Application、benchmark、licenseの相対pathを保っている。配置差はREADME/NOTICE/Gossで意図的差分として説明され、偶発的な独自`runtime.env`やbuild-only checkout/GOPATH残留がない。
+- official contestant homeとsystemd unitを基準に、username写像後も`env.sh`、Application、benchmark、licenseの相対pathを保っている。他editionのhome-level binary名やdirectory構成をpractice-image標準として横展開していない。配置差はREADME/NOTICE/Gossで意図的差分として説明され、偶発的な独自`runtime.env`やbuild-only checkout/GOPATH残留がない。
 - OSとarchitectureがUbuntu 26.04 arm64、AWS regionが`ap-northeast-1`で、profile、Packer、base AMI検索、build、tag、fresh boot、product検証、cleanupのregionが一致している。暗黙のdefault regionへ依存していない。
 - Packer build入力が`ap-northeast-1`のexact base image IDに固定され、別regionのAMI ID、amd64、旧Ubuntu、`most_recent`へfallbackしていない。
 - URL、checksum、config、lock、Goss、provenanceのcross-versionがない。
@@ -66,7 +66,7 @@
 - failureが非zeroで伝播し、completion markerを失敗時に作らない。
 - user/group、ownership、directory、package、service依存順、port、DB/proxy/DNS/TLSが対象upstreamから導かれている。
 - upstreamに競技用domainがある場合、元のsubdomainを保つ`isuren.internal`写像がDNS/hosts、proxy、TLS SAN、cookie/domain、Application、benchmark、healthcheckで一致し、一括置換・alias・published identity上書きがない。
-- Applicationとbenchmarkのbuild、配置、実行user/cwd、result/failure契約が分離されている。
+- Applicationとbenchmarkのbuild、配置、実行user/cwd、result/failure契約が分離されている。local helper/wrapperはofficial binaryと区別され、採用済みconsumer契約が必要とする場合だけAMIへ含まれる。wrapperなしならdirect commandと最終JSONの判定責任が明記されている。配置変更では再provision時に旧pathを除去し、Goss/static validationが不在を確認する。
 - frontendをこちらでbuildする方式とofficial prebuiltをbyte-for-byte配置する方式が分離されている。前者はbuild/hash/manifest/benchmark build/配置順、後者はexact commit/tree/file manifest/SHA-256/licenseとAMI内取得順がofficial契約に一致する。
 - prebuilt assetの外部URLを文字列だけで一括置換していない。未登録service worker等のdormant referenceはruntime到達性の証拠とともに維持し、activeな絶対domain依存は生成済みassetを変更せず停止している。
 - external frontend配布ならtarget固有workflow、target限定tag filter、asset名、manifest/licenseが揃う。repository slice完了とremote Release発行を分け、Release未発行の状態を外部verify-readyにしていない。

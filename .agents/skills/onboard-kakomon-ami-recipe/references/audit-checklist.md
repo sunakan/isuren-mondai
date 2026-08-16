@@ -17,7 +17,7 @@
 - package名、設定、user/group、directory、ownership、environment、systemd依存順を集める。
 - officialのcontestant home treeとsystemd unitから、`env.sh`、Application、benchmark、runtime、licenseの相対pathを一覧化する。username写像以外の配置差は意図的差分か欠落かを分類する。
 - `env.sh`の各値を公開practice defaultとclone/role固有secretへ分類する。公開DB defaultはofficial file名/keyを保ってimageへ置けるが、credential-bearing値やmachine identityを同じ扱いにしない。
-- benchmark source、binary、wrapper、runtime assetを分ける。build後にsource directoryを削除する場合も、binaryが実行時に参照するinitial-data、static file、cwd、相対pathはsource codeと実走証拠から残す。
+- benchmark source、module entrypoint、binary、任意のlocal helper/wrapper、runtime assetを分け、各fileがofficial由来かrecipe独自かを分類する。wrapperを既定で作らず、採用済みconsumer/result契約が要求する場合だけAMIへ含める。build後にsource directoryを削除する場合も、binaryが実行時に参照するinitial-data、static file、cwd、相対pathはsource codeと実走証拠から残す。official project rootがこれらのruntime assetを束ねる場合、source-only directoryと誤認してhome直下のApplication directoryへ潰さない。
 - listen address、port、protocol、hostname、DNS/hosts依存、TLS終端と証明書生成責任を調べる。
 - 競技用domainと全参照箇所を列挙し、元のsubdomainを保つ`isuren.internal`写像、TLS SAN、cookie/domain、benchmark target、自己署名fixtureまたは本物の秘密の境界を定義する。
 - architecture固有binary、private registry/image、外部download、build-time network依存を探す。
