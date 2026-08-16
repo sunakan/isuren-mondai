@@ -1,0 +1,119 @@
+file:
+  /home/isuren/isucari/bin/isucari:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isucari/bin/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isucari/bin/run-benchmark:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isucari/webapp/public/asset-manifest.json:
+    exists: true
+    filetype: file
+  /home/isuren/isucari/webapp/public/service-worker.js:
+    exists: true
+  /etc/nginx/sites-enabled/kakomon9-qualify.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /etc/nginx/sites-available/kakomon9-qualify.conf
+  /etc/nginx/sites-enabled/default:
+    exists: false
+  /opt/isuren-mondai/kakomon9-qualify/recipe.txt:
+    exists: true
+    contains:
+      - 'base_ami=ami-0df1235688731e6cc'
+      - 'frontend_tree=a427d1c0adf7e8875d7dfbdca352de5a199edd69'
+
+user:
+  isuren:
+    exists: true
+    uid: 1100
+    groups:
+      - isuren
+
+group:
+  isuren:
+    exists: true
+    gid: 1100
+
+package:
+  mysql-server:
+    installed: true
+  nginx:
+    installed: true
+
+service:
+  mysql:
+    enabled: true
+    running: true
+  nginx:
+    enabled: true
+    running: true
+  isucari-go:
+    enabled: true
+    running: true
+
+port:
+  tcp:80:
+    listening: true
+  tcp:8000:
+    listening: true
+  tcp:5555:
+    listening: false
+  tcp:7001:
+    listening: false
+
+command:
+  os-version:
+    exec: ". /etc/os-release; test \"$ID\" = ubuntu; test \"$VERSION_ID\" = 26.04"
+    exit-status: 0
+  architecture:
+    exec: "test \"$(dpkg --print-architecture)\" = arm64"
+    exit-status: 0
+  go-version:
+    exec: "runuser -u isuren -- /home/isuren/.local/bin/mise exec -- go version"
+    stdout:
+      - "go version go1.26.6 linux/arm64"
+    exit-status: 0
+  app-loopback-only:
+    exec: "ss -ltnH | awk '{print $4}' | grep -Fxq 127.0.0.1:8000"
+    exit-status: 0
+  hostname-contract:
+    exec: "grep -Fq '127.0.0.1 isucon9.isuren.internal isucari.t.isuren.internal' /etc/hosts && grep -Fq 'server_name isucon9.isuren.internal isucari.t.isuren.internal;' /etc/nginx/sites-available/kakomon9-qualify.conf"
+    exit-status: 0
+  healthcheck:
+    exec: "curl -fsS -o /dev/null -H 'Host: isucon9.isuren.internal' http://127.0.0.1/"
+    exit-status: 0
+  reset-contract:
+    exec: >-
+      curl -fsS -H 'Host: isucon9.isuren.internal' -H 'Content-Type: application/json'
+      --data '{"payment_service_url":"http://localhost:5555","shipment_service_url":"http://localhost:7001"}'
+      http://127.0.0.1/initialize | jq -e '.campaign == 0 and (.language | type == "string")'
+    exit-status: 0
+    timeout: 120000
+  mysql-database:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SHOW DATABASES LIKE 'isucari'\""
+    stdout:
+      - "isucari"
+    exit-status: 0
+  mysql-official-users:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SELECT COUNT(*) FROM mysql.user WHERE User='isucari'\""
+    stdout:
+      - "2"
+    exit-status: 0
+  initial-images:
+    exec: "test \"$(find /home/isuren/isucari/webapp/public/upload -type f | wc -l)\" -eq 20000"
+    exit-status: 0
+  benchmark-images:
+    exec: "test \"$(find /home/isuren/isucari/initial-data/images -type f | wc -l)\" -eq 20000"
+    exit-status: 0
+  frontend-no-registration:
+    exec: "! grep -R -a -F -q navigator.serviceWorker /home/isuren/isucari/webapp/public/index.html /home/isuren/isucari/webapp/public/static"
+    exit-status: 0
+  workbox-exact-import:
+    exec: "test \"$(grep -Fxc 'importScripts(\"https://storage.googleapis.com/workbox-cdn/releases/4.3.1/workbox-sw.js\");' /home/isuren/isucari/webapp/public/service-worker.js)\" -eq 1"
+    exit-status: 0

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Prepare exact ISUCON9 frontend and data artifacts into ignored dist/"
+set -euo pipefail
+exec kakomon9-qualify/scripts/prepare-artifacts.sh

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Run local source, shell, artifact, cloud-init, and Packer static validation"
+set -euo pipefail
+
+kakomon9-qualify/scripts/verify-artifacts.sh
+kakomon9-qualify/scripts/test-run-benchmark.sh
+
+find kakomon9-qualify mise-tasks/kakomon9-qualify \
+  -type f -name '*.sh' -not -path '*/dist/*' -print0 |
+  xargs -0 shellcheck -x -P SCRIPTDIR
+
+GO_BIN="$(mise where go@1.26.6)/bin/go"
+case "$(env -u GOROOT "${GO_BIN}" version)" in
+  'go version go1.26.6 '*) ;;
+  *)
+    echo 'Go 1.26.6 is required for validation' >&2
+    exit 1
+    ;;
+esac
+
+(
+  cd upstream/isucon9-qualify
+  env -u GOROOT "${GO_BIN}" test ./...
+  env -u GOROOT "${GO_BIN}" vet ./...
+)
+(
+  cd upstream/isucon9-qualify/webapp/go
+  env -u GOROOT "${GO_BIN}" test ./...
+  env -u GOROOT "${GO_BIN}" vet ./...
+)
+
+PROJECT_COMMIT="$(git rev-parse HEAD)" kakomon9-qualify/cloud-init/generate-user-data.py
+packer fmt -check kakomon9-qualify/packer
+packer validate \
+  -var vpc_id=vpc-static-validation \
+  -var subnet_id=subnet-static-validation \
+  -var iam_instance_profile=static-validation \
+  -var project_url="https://github.com/sunakan/isuren-mondai/commit/$(git rev-parse HEAD)" \
+  kakomon9-qualify/packer

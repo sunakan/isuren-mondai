@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#MISE description="Build the pinned kakomon9-qualify AMI after explicit artifact preparation"
+set -euo pipefail
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo 'commit all recipe changes before an AMI build' >&2
+  exit 1
+fi
+kakomon9-qualify/scripts/verify-artifacts.sh
+
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+PROJECT_BRANCH="$(git symbolic-ref --short HEAD)"
+REMOTE_COMMIT="$(git ls-remote origin "refs/heads/${PROJECT_BRANCH}" | awk '{print $1}')"
+if [ "${REMOTE_COMMIT}" != "${PROJECT_COMMIT}" ]; then
+  echo "origin/${PROJECT_BRANCH} does not resolve to ${PROJECT_COMMIT}; push is a human-owned prerequisite" >&2
+  exit 1
+fi
+export PROJECT_COMMIT
+kakomon9-qualify/cloud-init/generate-user-data.py
+packer init kakomon9-qualify/packer
+
+VPC_ID="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks --stack-name "${PACKER_NETWORK_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+
+packer build \
+  -var "vpc_id=${VPC_ID}" \
+  -var "subnet_id=${SUBNET_ID}" \
+  -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \
+  -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
+  kakomon9-qualify/packer
