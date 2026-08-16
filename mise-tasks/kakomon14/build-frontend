@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="kakomon14のfrontendをビルドし、kakomon14/dist/にビルド成果物を出力"
+#MISE description="frontendをbuildしてdist/へ出力する (kakomon14独自: Node 24.19.0/pnpm 11.21.0と公式publicを使用)"
 set -euo pipefail
+
+# Keep the task wrapper target-local while using the paired recipe's frontend
+# build entrypoint shape.
 kakomon14/scripts/build-frontend-release.sh

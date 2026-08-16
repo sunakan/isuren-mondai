@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Node 24.19.0/Yarn 3.2.2でfrontendをdist/へbuild"
+#MISE description="frontendをbuildしてdist/へ出力する (kakomon13独自: Node 24.19.0/Yarn 3.2.2)"
 set -euo pipefail
+
+# Keep the task wrapper target-local while using the paired recipe's frontend
+# build entrypoint shape.
 kakomon13/scripts/build-frontend-release.sh
