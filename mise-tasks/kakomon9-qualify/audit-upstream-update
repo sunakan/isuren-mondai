@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="Show exact managed and frontend diffs for an explicit official candidate SHA"
+#MISE description="official candidateのmanaged source/frontend差分を監査する (kakomon9-qualify独自: exact candidate SHAを引数に使用; external)"
 set -euo pipefail
 exec kakomon9-qualify/scripts/audit-upstream-update.sh "$@"
