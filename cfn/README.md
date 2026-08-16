@@ -2,7 +2,7 @@
 
 ベンチマーカー・競技サーバーを実際に起動するCloudFormationテンプレート置き場
 
-以下の例は kakomon14 を対象にしています(kakomon9-qualify の例は末尾を参照)
+以下の例は kakomon14 を対象にしています(kakomon9-qualify・kakomon13 の例は末尾を参照)
 
 ## 利用するインスタンスの料金目安
 
@@ -196,4 +196,91 @@ cd /home/isuren/isucari
   -payment-url http://10.42.1.10:5555 -shipment-url http://10.42.1.10:7001 \
   -payment-port 5555 -shipment-port 7001 \
   -data-dir initial-data -static-dir webapp/public/static
+```
+
+## kakomon13
+
+`kakomon13`のベンチマーカーは`--nameserver`/`--webapp`でDNSサーバー・Webアプリの接続先IPを
+直接指定できるため、bench側の名前解決設定は不要。固定のワイルドカードTLS証明書がAMIに
+焼き込まれ、OS trust storeにも登録済みのため、bench側で追加の証明書信頼設定も不要。
+
+### スタック作成と削除
+
+```shell
+# 作成
+GITHUB_USERS='<YOUR_GITHUB_USER_NAME>'
+AMI_ID=$(aws ec2 describe-images --owners self \
+  --filters 'Name=name,Values=isuren/kakomon13-*' 'Name=state,Values=available' \
+  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
+
+aws cloudformation deploy \
+  --stack-name kakomon13-1bench-1web \
+  --template-file cfn/kakomon13-1bench-1web.yaml \
+  --parameter-overrides AmiId="$AMI_ID" GithubUsers="${GITHUB_USERS}" \
+  --capabilities CAPABILITY_IAM
+```
+
+```shell
+# 削除
+aws cloudformation delete-stack --stack-name kakomon13-1bench-1web
+```
+
+### 接続(SSH版)
+
+```shell
+STACK_NAME=kakomon13-1bench-1web
+WEB1_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon13-web1" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicIp" --output text)
+ssh isuren@${WEB1_IP}
+```
+
+### 接続(SSM Session Manager版)
+
+```shell
+STACK_NAME=kakomon13-1bench-1web
+WEB1_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon13-web1" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].InstanceId" --output text)
+aws ssm start-session --target "$WEB1_INSTANCE_ID" \
+  --document-name AWS-StartInteractiveCommand \
+  --parameters command="sudo -u isuren -i"
+```
+
+### appのビルド(Go版)
+
+```shell
+cd /home/isuren/webapp/go
+go build -o isupipe -ldflags "-s -w"
+sudo systemctl restart isupipe-go
+```
+
+### ベンチ実行(SSH版)
+
+```shell
+STACK_NAME=kakomon13-1bench-1web
+BENCH_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon13-bench" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicIp" --output text)
+ssh isuren@${BENCH_IP} \
+  '/home/isuren/bench run --target https://pipe.u.isuren.internal \
+    --nameserver 10.42.1.11 --webapp 10.42.1.11 --dns-port 53 \
+    --enable-ssl --result-path /tmp/result.json'
+```
+
+### ベンチ実行(SSM Session Manager版)
+
+```shell
+STACK_NAME=kakomon13-1bench-1web
+BENCH_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" "Name=tag:Name,Values=kakomon13-bench" "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].InstanceId" --output text)
+aws ssm start-session --target "$BENCH_INSTANCE_ID" \
+  --document-name AWS-StartInteractiveCommand \
+  --parameters command="sudo -u isuren -i"
+
+# セッションに入ったらベンチを実行
+/home/isuren/bench run --target https://pipe.u.isuren.internal \
+  --nameserver 10.42.1.11 --webapp 10.42.1.11 --dns-port 53 \
+  --enable-ssl --result-path /tmp/result.json
 ```
