@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/build-frontend,
+# remove this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: build-frontend.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+
+# TODO: delete this task when the target consumes official prebuilt frontend
+# bytes. Otherwise keep this wrapper thin and delegate to a target-owned build
+# entrypoint that pins package manager/runtime, emits the archive, manifest,
+# and published checksum under the target dist directory.
+TODO_run_target_frontend_build "${TARGET_SLUG}/scripts/__FRONTEND_BUILD_ENTRYPOINT__"

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/validate, remove
+# this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: validate.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+TARGET_ROOT="${TARGET_SLUG}"
+
+# TODO: keep this task as the fail-fast entrypoint for the target-owned static
+# validator, or expand the checks here when a separate script is not warranted.
+TODO_validate_source_and_official_identity "${TARGET_ROOT}"
+TODO_validate_exact_ami_runtime_and_lock_inputs "${TARGET_ROOT}"
+TODO_validate_domain_service_and_step_order_contract "${TARGET_ROOT}"
+TODO_validate_frontend_or_prebuilt_artifact_contract "${TARGET_ROOT}"
+TODO_validate_cloud_init_and_packer_static_contract "${TARGET_ROOT}"
+
+# TODO: run only local syntax/lint/test gates whose dependencies are already
+# declared for this repository. Do not turn this task into an AWS/Orb product gate.
+TODO_run_target_local_static_checks "${TARGET_ROOT}"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/refresh-upstream,
+# remove this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: refresh-upstream.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+CANDIDATE_COMMIT="${1:?TODO reviewed official full SHA is required}"
+[[ "${CANDIDATE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: candidate commit must be a full lowercase Git SHA" >&2
+  exit 1
+}
+
+# This task is intentionally external/mutating after instantiation. Require a
+# reviewed candidate, then copy only NOTICE-managed paths and report the exact
+# resulting identity. Never hide latest/pull behavior inside validation.
+TODO_refresh_official_mirror_at_exact_commit "${TARGET_SLUG}" "${CANDIDATE_COMMIT}"
+TODO_copy_notice_managed_paths "${TARGET_SLUG}" "${CANDIDATE_COMMIT}"

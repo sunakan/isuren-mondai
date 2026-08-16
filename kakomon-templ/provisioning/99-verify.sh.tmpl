@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+GOSS_VERSION="0.4.10"
+GOSS_URL="https://github.com/goss-org/goss/releases/download/v${GOSS_VERSION}/goss_${GOSS_VERSION}_linux_arm64.tar.gz"
+GOSS_SHA256="90a59612b4d67d9f1a9038634c000790136bb82526a69de1e81ac075c2f6d2c6"
+
+# Replace this empty list in the target-owned copy. Keeping service identity
+# out of the template prevents cross-edition journal and Goss assumptions.
+JOURNAL_UNITS=()
+if [ "${#JOURNAL_UNITS[@]}" -eq 0 ]; then
+  echo "error: configure target JOURNAL_UNITS before using 99-verify.sh" >&2
+  exit 1
+fi
+
+require_file "${SCRIPT_DIR}/goss.yaml"
+
+journal_args=()
+for unit in "${JOURNAL_UNITS[@]}"; do
+  journal_args+=(-u "${unit}")
+done
+archive="$(mktemp)"
+staging="$(mktemp -d)"
+trap 'rm -f "${archive}"; rm -rf "${staging}"' EXIT
+
+# Download the verifier into staging, validate its exact identity, and remove
+# it after the sealed single-host observation completes. Goss never creates
+# state and does not replace standalone or product verification gates.
+log "99-verify.sh: goss validate start"
+curl -fsSL "${GOSS_URL}" -o "${archive}"
+echo "${GOSS_SHA256}  ${archive}" | sha256sum -c -
+tar -xzf "${archive}" -C "${staging}"
+GOSS_BIN="${staging}/goss"
+test -x "${GOSS_BIN}"
+test "$("${GOSS_BIN}" --version)" = "goss version ${GOSS_VERSION}"
+
+if ! "${GOSS_BIN}" validate -g "${SCRIPT_DIR}/goss.yaml" \
+  --format documentation --retry-timeout 30s --sleep 1s; then
+  log "99-verify.sh: goss validate failed, dumping target journal"
+  journalctl "${journal_args[@]}" --no-pager -n 100 || true
+  exit 1
+fi
+
+log "99-verify.sh: goss validate end"
+log "99-verify.sh: done"

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/release, remove
+# this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: release.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+TAG="${1:?TODO exact frontend tag is required}"
+TAG_REGEX="^${TARGET_SLUG}-frontend-v[0-9]+\.[0-9]+\.[0-9]+$"
+[[ "${TAG}" =~ ${TAG_REGEX} ]] || {
+  echo "error: tag must match ${TARGET_SLUG}-frontend-vMAJOR.MINOR.PATCH" >&2
+  exit 1
+}
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
+require_tag_absent_or_at_head "${TAG}"
+
+# Keep the Release token out of the frontend build. Restore it only for the
+# target-specific upload command, then remove the local copy.
+release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export -n release_gh_token
+unset GH_TOKEN GITHUB_TOKEN
+TODO_run_target_frontend_build
+
+# TODO: replace every asset with the exact target-owned archive, published
+# checksum, manifest, and any license/notice required by the Release contract.
+RELEASE_ASSETS=(
+  "${TARGET_SLUG}/dist/__FRONTEND_ARCHIVE__"
+  "${TARGET_SLUG}/dist/__FRONTEND_ARCHIVE_CHECKSUM__"
+  "${TARGET_SLUG}/dist/__TARGET_SPECIFIC_MANIFEST__"
+)
+GH_TOKEN="${release_gh_token}" TODO_upload_release_assets "${TAG}" "${RELEASE_ASSETS[@]}"
+unset release_gh_token

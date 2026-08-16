@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+# Prepare nginx without embedding a target hostname, TLS, frontend root, or
+# upstream service contract in the common base.
+install_nginx() {
+  if ! dpkg -s nginx >/dev/null 2>&1; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+    log "nginx: installed"
+  else
+    log "nginx: already installed"
+  fi
+}
+
+prepare_nginx() {
+  rm -f /etc/nginx/sites-enabled/default
+  systemctl stop nginx
+  log "nginx: default site removed and service stopped for target configuration"
+}
+
+install_nginx
+prepare_nginx
+
+log "90-nginx.sh: done"

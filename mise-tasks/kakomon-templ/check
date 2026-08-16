@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+#MISE description="kakomon recipe/task templateをローカル静的検査する"
+set -euo pipefail
+
+task_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${task_dir}/../.." && pwd)"
+provisioning_dir="${repo_root}/kakomon-templ/provisioning"
+
+task_templates=(
+  build.tmpl
+  diff.tmpl
+  validate.tmpl
+  build-frontend.tmpl
+  release.tmpl
+  lock-ami-tools.tmpl
+  test-go.tmpl
+  verify-official-data.tmpl
+  audit-upstream-update.tmpl
+  prepare-artifacts.tmpl
+  verify-artifacts.tmpl
+  refresh-upstream.tmpl
+  prune-ami.tmpl
+  publish-latest-ami.tmpl
+)
+
+provisioning_templates=(
+  lib.sh.tmpl
+  all.sh.tmpl
+  10-base.sh.tmpl
+  20-user.sh.tmpl
+  30-runtime.sh.tmpl
+  40-mysql.sh.tmpl
+  41-mysql-target.sh.tmpl
+  90-nginx.sh.tmpl
+  91-nginx-target.sh.tmpl
+  99-verify.sh.tmpl
+)
+
+mode_of() {
+  case "$(uname -s)" in
+  Darwin) stat -f "%Lp" "$1" ;;
+  *) stat -c "%a" "$1" ;;
+  esac
+}
+
+check_non_executable_file() {
+  local path="$1"
+  local label="$2"
+  test -f "${path}" || {
+    echo "error: missing ${label}" >&2
+    exit 1
+  }
+  test "$(mode_of "${path}")" = "644" || {
+    echo "error: ${label} must have mode 0644" >&2
+    exit 1
+  }
+  test ! -x "${path}" || {
+    echo "error: ${label} must not be executable" >&2
+    exit 1
+  }
+}
+
+check_non_executable_file "${task_dir}/README.md" "mise-tasks/kakomon-templ/README.md"
+check_non_executable_file "${repo_root}/kakomon-templ/README.md" "kakomon-templ/README.md"
+check_non_executable_file "${provisioning_dir}/README.md" "kakomon-templ/provisioning/README.md"
+
+task_template_paths=()
+for template in "${task_templates[@]}"; do
+  path="${task_dir}/${template}"
+  check_non_executable_file "${path}" "mise-tasks/kakomon-templ/${template}"
+  grep -qF "__KAKOMON_SLUG__" "${path}" || {
+    echo "error: ${template} must retain the target slug placeholder" >&2
+    exit 1
+  }
+  grep -qF "TODO" "${path}" || {
+    echo "error: ${template} must retain explicit target-specific TODOs" >&2
+    exit 1
+  }
+  if grep -n "^#MISE" "${path}"; then
+    echo "error: ${template} must not be discovered as a mise task" >&2
+    exit 1
+  fi
+  bash -n "${path}"
+  task_template_paths+=("${path}")
+done
+
+# Skeletons must not silently inherit a currently implemented target or exact
+# artifact identity. Those values are supplied only after copying to a target.
+if grep -Ein "kakomon(9-qualify|13|14)([^0-9]|$)|ami-[0-9a-f]{17}|[0-9a-f]{40}" \
+  "${task_template_paths[@]}"; then
+  echo "error: template contains a hard-coded target or artifact identity" >&2
+  exit 1
+fi
+
+# Non-comment template code may contain read-only Git inspection, but no direct
+# network/provider/release mutation. TODO adapters must be implemented only in
+# the copied target task after its exact contract has been reviewed.
+for path in "${task_template_paths[@]}"; do
+  if sed -E "/^[[:space:]]*#/d; /^[[:space:]]*$/d" "${path}" |
+    grep -En "(^|[;&|][[:space:]]*)(aws|gh|docker|curl|wget)[[:space:]]|packer[[:space:]]+build|scripts/github-release\.sh|git[[:space:]]+(push|tag|fetch|pull|clone)([[:space:]]|$)"; then
+    echo "error: $(basename "${path}") contains a directly runnable external mutation" >&2
+    exit 1
+  fi
+done
+
+provisioning_template_paths=()
+for template in "${provisioning_templates[@]}"; do
+  path="${provisioning_dir}/${template}"
+  check_non_executable_file "${path}" "kakomon-templ/provisioning/${template}"
+  bash -n "${path}"
+  provisioning_template_paths+=("${path}")
+done
+
+# Provisioning templates may pin common tools such as mise and Goss, but must
+# not silently carry a currently implemented target's identity.
+if grep -Ein "kakomon(9-qualify|13|14)([^0-9]|$)" "${provisioning_template_paths[@]}"; then
+  echo "error: provisioning template contains a hard-coded implemented target" >&2
+  exit 1
+fi
+
+# The task skeleton guard deliberately makes the remaining source unreachable
+# until copied, so suppress only those expected source-skeleton diagnostics.
+shellcheck -e SC1091,SC2034,SC2317,SC2329 "${task_template_paths[@]}"
+shellcheck -x -e SC1091 "${provisioning_template_paths[@]}"
+shfmt -i 2 -d "${task_template_paths[@]}" "${provisioning_template_paths[@]}"
+
+echo "kakomon recipe/task templates: local static checks passed"

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/build, remove this
+# guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: build.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+AWS_REGION="ap-northeast-1"
+
+# TODO: resolve the approved Packer network stack into VPC_ID, SUBNET_ID, and
+# IAM_INSTANCE_PROFILE. Keep the region explicit and fail before provisioning.
+TODO_resolve_packer_network_inputs
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
+
+# user-data embeds the HEAD commit. Fail locally when that commit is dirty or
+# unavailable remotely instead of failing later inside the build instance.
+require_clean_worktree
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+export PROJECT_COMMIT
+require_pushed_commit "${PROJECT_COMMIT}"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:${TARGET_SLUG}")"
+
+# EC2/all.sh only returns raw trace markers. Span creation and OTLP delivery
+# stay on the build host so credentials never enter the build instance or AMI.
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export TRACEPARENT
+
+# TODO: load target-owned exact inputs. Pin the source AMI and, when applicable,
+# a target-scoped Release selector plus the expected asset/checksum contract.
+# `latest` means the latest Release within TARGET_SLUG's frontend tag prefix;
+# provisioning must resolve it to an exact tag and digest before artifact use.
+SOURCE_AMI_ID="__SOURCE_AMI_ID__"
+FRONTEND_RELEASE_SELECTOR="__EXACT_TAG_OR_LATEST__"
+[[ "${SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
+  echo "error: TODO source AMI must be an exact AMI ID" >&2
+  exit 1
+}
+# TODO: replace this placeholder check with the target-specific Release prefix,
+# expected assets, and resolved identity validation; delete it for prebuilt-only targets.
+[[ "${FRONTEND_RELEASE_SELECTOR}" == "latest" ||
+  "${FRONTEND_RELEASE_SELECTOR}" =~ ^${TARGET_SLUG}-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+export FRONTEND_RELEASE_TAG="${FRONTEND_RELEASE_SELECTOR}"
+
+# user-data is small and reproducible from tracked provisioning files. Generate
+# it per build and remove it together with logs and identity handoff files.
+user_data="$(mktemp)"
+BUILD_LOG="$(mktemp)"
+cleanup() {
+  rm -f "${BUILD_LOG}" "${user_data}" \
+    "TODO-resolved-release-tag.txt" "TODO-resolved-asset-sha256.txt"
+}
+trap cleanup EXIT
+TODO_generate_user_data "${user_data}"
+TODO_initialize_packer
+
+# Stream the build log to the terminal and retain it for artifact identity and
+# host-side spans. Capture the original build status so later telemetry cannot
+# turn a failed build into a successful mise task.
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
+TODO_run_packer_build \
+  "${AWS_REGION}" "${SOURCE_AMI_ID}" "${VPC_ID}" "${SUBNET_ID}" \
+  "${IAM_INSTANCE_PROFILE}" "${user_data}" "${PROJECT_COMMIT}" "${RECIPE_TREE}" |
+  tee "${BUILD_LOG}" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
+
+if [ "${BUILD_EXIT}" -eq 0 ]; then
+  # TODO: extract only the produced AMI ID, then validate resolved Release tag
+  # and digest before applying target-specific provenance tags.
+  if ! TODO_validate_build_artifact_identity "${BUILD_LOG}"; then
+    BUILD_EXIT=1
+  elif ! TODO_apply_artifact_provenance_tags "${AWS_REGION}"; then
+    BUILD_EXIT=1
+  fi
+fi
+
+# Emit telemetry only after artifact identity/tag handling. Telemetry failure
+# must not replace BUILD_EXIT; the task returns the original build outcome.
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE="ok"
+  if [ "${BUILD_EXIT}" -ne 0 ]; then
+    ROOT_STATUS_CODE="error"
+  fi
+  otel_span \
+    --service "${OTEL_SERVICE_NAME:-${TARGET_SLUG}-ami-build}" \
+    --name "packer.build" \
+    --kind server \
+    --force-trace-id "${TRACE_ID}" \
+    --force-span-id "${ROOT_SPAN_ID}" \
+    --start "${BUILD_START_EPOCH}" \
+    --end "${BUILD_END_EPOCH}" \
+    --status-code "${ROOT_STATUS_CODE}"
+  otel_emit_provisioning_spans \
+    "${BUILD_LOG}" "${TRACE_ID}" "${ROOT_SPAN_ID}" "${TARGET_SLUG}"
+fi
+
+exit "${BUILD_EXIT}"

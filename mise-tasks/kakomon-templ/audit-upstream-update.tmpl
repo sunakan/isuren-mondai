@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/audit-upstream-update,
+# remove this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: audit-upstream-update.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+CANDIDATE_COMMIT="${1:?TODO candidate official full SHA is required}"
+[[ "${CANDIDATE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: candidate commit must be a full lowercase Git SHA" >&2
+  exit 1
+}
+
+# Audit candidate bytes without changing the managed source. Keep every
+# exclusion tied to the target NOTICE/provenance contract.
+TODO_audit_candidate_managed_paths "${TARGET_SLUG}" "${CANDIDATE_COMMIT}"

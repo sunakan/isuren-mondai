@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/test-go, remove
+# this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: test-go.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+
+# Keep the mise task thin. The target-owned entrypoint decides which Go
+# modules, official cache, frontend manifest, and benchmark binaries are part
+# of its local test/build contract.
+TODO_run_target_go_tests "${TARGET_SLUG}/scripts/__GO_TEST_ENTRYPOINT__"

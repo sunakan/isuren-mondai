@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/verify-artifacts,
+# remove this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: verify-artifacts.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+
+# Verify only prepared local bytes here. Network retrieval and artifact
+# preparation belong to a separate explicit task.
+TODO_verify_prepared_manifest_digest_and_provenance "${TARGET_SLUG}/dist"

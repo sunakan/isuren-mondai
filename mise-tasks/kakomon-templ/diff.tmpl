@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/diff, remove this
+# guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: diff.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+MIRROR="tmp/all-kakomon/__OFFICIAL_REPOSITORY_NAME__"
+OFFICIAL_ORIGIN="https://github.com/isucon/__OFFICIAL_REPOSITORY_NAME__.git"
+OFFICIAL_COMMIT="__OFFICIAL_COMMIT_40_HEX__"
+
+# The worktree-local official mirror is read-only evidence. Never fetch, pull,
+# checkout, or reset it from this task.
+test -d "${MIRROR}/.git" || {
+  echo "error: worktree-local official mirror is missing" >&2
+  exit 1
+}
+[[ "${OFFICIAL_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: TODO official mirror commit must be a full SHA" >&2
+  exit 1
+}
+test "$(git -C "${MIRROR}" remote get-url origin)" = "${OFFICIAL_ORIGIN}"
+test "$(git -C "${MIRROR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"
+test -z "$(git -C "${MIRROR}" status --short)"
+
+# TODO: compare only managed source paths. Document every exclusion as a
+# target-specific data/artifact boundary. A diff exit status of 1 means that
+# differences were displayed; it is not a task failure.
+TODO_diff_managed_subpaths "${MIRROR}" "upstream/__MANAGED_SOURCE_DIRECTORY__" || true

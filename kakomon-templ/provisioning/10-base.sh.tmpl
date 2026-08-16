@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+# Keep only tools required by the common provisioning skeletons. Database,
+# proxy, DNS, archive-format-specific, and diagnostic packages belong to the
+# target step that consumes them.
+COMMON_PACKAGES=(
+  ca-certificates
+  curl
+  git
+  gzip
+  openssl
+  procps
+  rsync
+  sudo
+  tar
+)
+
+validate_platform() {
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  test "${ID}" = ubuntu
+  test "${VERSION_ID}" = 26.04
+  test "$(dpkg --print-architecture)" = arm64
+  log "platform: Ubuntu 26.04 arm64"
+}
+
+install_common_packages() {
+  local package
+  local missing=()
+  for package in "${COMMON_PACKAGES[@]}"; do
+    if ! dpkg -s "${package}" >/dev/null 2>&1; then
+      missing+=("${package}")
+    fi
+  done
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    log "base packages: already installed"
+    return
+  fi
+
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+  log "base packages: installed ${missing[*]}"
+}
+
+# Keep the OS baseline explicit and identical across target recipes. Target
+# services add their own hostname, DNS, and proxy contracts later.
+set_timezone() {
+  timedatectl set-timezone UTC
+  log "timezone: set to UTC"
+}
+
+set_sysctl_port_range() {
+  local conf=/etc/sysctl.d/99-isuren.conf
+  local content='net.ipv4.ip_local_port_range = 10000 65535'
+  echo "${content}" >"${conf}"
+  sysctl --system >/dev/null
+  log "sysctl: ${conf} set"
+}
+
+set_limits() {
+  local conf=/etc/security/limits.d/99-isuren.conf
+  local content
+  content=$(
+    cat <<'EOD'
+* - nofile 655360
+* - nproc 655360
+* soft memlock unlimited
+* hard memlock unlimited
+EOD
+  )
+  echo "${content}" >"${conf}"
+  log "limits: ${conf} set"
+}
+
+validate_platform
+install_common_packages
+set_timezone
+set_sysctl_port_range
+set_limits
+
+log "10-base.sh: done"

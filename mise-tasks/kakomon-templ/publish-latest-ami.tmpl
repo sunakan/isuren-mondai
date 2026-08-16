@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/publish-latest-ami,
+# remove this guard, replace every TODO/__...__, add #MISE description and
+# #MISE interactive=true, then make executable.
+set -euo pipefail
+echo "error: publish-latest-ami.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+AMI_NAME_PREFIX="isuren/${TARGET_SLUG}-"
+
+# Resolve one target-scoped, self-owned AMI and display its provenance before
+# confirmation. Publish every backing snapshot before the AMI to avoid a
+# temporarily unusable public image.
+TODO_resolve_and_validate_latest_target_ami "${AMI_NAME_PREFIX}"
+TODO_confirm_target_ami_publication
+TODO_publish_reviewed_snapshots
+TODO_publish_reviewed_ami

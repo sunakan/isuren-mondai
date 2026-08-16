@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/prune-ami, remove
+# this guard, replace every TODO/__...__, add #MISE description and
+# #MISE interactive=true, then make executable.
+set -euo pipefail
+echo "error: prune-ami.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+AMI_NAME_PREFIX="isuren/${TARGET_SLUG}-"
+
+# Resolve only target-scoped, self-owned AMIs. Display the exact AMI and EBS
+# snapshot targets, require an interactive confirmation, then deregister and
+# delete only the reviewed set. Keep at least the target policy's retained set.
+TODO_resolve_target_prune_set "${AMI_NAME_PREFIX}"
+TODO_confirm_target_prune_set
+TODO_prune_reviewed_amis_and_snapshots

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+# Optional target extension. Copy this file only for MySQL daemon settings or
+# other target state that must immediately follow 40-mysql.sh. Keep source-
+# dependent schema and initial data in a later, responsibility-named step.
+echo "error: implement the target MySQL extension or omit this file" >&2
+exit 1

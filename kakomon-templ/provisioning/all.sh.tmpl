@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+require_root
+
+# Validate common build identity before any step changes the image. Add other
+# target-owned input checks only when its source/frontend contract requires it.
+: "${RECIPE_COMMIT:?RECIPE_COMMIT must be the full project commit}"
+[[ "${RECIPE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: RECIPE_COMMIT is not a full lowercase Git SHA" >&2
+  exit 1
+}
+[[ "${KAKOMON_SLUG}" =~ ^kakomon[0-9]+(-(qualify|final))?$ ]] || {
+  echo "error: replace __KAKOMON_SLUG__ with the canonical target slug" >&2
+  exit 1
+}
+
+# Keep archives and package/build temporary files on the root-backed volume;
+# Ubuntu may mount /tmp as RAM-backed tmpfs.
+RECIPE_TMPDIR="/var/tmp/isuren-mondai-${KAKOMON_SLUG}"
+rm -rf -- "${RECIPE_TMPDIR}"
+install -d -m 1777 "${RECIPE_TMPDIR}"
+export TMPDIR="${RECIPE_TMPDIR}"
+
+log "start"
+log "provisioning.all: temp_dir=${TMPDIR}"
+log "spans: begin"
+log "provisioning.all: disk_total_bytes=$(disk_total_bytes)"
+log "provisioning.all: start_ns=$(now_ns) disk_before=$(disk_used_bytes) traceparent=${TRACEPARENT:-<unset>}"
+
+# Keep the provisioning span complete and remove staging even when set -e
+# stops a failed step.
+record_provisioning_all_end() {
+  local status=$?
+  log "provisioning.all: end_ns=$(now_ns) disk_after=$(disk_used_bytes) exit_status=${status}"
+  rm -rf -- "${RECIPE_TMPDIR}"
+  log "spans: end"
+  return "${status}"
+}
+trap record_provisioning_all_end EXIT
+
+run_step() {
+  local script="$1"
+  local start_ns disk_before status=0
+  start_ns="$(now_ns)"
+  disk_before="$(disk_used_bytes)"
+  bash "${SCRIPT_DIR}/${script}" || status=$?
+  log "step: script=${script} start_ns=${start_ns} end_ns=$(now_ns) disk_before=${disk_before} disk_after=$(disk_used_bytes) exit_status=${status}"
+  return "${status}"
+}
+
+# This file becomes the target-owned source of truth for step order. List only
+# steps that exist in the copied recipe; do not add compatibility no-ops.
+run_step 10-base.sh
+run_step 20-user.sh
+run_step 30-runtime.sh
+run_step 40-mysql.sh
+# Add `run_step 41-mysql-target.sh` here only when that extension is copied.
+# Add explicit target-owned source/DB/Application/frontend/benchmark steps here.
+run_step 90-nginx.sh
+# Add `run_step 91-nginx-target.sh` here only when that extension is copied.
+run_step 99-verify.sh
+
+touch "/var/lib/cloud/${KAKOMON_SLUG}-provisioned"
+log "all.sh: done"

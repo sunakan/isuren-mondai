@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Source skeleton only. Copy to mise-tasks/__KAKOMON_SLUG__/lock-ami-tools,
+# remove this guard, replace every TODO/__...__, add #MISE description, then make executable.
+set -euo pipefail
+echo "error: lock-ami-tools.tmpl is a non-runnable source skeleton" >&2
+exit 64
+
+TARGET_SLUG="__KAKOMON_SLUG__"
+CONFIG_PATH="${TARGET_SLUG}/provisioning/mise.ami.toml"
+LOCK_PATH="${TARGET_SLUG}/provisioning/mise.ami.lock"
+LOCK_PLATFORM="linux-arm64"
+MISE_TOOL_IMAGE="__PINNED_MISE_TOOL_IMAGE_AND_DIGEST__"
+
+test -f "${CONFIG_PATH}"
+
+# mise.ami.toml is a target-owned nonstandard config filename. Generate its
+# global lock in an isolated environment so host mise state remains untouched.
+# TODO: use a reviewed, immutable tool image/digest; never leave latest here.
+# The implementation may update only LOCK_PATH and must propagate lock failure.
+TODO_run_isolated_lock_update \
+  "${MISE_TOOL_IMAGE}" "${LOCK_PLATFORM}" "${CONFIG_PATH}" "${LOCK_PATH}"
+
+test -s "${LOCK_PATH}"
+echo "${LOCK_PATH}: updated"

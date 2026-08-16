@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+# Optional target extension. Copy this file only when nginx vhost/TLS/proxy
+# configuration is not owned by another target step. The implementation must
+# install the target config, run nginx -t, enable/start nginx, and perform the
+# target hostname/port healthcheck.
+echo "error: implement the target nginx extension or omit this file" >&2
+exit 1

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Replace the placeholder when this template is copied into a target recipe.
+: "${KAKOMON_SLUG:=__KAKOMON_SLUG__}"
+: "${ISUREN_USER:=isuren}"
+: "${ISUREN_UID:=1100}"
+: "${ISUREN_GID:=1100}"
+
+log() {
+  echo "[${KAKOMON_SLUG}] $*"
+}
+
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo 'provisioning must run as root' >&2
+    exit 1
+  fi
+}
+
+require_file() {
+  test -f "$1" || {
+    printf 'required file missing: %s\n' "$1" >&2
+    exit 1
+  }
+}
+
+# These functions expose raw provisioning telemetry for the target build task
+# to convert after the image build completes. The VM never sends OTLP data.
+now_ns() {
+  date +%s%N
+}
+
+disk_used_bytes() {
+  df -B1 / | awk 'NR==2{print $3}'
+}
+
+disk_total_bytes() {
+  df -B1 / | awk 'NR==2{print $2}'
+}
