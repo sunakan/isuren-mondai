@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Run local source, shell, cloud-init, and Packer static validation"
+#MISE description="recipe contractを検証する (kakomon9-qualify独自: source/artifact/shell/cloud-init/Packer static)"
 set -euo pipefail
+
+# shellcheck source=kakomon9-qualify/scripts/artifact-inputs.env
+source kakomon9-qualify/scripts/artifact-inputs.env
 
 if rg -n 'kakomon9-qualify-dist|artifact-ready|path\.root\}/\.\./dist' \
   kakomon9-qualify/packer kakomon9-qualify/cloud-init; then
@@ -50,11 +53,18 @@ esac
   env -u GOROOT "${GO_BIN}" vet ./...
 )
 
-PROJECT_COMMIT="$(git rev-parse HEAD)" kakomon9-qualify/cloud-init/generate-user-data.py
+user_data="$(mktemp)"
+trap 'rm -f "${user_data}"' EXIT
+PROJECT_COMMIT="$(git rev-parse HEAD)" \
+  TRACEPARENT="00-0123456789abcdef0123456789abcdef-0123456789abcdef-01" \
+  python3 kakomon9-qualify/cloud-init/generate-user-data.py --output "${user_data}"
 packer fmt -check kakomon9-qualify/packer
 packer validate -syntax-only \
+  -var source_ami="${BASE_AMI_ID}" \
   -var vpc_id=vpc-static-validation \
   -var subnet_id=subnet-static-validation \
   -var iam_instance_profile=static-validation \
+  -var user_data_file="${user_data}" \
   -var project_url="https://github.com/sunakan/isuren-mondai/commit/$(git rev-parse HEAD)" \
+  -var recipe_tree="$(git rev-parse HEAD:kakomon9-qualify)" \
   kakomon9-qualify/packer
