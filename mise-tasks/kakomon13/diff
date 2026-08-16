@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="worktree-local official mirrorとKAKOMON13 managed sourceの差分を表示"
+#MISE description="official mirrorとmanaged sourceの差分を表示 (kakomon13独自: Go/bench/frontendを比較)"
 set -euo pipefail
 
+# The official mirror is read-only evidence; diff exit 1 means differences,
+# not a task failure.
 mirror=tmp/all-kakomon/isucon13
 test -d "${mirror}/.git" || {
   echo "error: worktree-local mirror is missing" >&2
@@ -11,6 +13,8 @@ test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/
 test "$(git -C "${mirror}" rev-parse HEAD)" = "8f6afdc3603f0c661368de4659a7240862f59623"
 test -z "$(git -C "${mirror}" status --short)"
 
+# kakomon13独自: unmanaged benchmark/frontend assets are excluded from the
+# comparison because they are obtained separately during the recipe build.
 diff -ru "${mirror}/webapp/go" upstream/isucon13/webapp/go || true
 diff -ru \
   --exclude=Dockerfile.dev \

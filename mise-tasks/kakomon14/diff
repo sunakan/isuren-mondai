@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-#MISE description="tmp/all-kakomon/isucon14とupstream/isucon14のgo・sqlをunified diffで比較する"
+#MISE description="official mirrorとmanaged sourceの差分を表示 (kakomon14独自: Go/SQLを比較)"
 set -euo pipefail
 
-SRC="tmp/all-kakomon/isucon14"
-DST="upstream/isucon14"
-
-if [ ! -d "${SRC}" ]; then
-  echo "エラー: ${SRC} が存在しません。先に mise run kakomon14:refresh-upstream を実行してください。" >&2
+# The official mirror is read-only evidence; diff exit 1 means differences,
+# not a task failure.
+mirror=tmp/all-kakomon/isucon14
+test -d "${mirror}/.git" || {
+  echo "error: worktree-local mirror is missing; run kakomon14:refresh-upstream first" >&2
   exit 1
-fi
+}
+test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon14.git"
+test -z "$(git -C "${mirror}" status --short)"
 
-# diffは差分があると終了コード1を返す(エラーではない)ため、set -eで途中終了しないよう
-# 各呼び出しに || trueを付ける。
-diff -ru "${DST}/webapp/go" "${SRC}/webapp/go" || true
-diff -ru "${DST}/webapp/sql" "${SRC}/webapp/sql" || true
+# kakomon14独自: the managed source comparison is limited to Go and SQL;
+# frontend/public and other non-managed data follow NOTICE.md instead.
+diff -ru "${mirror}/webapp/go" upstream/isucon14/webapp/go || true
+diff -ru "${mirror}/webapp/sql" upstream/isucon14/webapp/sql || true
