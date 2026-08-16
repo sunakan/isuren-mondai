@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# kakomon14のPacker AMIビルド(mise-tasks/kakomon14/build)でのOTel trace送信を共有するヘルパー。
-# EC2側(kakomon14/provisioning/all.sh)は生データ記録のみを行い、実際のspan生成・OTLP送信は
-# ここ(Mac側)がpacker build完了後に一括して行う(APIキーをEC2/AMIへ一切渡さないための設計。
-# 詳細はtmp/20260814205658-otel-trace-plan.md参照)。送信手段はMackerelがOTLP/HTTP JSONを
-# 受理しない(http/protobuf必須)ことが判明したため、curl+jqではなくotel-cliを使う。
+# kakomon13/kakomon14のPacker AMI build taskでのOTel trace送信を共有するヘルパー。
+# EC2側のtarget別all.shは生データ記録のみを行い、実際のspan生成・OTLP送信はここ(Mac側)が
+# packer build完了後に一括して行う(APIキーをEC2/AMIへ一切渡さないための設計。詳細は
+# tmp/20260814205658-otel-trace-plan.md参照)。送信手段はMackerelがOTLP/HTTP JSONを受理しない
+# (http/protobuf必須)ことが判明したため、curl+jqではなくotel-cliを使う。
 
 # OTEL_EXPORTER_OTLP_ENDPOINT未設定ならtrace送信自体を丸ごとスキップする。
 otel_tracing_enabled() {
@@ -26,24 +26,27 @@ _otel_ns_to_epoch() {
   echo "${ns:0:10}.${ns:10}"
 }
 
-# $BUILD_LOGから"[kakomon14] step: ..."/"[kakomon14] provisioning.all: ..."行を抜き出し、
-# provisioning.all span(親: root_span_id)と13本のstep span(親: provisioning.allが
-# ここで採番するspan-id)を送信する。EC2側はspan-idを一切採番しない(生データのみ記録)ため、
-# Mac側がここで初めて採番し親子関係を組み立てる。
+# $BUILD_LOGからtargetの"[target] step: ..."/"[target] provisioning.all: ..."行を抜き出し、
+# provisioning.all span(親: root_span_id)と各step span(親: provisioning.allがここで採番する
+# span-id)を送信する。EC2側はspan-idを一切採番しない(生データのみ記録)ため、Mac側がここで
+# 初めて採番し親子関係を組み立てる。
 otel_emit_provisioning_spans() {
   local build_log="$1"
   local trace_id="$2"
   local root_span_id="$3"
+  local target="${4:-kakomon14}"
+  local service="${OTEL_SERVICE_NAME:-${target}-ami-build}"
+  local log_prefix="\\[${target}\\]"
 
   if ! otel_tracing_enabled; then
     return 0
   fi
 
   local disk_total
-  disk_total="$(grep -oE '\[kakomon14\] provisioning\.all: disk_total_bytes=[0-9]+' "${build_log}" | tail -n1 | sed -nE 's/.*disk_total_bytes=([0-9]+).*/\1/p' || true)"
+  disk_total="$(grep -oE "${log_prefix} provisioning\\.all: disk_total_bytes=[0-9]+" "${build_log}" | tail -n1 | sed -nE 's/.*disk_total_bytes=([0-9]+).*/\1/p' || true)"
 
   local start_line
-  start_line="$(grep -E '\[kakomon14\] provisioning\.all: start_ns=' "${build_log}" | tail -n1 || true)"
+  start_line="$(grep -E "${log_prefix} provisioning\\.all: start_ns=" "${build_log}" | tail -n1 || true)"
   local provisioning_start_ns
   provisioning_start_ns="$(printf '%s\n' "${start_line}" | sed -nE 's/.*start_ns=([0-9]+).*/\1/p')"
   local provisioning_disk_before
@@ -52,7 +55,7 @@ otel_emit_provisioning_spans() {
   received_traceparent="$(printf '%s\n' "${start_line}" | sed -nE 's/.*traceparent=(.*)$/\1/p')"
 
   local end_line
-  end_line="$(grep -E '\[kakomon14\] provisioning\.all: end_ns=' "${build_log}" | tail -n1 || true)"
+  end_line="$(grep -E "${log_prefix} provisioning\\.all: end_ns=" "${build_log}" | tail -n1 || true)"
   local provisioning_end_ns
   provisioning_end_ns="$(printf '%s\n' "${end_line}" | sed -nE 's/.*end_ns=([0-9]+).*/\1/p')"
   local provisioning_disk_after
@@ -81,7 +84,7 @@ otel_emit_provisioning_spans() {
   fi
 
   otel_span \
-    --service "${OTEL_SERVICE_NAME:-kakomon14-ami-build}" \
+    --service "${service}" \
     --name "provisioning.all" \
     --kind internal \
     --force-trace-id "${trace_id}" \
@@ -92,7 +95,7 @@ otel_emit_provisioning_spans() {
     --attrs "disk.total_bytes=${disk_total},disk.before_bytes=${provisioning_disk_before},disk.after_bytes=${provisioning_disk_after},disk.delta_bytes=$((provisioning_disk_after - provisioning_disk_before)),exit_status=${provisioning_exit_status}" \
     --status-code "${provisioning_status_code}"
 
-  grep -E '\[kakomon14\] step: ' "${build_log}" | while IFS= read -r line; do
+  grep -E "${log_prefix} step: " "${build_log}" | while IFS= read -r line; do
     local step_script step_start_ns step_end_ns step_disk_before step_disk_after step_exit_status
     step_script="$(printf '%s\n' "${line}" | sed -nE 's/.*script=([^ ]+).*/\1/p')"
     step_start_ns="$(printf '%s\n' "${line}" | sed -nE 's/.*start_ns=([0-9]+).*/\1/p')"
@@ -107,7 +110,7 @@ otel_emit_provisioning_spans() {
     fi
 
     otel_span \
-      --service "${OTEL_SERVICE_NAME:-kakomon14-ami-build}" \
+      --service "${service}" \
       --name "${step_script}" \
       --kind internal \
       --force-trace-id "${trace_id}" \

@@ -2,7 +2,7 @@ packer {
   required_plugins {
     amazon = {
       source  = "github.com/hashicorp/amazon"
-      version = "~> 1"
+      version = "= 1.8.2"
     }
   }
 }
@@ -24,6 +24,10 @@ variable "subnet_id" {
 # ビルド中の一時インスタンスへSSM Session Manager経由で接続し、cloud-initの進行状況を
 # 直接デバッグできるようにするため(mise-tasks/kakomon14/buildがCloudFormation Outputsから渡す)。
 variable "iam_instance_profile" {
+  type = string
+}
+
+variable "user_data_file" {
   type = string
 }
 
@@ -86,9 +90,9 @@ source "amazon-ebs" "kakomon14" {
   subnet_id            = var.subnet_id
   iam_instance_profile = var.iam_instance_profile
 
-  # cloud-init/generate-user-data.pyが生成したもの。git cloneで実体を取得する構成のため
-  # 内容はごく小さく、EC2 User Dataの16KB制限(base64後)を気にする必要がない。
-  user_data_file = "${path.root}/../cloud-init/user-data.yaml"
+  # cloud-init/generate-user-data.pyが生成した一時ファイル。git cloneで実体を取得する構成の
+  # ため内容はごく小さく、EC2 User Dataの16KB制限(base64後)を気にする必要がない。
+  user_data_file = var.user_data_file
 
   tags          = local.ami_tags
   snapshot_tags = local.ami_tags

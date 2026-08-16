@@ -1,56 +1,50 @@
 #!/usr/bin/env python3
-"""kakomon14/provisioning/を実行するcloud-config(user-data)を生成する。
+"""Generate cloud-config for one exact isuren-mondai recipe commit."""
 
-provisioning/配下のファイル自体はuser-dataに埋め込まず、EC2起動時にこのリポジトリ自身を
-git clone(HEADのコミットに固定)して取得する。これにより埋め込み対象ファイルの手動管理
-(FILESリスト)やEC2 User Dataの16KB制限回避(gzip)が丸ごと不要になる。
-
-git cloneするコミットは呼び出し元(mise-tasks/kakomon14/build)が計算したPROJECT_COMMITを
-環境変数で受け取る。ここで独自にgit rev-parse HEADを再計算すると、AMIタグ(Project)が指す
-コミットと実際にcloneされるコミットが理論上ズレうる。
-"""
-
+import argparse
 import os
 import pathlib
+import re
 
 import yaml
 
-SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-OUTPUT_FILE = SCRIPT_DIR / "user-data.yaml"
 REPO_URL = "https://github.com/sunakan/isuren-mondai.git"
 CLONE_DIR = "/opt/isuren-mondai"
 PROVISIONING_DIR = f"{CLONE_DIR}/kakomon14/provisioning"
 
 
-def build_cloud_config() -> dict:
-    commit = os.environ["PROJECT_COMMIT"]
-    # OTel trace化用(mise-tasks/kakomon14/buildが生成)。未設定(単体実行時等)は空文字を許容する。
-    # all.shはこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信はEC2側では一切行わない
-    # (APIキーをEC2/AMIへ渡さない設計。scripts/otel.sh参照)。
-    traceparent = os.environ.get("TRACEPARENT", "")
+def build_cloud_config(commit: str, traceparent: str) -> dict:
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("PROJECT_COMMIT must be a full lowercase Git SHA")
+    if traceparent and not re.fullmatch(r"00-[0-9a-f]{32}-[0-9a-f]{16}-01", traceparent):
+        raise ValueError("TRACEPARENT has an invalid format")
     return {
-        # git init+remote add+fetch <SHA>+checkoutの構成にすることで、shallow(--depth 1)のまま
-        # 任意のコミットを指定できる(50-source.shのsparse_checkout_fetchと同じ考え方)。
-        # ENABLE_TLSは自己署名証明書生成のみでネットワーク到達性を要さないためtrue固定。
-        # 本番AMIでは1回きりのプロビジョニングのため、clone自体も実行後に削除する
-        # (50-source.shのcleanup_checkoutsと同じ理由: ディスク使用量・古い設定混入リスクを避ける)。
         "runcmd": [
             f"git init --quiet {CLONE_DIR}",
             f"git -C {CLONE_DIR} remote add origin {REPO_URL}",
             f"git -C {CLONE_DIR} fetch --quiet --depth 1 origin {commit}",
             f"git -C {CLONE_DIR} checkout --quiet {commit}",
-            f"env ENABLE_TLS=true TRACEPARENT={traceparent} bash {PROVISIONING_DIR}/all.sh",
+            (
+                f"env RECIPE_COMMIT={commit} ENABLE_TLS=true TRACEPARENT={traceparent} "
+                f"bash {PROVISIONING_DIR}/all.sh"
+            ),
             f"rm -rf {CLONE_DIR}",
-        ],
+        ]
     }
 
 
 def main() -> None:
-    cloud_config = build_cloud_config()
-    body = yaml.dump(cloud_config, allow_unicode=True, sort_keys=False, width=4096)
-    text = f"#cloud-config\n{body}"
-    OUTPUT_FILE.write_text(text)
-    print(f"wrote {OUTPUT_FILE}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True, type=pathlib.Path)
+    args = parser.parse_args()
+    config = build_cloud_config(
+        os.environ["PROJECT_COMMIT"],
+        os.environ.get("TRACEPARENT", ""),
+    )
+    args.output.write_text(
+        "#cloud-config\n" + yaml.safe_dump(config, allow_unicode=True, sort_keys=False, width=4096)
+    )
+    print(args.output)
 
 
 if __name__ == "__main__":

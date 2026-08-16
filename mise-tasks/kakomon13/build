@@ -1,12 +1,44 @@
 #!/usr/bin/env bash
-#MISE description="KAKOMON13 AMIをbuild"
+#MISE description="AMIをPackerでbuildする (kakomon13独自: source AMIとfrontend Releaseを固定入力から解決)"
 set -euo pipefail
 
-# Target-local text inputs keep the normal mise task invocation aligned with the
-# other recipes while preserving exact, reviewable AMI and Release identities.
+VPC_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
+# user-dataはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだとEC2起動時の
+# git fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため、ここで先に検知する。
+require_clean_worktree
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+export PROJECT_COMMIT
+require_pushed_commit "${PROJECT_COMMIT}"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:kakomon13")"
+
+# OTel trace化用。EC2側(all.sh)はこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信は
+# 一切行わない(APIキーをEC2/AMIへ渡さないための設計。詳細はscripts/otel.sh参照)。
+# tracing無効時(OTEL_EXPORTER_OTLP_ENDPOINT未設定)でも生成自体は行う(コストが無視できるほど
+# 小さいため、if分岐で複雑にするより常に生成した方がシンプル)。
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export TRACEPARENT
+
+# Target-local text inputs keep the AMI and frontend Release identity exact and reviewable.
 # shellcheck source=kakomon13/scripts/ami-inputs.env
 source kakomon13/scripts/ami-inputs.env
-
 [[ "${KAKOMON13_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
   echo "error: KAKOMON13_SOURCE_AMI_ID is not an exact AMI ID" >&2
   exit 1
@@ -19,37 +51,23 @@ source kakomon13/scripts/ami-inputs.env
   echo "error: KAKOMON13_FRONTEND_RELEASE_SHA256 is invalid" >&2
   exit 1
 }
-
-# shellcheck source=scripts/lib.sh
-source scripts/lib.sh
-require_clean_worktree
-PROJECT_COMMIT="$(git rev-parse HEAD)"
-require_pushed_commit "${PROJECT_COMMIT}"
-RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:kakomon13")"
-
-VPC_ID="$(aws cloudformation describe-stacks \
-  --region ap-northeast-1 \
-  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
-  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
-SUBNET_ID="$(aws cloudformation describe-stacks \
-  --region ap-northeast-1 \
-  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
-  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
-IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
-  --region ap-northeast-1 \
-  --stack-name "${PACKER_NETWORK_STACK_NAME}" \
-  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
-
-TRACE_ID="$(openssl rand -hex 16)"
-ROOT_SPAN_ID="$(openssl rand -hex 8)"
-export PROJECT_COMMIT TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
 export FRONTEND_RELEASE_TAG="${KAKOMON13_FRONTEND_RELEASE_TAG}"
 export FRONTEND_RELEASE_SHA256="${KAKOMON13_FRONTEND_RELEASE_SHA256}"
+
+# user-dataはprovisioning/配下から再生成可能なためGit管理していない。ビルドのたびに最新化し、
+# 生成し忘れによる古いrecipeでのビルドを防ぐ。
 user_data="$(mktemp)"
-trap 'rm -f "${user_data}"' EXIT
 python3 kakomon13/cloud-init/generate-user-data.py --output "${user_data}"
 
 packer init kakomon13/packer/kakomon13.pkr.hcl
+BUILD_LOG="$(mktemp)"
+trap 'rm -f "${BUILD_LOG}" "${user_data}"' EXIT
+
+# buildログを画面に出しつつファイルにも残す(AMI ID抽出・span化のため)。
+# packer buildのexit codeをOTel送信のために明示的に捕まえた上でtaskを継続させる。
+# BUILD_EXITが非ゼロの場合、以降のAMI固有処理は実行せず、最後に元のexit codeを返す。
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
 packer build \
   -var "region=ap-northeast-1" \
   -var "source_ami=${KAKOMON13_SOURCE_AMI_ID}" \
@@ -61,4 +79,30 @@ packer build \
   -var "recipe_tree=${RECIPE_TREE}" \
   -var "frontend_release_tag=${FRONTEND_RELEASE_TAG}" \
   -var "frontend_release_sha256=${FRONTEND_RELEASE_SHA256}" \
-  kakomon13/packer/kakomon13.pkr.hcl
+  kakomon13/packer/kakomon13.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
+
+# trace送信はPacker build完了後に行う。送信の成否はBUILD_EXITに影響させない
+# (otel_span/otel_emit_provisioning_spansは失敗しても呼び出し元を落とさない設計)。
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE="ok"
+  if [ "${BUILD_EXIT}" -ne 0 ]; then
+    ROOT_STATUS_CODE="error"
+  fi
+  # kindはinternalではなくserverにする。MackerelのAPMトレース一覧はroot spanがserver kindの
+  # トレースしか一覧に出さないため、子span(provisioning.all・各step)はinternalのままにする。
+  otel_span \
+    --service "${OTEL_SERVICE_NAME:-kakomon13-ami-build}" \
+    --name "packer.build" \
+    --kind server \
+    --force-trace-id "${TRACE_ID}" \
+    --force-span-id "${ROOT_SPAN_ID}" \
+    --start "${BUILD_START_EPOCH}" \
+    --end "${BUILD_END_EPOCH}" \
+    --status-code "${ROOT_STATUS_CODE}"
+  otel_emit_provisioning_spans "${BUILD_LOG}" "${TRACE_ID}" "${ROOT_SPAN_ID}" kakomon13
+fi
+
+# 最後に実行されたコマンド(otel_span等)がexit 0で終わるため、これが無いとpacker build自体が
+# 失敗していてもmise taskは成功扱いになる。元のPacker exit codeを明示的に返す。
+exit "${BUILD_EXIT}"
