@@ -5,6 +5,49 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+# Keep only tools required by the common provisioning skeletons. Database,
+# proxy, DNS, archive-format-specific, and diagnostic packages belong to the
+# target step that consumes them.
+COMMON_PACKAGES=(
+  ca-certificates
+  curl
+  git
+  gzip
+  openssl
+  procps
+  rsync
+  sudo
+  tar
+)
+
+validate_platform() {
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  test "${ID}" = ubuntu
+  test "${VERSION_ID}" = 26.04
+  test "$(dpkg --print-architecture)" = arm64
+  log "platform: Ubuntu 26.04 arm64"
+}
+
+install_common_packages() {
+  local package
+  local missing=()
+  for package in "${COMMON_PACKAGES[@]}"; do
+    if ! dpkg -s "${package}" >/dev/null 2>&1; then
+      missing+=("${package}")
+    fi
+  done
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    log "base packages: already installed"
+    return
+  fi
+
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+  log "base packages: installed ${missing[*]}"
+}
+
 # Keep the OS baseline explicit and identical across target recipes. Target
 # services add their own hostname, DNS, and proxy contracts later.
 set_timezone() {
@@ -58,6 +101,8 @@ set_hosts() {
 # /etc/ssh/sshd_config.d/pubkey.conf に PubkeyAcceptedAlgorithms=+ssh-rsa を配置するタスク。
 # 旧クライアント互換のための設定で、bastionからの接続は最新クライアント前提のため除外。
 
+validate_platform
+install_common_packages
 set_timezone
 set_sysctl_port_range
 set_limits
