@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="official mirrorとmanaged sourceの差分を表示 (kakomon14独自: Go/SQLを比較)"
+#MISE description="official mirrorとmanaged sourceの差分を表示"
 set -euo pipefail
 
 # The official mirror is read-only evidence; diff exit 1 means differences,
