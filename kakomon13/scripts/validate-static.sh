@@ -138,6 +138,11 @@ grep -qF 'test "$(runuser -u "${ISUREN_USER}" -- git -C "${OFFICIAL_DIR}" rev-pa
 # shellcheck disable=SC2016 # This is the exact source text required by the contract.
 grep -qF '= "goss version ${GOSS_VERSION}"' kakomon13/provisioning/99-verify.sh ||
   fail "Goss version output contract is stale"
+# shellcheck disable=SC2016 # This is the exact source path required by the seal contract.
+grep -qF '"/home/${ISUREN_USER}/isucon13"' kakomon13/provisioning/95-seal.sh ||
+  fail "benchmark source tree must be removed during seal"
+grep -A1 -F '  /home/isuren/isucon13:' kakomon13/provisioning/goss.yaml |
+  grep -qF 'exists: false' || fail "Goss must reject a retained benchmark source tree"
 if rg -n '^[[:space:]]+contains:' kakomon13/provisioning/goss.yaml; then
   fail "deprecated literal Goss file.contains contract remains"
 fi

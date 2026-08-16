@@ -19,7 +19,11 @@ if [ -d "${mysql_datadir}" ]; then
   mysql -uroot isudns -e 'DELETE FROM records; DELETE FROM domains;'
   systemctl stop mysql
 fi
-rm -rf "/home/${ISUREN_USER}/.kakomon13-staging"
+# The installed /home/isuren/bench binary embeds its runtime assets. Keep the
+# executable, but remove the benchmark source tree and other build-only files.
+rm -rf \
+  "/home/${ISUREN_USER}/.kakomon13-staging" \
+  "/home/${ISUREN_USER}/isucon13"
 rm -rf "/home/${ISUREN_USER}/.cache/go-build" "/home/${ISUREN_USER}/go/pkg/mod/cache"
 
 log "95-seal.sh: done"

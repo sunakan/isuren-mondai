@@ -57,6 +57,8 @@ file:
     exists: false
   /home/isuren/.kakomon13-staging:
     exists: false
+  /home/isuren/isucon13:
+    exists: false
   /usr/local/libexec/kakomon13-instance-init:
     exists: true
     filetype: file
