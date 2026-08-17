@@ -11,6 +11,14 @@ kakomon12-qualify onboardingのimplement/verifyで実際に踏んだ問題と対
 - `chmod +x`では直らない(中身が実行可能形式でないため)。真因はビルド対象の取り違え。
 - 対策: 公式`Makefile`/`Dockerfile`の`go build`行を必ず確認し、`.`ではなく実際に指定されているpackage path(`./cmd/X`等)へ揃える。ローカル検証task(`test-go`等)のビルド対象も同じpathへ揃え、AMI内で実際にビルドされるものと一致させる。
 
+## runtime配置pathは公式README/provisioningで確認し、独自の慣習(`bin/`等)で決め打ちしない
+
+benchmark等のビルド成果物を`/home/isuren/bin/<name>`のようなsubdirectoryへ置くか、`/home/isuren/<name>`のようにhome直下へ直接置くかは、target固有の公式配置を確認せず「他のkakomonNがこうしていたから」で決めると本家とズレる。
+
+- isucon12-qualifyの公式README.mdには「ベンチマーカーは`/home/isucon/bench`以下にビルド済みのバイナリがあります」と明記されており、`bin/`のようなsubdirectoryは存在しない。にもかかわらずimplement時に`/home/isuren/bin/bench`という独自subdirectory配置にしてしまい、後から本家と比較して気づいた。
+- 既存targetの前例も統一されていない(kakomon13は`/home/isuren/bench`をhome直下に直接、kakomon9-qualifyは本家の`isucari`プロジェクト構造ごと保持しているため`bin/`配下)。「他のtargetがこうしているから」ではなく、`recipe-contract.md`の「upstreamのfilesystem構成を保つ」原則どおり、対象targetの公式README・provisioning(mitamae/ansible等)・Dockerfileが実際に示す相対pathをそのtargetごとに確認する。
+- ビルド成果物の配置pathを変更した場合、provisioning step本体だけでなく、`goss.yaml`のfile checkと、そのpathを文字列で参照している他のstep/README/NOTICEも一致するまで揃っているか確認する(片方だけ直すと矛盾が残る)。
+
 ## GitHub Releaseの取得はgh CLIより素のcurlを先に試す
 
 公開リポジトリのRelease assetは`https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>`という直接URLで認証不要・`gh` CLI不要で取得できる(kakomon14/13のfrontend Release取得、`provisioning/80-frontend.sh`/`60-frontend.sh`が既にこの方式)。
@@ -44,3 +52,10 @@ Goの`http.ListenAndServe(":PORT")`/echoの`e.Start(":PORT")`のようにhostを
 
 - mainへのマージ完了やworktree/branchのcleanupと同じタイミングで「もう使わないだろう」と一緒くたに削除しない。既存の`kakomon13-golden-base`・`kakomon14-golden-base`・`kakomon9-qualify-golden-base`も同様に保持され続けている。
 - 削除してよいのは、あくまで失敗した試行の診断用VM(名前が同じでも、対応するcommitがもう存在しない・再現性のない一時状態)であり、その判断も基本的に人間の確認を経てから行う。
+
+## Orb VM内から`systemctl reboot`すると`orb exec`が応答しなくなることがある
+
+`orb-golden-green`のreboot検証で、cloneしたOrb VM内から`systemctl reboot`(または`nohup systemctl reboot &`)を実行すると、`orb list`上は`running`に戻るのに`orb -m <vm> ...`(exec/run/shell)がその後何度リトライしても無応答(出力なし、exit 1)になることがあった。
+
+- `orb stop <vm>` → `orb start <vm>`(Orb側からのVM制御)に切り替えると問題なく再接続でき、identity(machine-id/SSH host key/MySQL server UUID等)・サービスのenabled/active状態も正しく検証できた。
+- reboot検証は最初から`orb stop`/`orb start`で行う方が安全。VM内部からの`systemctl reboot`はOrb環境特有の接続断を起こしうる(EC2実機でも同じ問題が起きるとは限らないが、Orbでの検証手段としては避ける)。
