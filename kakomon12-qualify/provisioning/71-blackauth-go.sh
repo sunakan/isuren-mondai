@@ -14,6 +14,10 @@ require_file "${BLACKAUTH_DIR}/isuports.pem"
 runuser -u "${ISUREN_USER}" -- env HOME="${ISUREN_HOME}" CGO_ENABLED=0 MISE_BIN="${MISE_BIN}" \
   sh -c 'cd "$1" && "${MISE_BIN}" exec -- go build -trimpath -ldflags "-s -w" -o blackauth .' \
   sh "${BLACKAUTH_DIR}"
+# See 70-webapp-go.sh: go build's output mode was observed to be unreliable
+# (0644) for at least one directory in this recipe on Orb Golden Base. Chmod
+# defensively here too rather than assuming CGO_ENABLED=0 avoids it.
+chmod 0755 "${BLACKAUTH_DIR}/blackauth"
 test -x "${BLACKAUTH_DIR}/blackauth"
 
 install -m 0644 "${SCRIPT_DIR}/systemd/blackauth.service" /etc/systemd/system/blackauth.service

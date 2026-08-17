@@ -18,6 +18,12 @@ WEBAPP_DIR="${ISUREN_HOME}/webapp/go"
 runuser -u "${ISUREN_USER}" -- env HOME="${ISUREN_HOME}" CGO_ENABLED=1 MISE_BIN="${MISE_BIN}" \
   sh -c 'cd "$1" && "${MISE_BIN}" exec -- go build -trimpath -ldflags "-s -w" -o isuports .' \
   sh "${WEBAPP_DIR}"
+# Observed on Orb Golden Base (Ubuntu 26.04 arm64): `go build` in this
+# directory produces isuports as 0644 (no execute bit), unlike plain `go
+# build` elsewhere (verified with minimal CGO/non-CGO reproductions outside
+# this tree, all 0755). Root cause not identified; chmod defensively rather
+# than relying on go build's output mode here.
+chmod 0755 "${WEBAPP_DIR}/isuports"
 test -x "${WEBAPP_DIR}/isuports"
 
 install -m 0644 "${SCRIPT_DIR}/systemd/isuports-go.service" /etc/systemd/system/isuports-go.service

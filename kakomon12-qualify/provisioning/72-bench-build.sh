@@ -17,6 +17,9 @@ install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${ISUREN_HOME}/bin"
 runuser -u "${ISUREN_USER}" -- env HOME="${ISUREN_HOME}" CGO_ENABLED=1 MISE_BIN="${MISE_BIN}" \
   sh -c 'cd "$1" && "${MISE_BIN}" exec -- go build -trimpath -ldflags "-s -w" -o "$2" ./cmd/bench' \
   sh "${BUILD_ROOT}/bench" "${BENCH_BIN}"
+# See 70-webapp-go.sh: go build's output mode was observed to be unreliable
+# (0644) on Orb Golden Base. Chmod defensively here too.
+chmod 0755 "${BENCH_BIN}"
 test -x "${BENCH_BIN}"
 chown "${ISUREN_USER}:${ISUREN_USER}" "${BENCH_BIN}"
 
