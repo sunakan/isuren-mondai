@@ -121,9 +121,14 @@ service:
 port:
   tcp:443:
     listening: true
-  tcp:3000:
+  # isuports/blackauth call e.Start(":3000")/http.ListenAndServe(":3001")
+  # with no host, which Go binds as an IPv6 [::] dual-stack-or-not listener
+  # depending on the kernel; on this image it only shows up in
+  # /proc/net/tcp6, not /proc/net/tcp, so goss's `tcp:` (v4) resource
+  # reports it as not listening even though `ss -ltn` shows it live.
+  tcp6:3000:
     listening: true
-  tcp:3001:
+  tcp6:3001:
     listening: true
 
 command:
