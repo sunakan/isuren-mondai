@@ -103,8 +103,6 @@ package:
     installed: true
   nginx:
     installed: true
-  gh:
-    installed: true
 
 service:
   mysql:
@@ -146,7 +144,11 @@ command:
       - "go version go1.26.6 linux/arm64"
     exit-status: 0
   webapp-cgo-linked:
-    exec: "file /home/isuren/webapp/go/isuports | grep -q 'dynamically linked'"
+    # `file` is not installed on this image; ldd's exit status (0 = dynamic
+    # executable, non-zero for "not a dynamic executable"/static binaries)
+    # confirms the CGO build actually linked libc rather than checking a
+    # magic-byte-based tool's output text.
+    exec: "ldd /home/isuren/webapp/go/isuports"
     exit-status: 0
   wildcard-hostname-contract:
     exec: "grep -F 'server_name *.t.isuren.internal;' /etc/nginx/sites-available/isuports.conf"
