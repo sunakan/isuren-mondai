@@ -25,6 +25,15 @@ chmod 0755 "${BENCH_BIN}"
 test -x "${BENCH_BIN}"
 chown "${ISUREN_USER}:${ISUREN_USER}" "${BENCH_BIN}"
 
+# The official bench binary reads its own copy of the private JWT key from
+# ./isuports.pem (cwd-relative os.ReadFile), unlike blackauth which embeds
+# the same key at compile time via go:embed. Since this recipe flattens the
+# bench binary to directly under ISUREN_HOME (see BENCH_BIN comment above,
+# matching the official README's "/home/isucon/bench" layout), the sibling
+# key file is flattened the same way rather than nested under a bench/ dir.
+install -m 0600 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+  "${ISUREN_HOME}/blackauth/isuports.pem" "${ISUREN_HOME}/isuports.pem"
+
 # bench, isucon12-portal, data, and the staged webapp/go copy are compile-time
 # inputs only; the running Application already lives at
 # /home/isuren/webapp/go independently of this staged tree. Remove the whole

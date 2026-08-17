@@ -36,6 +36,10 @@ file:
     exists: true
     filetype: file
     mode: "0600"
+  /home/isuren/isuports.pem:
+    exists: true
+    filetype: file
+    mode: "0600"
   /home/isuren/webapp/sql/init.sh:
     exists: true
     filetype: file
