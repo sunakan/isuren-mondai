@@ -110,4 +110,14 @@ if [ ! -d "${EXTRACT_DIR}/initial_data" ] || [ -z "$(find "${EXTRACT_DIR}/initia
   exit 1
 fi
 
+# Resolves README.md's previously open questions: the archive also carries
+# bench's own runtime fixtures (bench/Makefile's benchmarker.json /
+# benchmarker_tenant.json targets, read cwd-relative by bench/models.go) and
+# the admin-DB seed (webapp/sql/admin/90_data.sql, gitignored upstream) that
+# provides the ~100 baseline tenant rows init.sql's
+# `DELETE FROM tenant WHERE id > 100` assumes already exist.
+require_file "${EXTRACT_DIR}/bench/benchmarker.json"
+require_file "${EXTRACT_DIR}/bench/benchmarker_tenant.json"
+require_file "${EXTRACT_DIR}/webapp/sql/admin/90_data.sql"
+
 log "05-artifacts.sh: official non-code inputs and initial_data fetched and verified"

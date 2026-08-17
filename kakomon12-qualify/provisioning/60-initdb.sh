@@ -9,10 +9,15 @@ SQL_DIR="${ISUREN_HOME}/webapp/sql"
 
 # 01_create_mysql_database.sql creates the isuports database and the isucon
 # MySQL user/grant; 10_schema.sql creates the admin tables (tenant,
-# id_generator, visit_history). Both run once, as root, at provisioning time
-# -- they are schema DDL, not part of the repeatable /initialize contract.
+# id_generator, visit_history). 90_data.sql (from the initial_data Release
+# archive, not the source checkout -- see 05-artifacts.sh/50-source.sh) seeds
+# the ~100 baseline tenant rows init.sql's `DELETE FROM tenant WHERE id > 100`
+# assumes already exist. All three run once, as root, at provisioning time --
+# they are schema/baseline-data DDL, not part of the repeatable /initialize
+# contract (which only re-applies init.sql itself, via sql/init.sh).
 mysql --defaults-file=/dev/null --user=root <"${SQL_DIR}/admin/01_create_mysql_database.sql"
 mysql --defaults-file=/dev/null --user=root <"${SQL_DIR}/admin/10_schema.sql"
+mysql --defaults-file=/dev/null --user=root isuports <"${SQL_DIR}/admin/90_data.sql"
 
 # sql/init.sh is the same script the running Application execs on every
 # POST /initialize (webapp/go's `initializeScript = "../sql/init.sh"`); run
@@ -29,17 +34,6 @@ runuser -u "${ISUREN_USER}" -- env \
 
 test "$(mysql --defaults-file=/dev/null --user=root --skip-column-names -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='isuports'")" -gt 0
 test -n "$(find "${ISUREN_HOME}/webapp/tenant_db" -maxdepth 1 -name '*.db')"
-
-# NOTE (decision-required, unresolved by this implement pass): whether the
-# initial ~100 tenant rows referenced by init.sql's
-# `DELETE FROM tenant WHERE id > 100` come from inside the initial_data
-# Release archive (e.g. an admin-DB SQL dump alongside the per-tenant .db
-# files) or are created by the benchmarker's own prepare phase
-# (`-prepare-only` / `-skip-prepare` flags in bench/cmd/bench/main.go) could
-# not be confirmed without downloading and inspecting the real archive
-# (network access is out of scope for onboard-kakomon-ami-recipe's
-# audit/plan/implement modes). If admin.tenant is empty after this step while
-# webapp/tenant_db has *.db files, that is expected until this is resolved in
-# `verify` -- do not add a fabricated seed file here.
+test "$(mysql --defaults-file=/dev/null --user=root --skip-column-names -e "SELECT COUNT(*) FROM isuports.tenant")" -eq 100
 
 log "60-initdb.sh: official admin schema created, tenant_db seeded from initial_data"

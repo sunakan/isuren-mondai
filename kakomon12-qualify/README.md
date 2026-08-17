@@ -169,18 +169,22 @@ AMI:
    GraphQL (`gh release list`) but got 403/"release not found" on the REST
    `releases/tags` and `release download` endpoints; plain `curl` against the
    public download URL worked without any token.
-2. **The internal layout of the `initial_data` archive past `initial_data/*.db`
-   was not confirmed.** `bench/Makefile` also has targets named
-   `benchmarker.json`/`benchmarker_tenant.json` that depend on the same
-   archive; `05-artifacts.sh` only asserts `initial_data/*.db` exists after
-   extraction and does not (cannot, without downloading it) place any other
-   file the archive might contain relative to `bench/`.
-3. **Whether the initial ~100 tenant rows referenced by
-   `init.sql`'s `DELETE FROM tenant WHERE id > 100` come from inside that
-   archive (e.g. an admin-DB SQL dump alongside the per-tenant `.db` files)
-   or are created by the benchmarker's own prepare phase
-   (`-prepare-only`/`-skip-prepare` flags) was not confirmed.** See the note
-   in `provisioning/60-initdb.sh`.
+2. **Resolved during `orb-standalone-green` verification.** The archive's
+   internal layout past `initial_data/*.db` is `bench/benchmarker.json`,
+   `bench/benchmarker_tenant.json`, and `webapp/sql/admin/90_data.sql` (the
+   same relative paths `bench/Makefile` and the official
+   `docker-compose.yml`'s `webapp/sql/admin/:/docker-entrypoint-initdb.d`
+   mount expect). `05-artifacts.sh` now requires all three after extraction;
+   `50-source.sh` deploys the first two flattened to `ISUREN_HOME` (next to
+   the bench binary, which `bench/models.go` reads cwd-relative) and the
+   third to `webapp/sql/admin/90_data.sql`.
+3. **Resolved during `orb-standalone-green` verification.** The initial ~100
+   tenant rows come from `webapp/sql/admin/90_data.sql` inside the archive (a
+   full `mysqldump` with `DROP TABLE IF EXISTS`/`CREATE TABLE`/`INSERT`
+   statements for `id_generator` and `tenant`), applied once in
+   `provisioning/60-initdb.sh` after `10_schema.sql`, matching the official
+   `docker-entrypoint-initdb.d` alphabetical-order convention
+   (`01_`, `10_`, `90_`). Not created by the benchmarker's prepare phase.
 4. **`webapp/go`'s CGO dependency (`mattn/go-sqlite3`) has not been built on
    real Ubuntu 26.04 arm64.** `provisioning/70-webapp-go.sh` sets
    `CGO_ENABLED=1` and `10-base.sh` installs `build-essential`, but this was

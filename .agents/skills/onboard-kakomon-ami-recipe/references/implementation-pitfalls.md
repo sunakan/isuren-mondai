@@ -59,3 +59,11 @@ Goの`http.ListenAndServe(":PORT")`/echoの`e.Start(":PORT")`のようにhostを
 
 - `orb stop <vm>` → `orb start <vm>`(Orb側からのVM制御)に切り替えると問題なく再接続でき、identity(machine-id/SSH host key/MySQL server UUID等)・サービスのenabled/active状態も正しく検証できた。
 - reboot検証は最初から`orb stop`/`orb start`で行う方が安全。VM内部からの`systemctl reboot`はOrb環境特有の接続断を起こしうる(EC2実機でも同じ問題が起きるとは限らないが、Orbでの検証手段としては避ける)。
+
+## benchmarker自身が実行時cwd相対で読むruntime input(鍵・fixtureデータ)は、他プロセスの配置pathへ埋没しやすい
+
+`orb-standalone-green`(benchmark実走)で初めて発覚する種類の欠落がある。Gossは「ファイルが存在するか」を個別pathでチェックするだけで、「benchmarkerが実際に実行時カレントディレクトリから見つけられるか」は検証しない。
+
+- isucon12-qualifyのbenchは`blackauth`と違い秘密鍵をgo:embedせず、実行時に`./isuports.pem`をcwd相対で`os.ReadFile`する(`bench/models.go`は`./benchmarker.json`/`./benchmarker_tenant.json`も同様)。provisioningは秘密鍵を`blackauth/`側にしか配置しておらず、bench起動時に`open ./isuports.pem: no such file or directory`で即失敗した。Gossは`blackauth/isuports.pem`の存在だけを見ていたため素通りしていた。
+- 対策: 公式sourceで`os.ReadFile("./X")`・`os.Open("./X")`のようなcwd相対読み込みをしている箇所を洗い出し、そのbinaryを配置するdirectory(このrecipeでは`ISUREN_HOME`直下、bench flatten配置と同じ場所)に同じファイルを複製する。「配置したかどうか」ではなく「そのプロセスの実行時cwdから見えるか」で検証する。
+- 同じセッションでinitial_data Release archiveの内部layoutも実際にdownloadして初めて判明した: `bench/benchmarker.json`・`bench/benchmarker_tenant.json`(bench runtime fixture)、`webapp/sql/admin/90_data.sql`(gitignore対象、`docker-entrypoint-initdb.d`規約で`01_`/`10_`の後に自動適用される admin tenant seed)が`initial_data/*.db`以外にも同梱されていた。`initial_data/*.db`の存在だけを確認して「archiveの中身を把握した」と扱わず、公式`Makefile`・`docker-compose.yml`のmount定義等、archiveを実際に消費している箇所を全て洗い出してから必須ファイルを確定する。

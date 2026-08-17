@@ -40,6 +40,15 @@ file:
     exists: true
     filetype: file
     mode: "0600"
+  /home/isuren/benchmarker.json:
+    exists: true
+    filetype: file
+  /home/isuren/benchmarker_tenant.json:
+    exists: true
+    filetype: file
+  /home/isuren/webapp/sql/admin/90_data.sql:
+    exists: true
+    filetype: file
   /home/isuren/webapp/sql/init.sh:
     exists: true
     filetype: file
@@ -185,4 +194,9 @@ command:
     exit-status: 0
   tenant-db-seeded:
     exec: "test -n \"$(find /home/isuren/webapp/tenant_db -maxdepth 1 -name '*.db')\""
+    exit-status: 0
+  admin-tenant-seeded:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SELECT COUNT(*) FROM isuports.tenant\""
+    stdout:
+      - "100"
     exit-status: 0
