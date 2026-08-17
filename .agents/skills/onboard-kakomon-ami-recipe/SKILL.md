@@ -32,6 +32,7 @@ description: isuren-mondaiへISUCON過去問のGo版AMI recipeを追加・移植
 ### `implement`
 
 - 明示的に承認されたplan、変更許可path、専用worktree、受け入れ条件が揃ってからローカル実装する。
+- [実装時によくある落とし穴](references/implementation-pitfalls.md)を先に読む。Goのビルド対象、GitHub Release取得、Gossのport/file検証等、過去targetで実際に踏んだ問題を再現しない。
 - target専用の`kakomon*/**`、`upstream/<official-repo-name>/**`、`mise-tasks/<canonical-slug>/**`だけを変更し、managed source、cloud-init、`all.sh`、edition固有step、Goss、mise、Packerを[recipe実装契約](references/recipe-contract.md)どおり分担させる。
 - template保守が明示された場合だけ`kakomon-templ/**`・`mise-tasks/kakomon-templ/**`を変更許可pathへ加える。target実装のついでにtemplateへ逆流させず、template変更とtarget変更を別の検証・commit単位にする。
 - Red/Green、関連lint/test、自己レビューを行う。未決判断や停止条件に到達したら変更を広げない。
@@ -75,6 +76,7 @@ template更新を既存targetへ自動伝播させない。共通責務の改善
 ### `verify`
 
 - [検証gate](references/verification-gates.md)を読み、依頼されたgateだけを実施する。
+- Goss failureは即target/gate固有バグと決めつけない。[実装時によくある落とし穴](references/implementation-pitfalls.md)のGoss port/fileチェックの既知の誤検知パターンに該当しないか、`ss -ltn`等で実際の状態を確認してから対応を決める。
 - 一つの成功を別gateの成功へ読み替えない。gateごとにartifact identity、recipe digest、環境、証拠、cleanupを記録する。
 - external frontendを使う場合は検証対象recipe commitがremoteから取得可能で、target固有Release asset/digestが存在することをread-onlyで確認し、不足時はEC2/VMへ変更を加える前に停止する。`latest` selectorの場合はtarget prefixでの解決結果と実asset digestを確認する。local mainとremote mainの完全一致は要求しない。
 - Orb/AWSなどの外部状態を調査・操作する前に、リポジトリ指定のexternal-operation preflightを適用し、人間の承認、費用上限、TTL、resource namespace、cleanup責任を確定する。AWS regionは東京`ap-northeast-1`へ固定する。
