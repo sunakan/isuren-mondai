@@ -7,10 +7,19 @@ source "${SCRIPT_DIR}/lib.sh"
 
 MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
 BUILD_ROOT="${ISUREN_HOME}/.build/isucon12-qualify"
-# Official README.md: "ベンチマーカーは /home/isucon/bench 以下にビルド済みの
-# バイナリがあります" -- the official benchmarker binary lives directly under
-# the home directory, not a bin/ subdirectory. Match that path.
-BENCH_BIN="${ISUREN_HOME}/bench"
+ARTIFACT_EXTRACT_DIR="${ARTIFACT_DIR}/extracted"
+# bench/scenario.go derives the admin URL as `b.Scheme+"://admin."+b.Host`
+# from whatever -target-url resolves to, and bench/models.go reads
+# ./isuports.pem, ./benchmarker.json, ./benchmarker_tenant.json cwd-relative,
+# and (confirmed via orb-standalone-green) a validation step also opens
+# ../public/js cwd-relative. All of this only resolves correctly if bench
+# runs from a bench/ directory that is a *sibling* of public/ (and of
+# webapp/, blackauth/) -- i.e. the official repository root layout, not a
+# single flattened binary directly under ISUREN_HOME as an earlier revision
+# of this script assumed (see implementation-pitfalls.md correction).
+BENCH_DIR="${ISUREN_HOME}/bench"
+BENCH_BIN="${BENCH_DIR}/bench"
+install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${BENCH_DIR}"
 
 # bench/go.mod's `replace ../isucon12-portal`, `replace ../data`, and
 # `replace ../webapp/go` directives expect these three directories as
@@ -27,12 +36,16 @@ chown "${ISUREN_USER}:${ISUREN_USER}" "${BENCH_BIN}"
 
 # The official bench binary reads its own copy of the private JWT key from
 # ./isuports.pem (cwd-relative os.ReadFile), unlike blackauth which embeds
-# the same key at compile time via go:embed. Since this recipe flattens the
-# bench binary to directly under ISUREN_HOME (see BENCH_BIN comment above,
-# matching the official README's "/home/isucon/bench" layout), the sibling
-# key file is flattened the same way rather than nested under a bench/ dir.
+# the same key at compile time via go:embed. bench/models.go's
+# ./benchmarker.json / ./benchmarker_tenant.json (runtime validation
+# fixtures shipped in the initial_data Release archive, not the source
+# checkout -- see 05-artifacts.sh) are read the same cwd-relative way.
 install -m 0600 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
-  "${ISUREN_HOME}/blackauth/isuports.pem" "${ISUREN_HOME}/isuports.pem"
+  "${ISUREN_HOME}/blackauth/isuports.pem" "${BENCH_DIR}/isuports.pem"
+install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+  "${ARTIFACT_EXTRACT_DIR}/bench/benchmarker.json" "${BENCH_DIR}/benchmarker.json"
+install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
+  "${ARTIFACT_EXTRACT_DIR}/bench/benchmarker_tenant.json" "${BENCH_DIR}/benchmarker_tenant.json"
 
 # bench, isucon12-portal, data, and the staged webapp/go copy are compile-time
 # inputs only; the running Application already lives at
@@ -43,4 +56,4 @@ install -m 0600 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
 rm -rf "${ISUREN_HOME}/.build"
 rm -rf "${ISUREN_HOME}/go" "${ISUREN_HOME}/.cache/go-build"
 
-log "72-bench-build.sh: benchmark built at /home/isuren/bench; build-only source removed"
+log "72-bench-build.sh: benchmark built at /home/isuren/bench/bench; build-only source removed"

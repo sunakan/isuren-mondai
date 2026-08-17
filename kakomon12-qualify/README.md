@@ -35,8 +35,9 @@ variables, `webapp/go/isuports.go`'s `getEnv(...)` calls -- no source patch
 needed). So a 1bench-1web split only needs:
 
 - `-target-addr <web1 private IP>:443` (bench dials Web directly)
-- `-target-url https://admin.t.isuren.internal` or any `*.t.isuren.internal`
-  name (Host header / SNI only)
+- `-target-url https://t.isuren.internal` (the **base** hostname; `bench`
+  derives the admin URL itself as `admin.<host>` -- see "Result contract"
+  below)
 - nginx's `server_name *.t.isuren.internal;` matches every tenant subdomain
   without per-subdomain DNS records
 
@@ -90,11 +91,20 @@ must read the benchmarker's own stdout/stderr log and honor
 
 ```text
 /home/isuren/bench \
-  -target-url https://admin.t.isuren.internal \
+  -target-url https://t.isuren.internal \
   -target-addr WEB_PRIVATE_IP:443 \
   -exit-error-on-fail \
   -duration 60s
 ```
+
+`-target-url` must be the **base** hostname (`bench/cmd/bench/main.go`'s
+default is `https://t.isucon.dev`, the official base host), not the admin
+one: `bench/scenario.go` derives the admin URL itself as
+`b.Scheme+"://admin."+b.Host` from whatever `-target-url` parses to.
+Passing the admin hostname directly (an earlier draft of this doc did)
+produces a doubled `admin.admin.t.isuren.internal` Host header and every
+admin-API call 401s with `tenant not found` (confirmed via
+`orb-standalone-green`).
 
 ## Topology boundary
 
@@ -125,8 +135,9 @@ the benchmarker's `-target-addr`/Host-header split requires it.
    AMI build.
 3. `provisioning/` installs the runtime and services, deploys the verified
    inputs to their official relative paths (`/home/isuren/webapp/**`,
-   `/home/isuren/blackauth/**`, `/home/isuren/bench`), builds
-   Application/auth-server/benchmark, and runs Goss.
+   `/home/isuren/blackauth/**`, `/home/isuren/bench/**`,
+   `/home/isuren/public/**`), builds Application/auth-server/benchmark, and
+   runs Goss.
 4. Packer waits for the completion marker and seals clone-local identity
    (machine-id, SSH host keys, `authorized_keys`). It does not upload local
    `dist/`; AMI build, fresh-boot, benchmark, Orb, and AWS product gates
@@ -175,9 +186,9 @@ AMI:
    same relative paths `bench/Makefile` and the official
    `docker-compose.yml`'s `webapp/sql/admin/:/docker-entrypoint-initdb.d`
    mount expect). `05-artifacts.sh` now requires all three after extraction;
-   `50-source.sh` deploys the first two flattened to `ISUREN_HOME` (next to
-   the bench binary, which `bench/models.go` reads cwd-relative) and the
-   third to `webapp/sql/admin/90_data.sql`.
+   `72-bench-build.sh` deploys the first two into `/home/isuren/bench/`
+   (`bench/models.go` reads them, and `./isuports.pem`, cwd-relative) and
+   `50-source.sh` deploys the third to `webapp/sql/admin/90_data.sql`.
 3. **Resolved during `orb-standalone-green` verification.** The initial ~100
    tenant rows come from `webapp/sql/admin/90_data.sql` inside the archive (a
    full `mysqldump` with `DROP TABLE IF EXISTS`/`CREATE TABLE`/`INSERT`
@@ -204,6 +215,26 @@ AMI:
    `provisioning/mitamae/cookbooks/redis/default.rb` in the official
    repository with no other apparent purpose). Human-confirmed decision, not
    a gap, but recorded here in case verify-phase behavior suggests otherwise.
+7. **Resolved during `orb-standalone-green` verification.** `webapp/go`'s
+   `createTenantDB` shells out to the `sqlite3` CLI (not just the
+   `mattn/go-sqlite3` Go driver used to CGO-build `webapp/go` itself) to
+   provision each new tenant's SQLite file; without the `sqlite3` package,
+   `POST /api/admin/tenants/add` 500s with `sqlite3: not found`.
+   `10-base.sh` now installs it, matching the official Dockerfile's
+   `apt-get install -y wget gcc g++ make sqlite3`.
+8. **Resolved during `orb-standalone-green` verification.** An earlier
+   revision of this recipe flattened the `bench` binary directly under
+   `ISUREN_HOME` (reasoning from the official README's "`/home/isucon/bench`
+   以下にビルド済みのバイナリがあります" wording alone). Actually running
+   `bench` revealed it also opens `../public/js` cwd-relative during
+   validation (`bench/scenario.go`/model code), which only resolves if
+   `bench`'s own binary lives in a `bench/` directory that is a **sibling**
+   of `public/` -- i.e. the full official repository-root layout, not a
+   flattened single file. `72-bench-build.sh` now builds to
+   `/home/isuren/bench/bench` (with `isuports.pem`, `benchmarker.json`,
+   `benchmarker_tenant.json` alongside it), and `50-source.sh` deploys
+   `public/` to the sibling `/home/isuren/public/` (nginx's `root` in
+   `90-nginx.sh` was updated to match).
 
 No `mise-tasks/kakomon12-qualify/prepare-artifacts` or
 `verify-artifacts`/`audit-upstream-update` tasks exist yet (unlike

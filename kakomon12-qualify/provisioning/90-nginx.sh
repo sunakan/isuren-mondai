@@ -46,7 +46,7 @@ server {
   ssl_prefer_server_ciphers off;
 
   client_max_body_size 10m;
-  root /home/isuren/webapp/public;
+  root /home/isuren/public;
 
   location / {
     try_files $uri /index.html;

@@ -7,7 +7,7 @@ file:
     exists: true
     filetype: file
     mode: "0755"
-  /home/isuren/bench:
+  /home/isuren/bench/bench:
     exists: true
     filetype: file
     mode: "0755"
@@ -36,14 +36,14 @@ file:
     exists: true
     filetype: file
     mode: "0600"
-  /home/isuren/isuports.pem:
+  /home/isuren/bench/isuports.pem:
     exists: true
     filetype: file
     mode: "0600"
-  /home/isuren/benchmarker.json:
+  /home/isuren/bench/benchmarker.json:
     exists: true
     filetype: file
-  /home/isuren/benchmarker_tenant.json:
+  /home/isuren/bench/benchmarker_tenant.json:
     exists: true
     filetype: file
   /home/isuren/webapp/sql/admin/90_data.sql:
@@ -53,7 +53,7 @@ file:
     exists: true
     filetype: file
     mode: "0755"
-  /home/isuren/webapp/public/index.html:
+  /home/isuren/public/index.html:
     exists: true
     filetype: file
   /home/isuren/initial_data:
@@ -115,6 +115,8 @@ package:
   mysql-server:
     installed: true
   nginx:
+    installed: true
+  sqlite3:
     installed: true
 
 service:

@@ -21,11 +21,21 @@ install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${OFFICIAL_DIR}/webapp/public.pem" "${ISUREN_HOME}/webapp/public.pem"
 rsync -a "${OFFICIAL_DIR}/webapp/sql/" "${ISUREN_HOME}/webapp/sql/"
 chmod 0755 "${ISUREN_HOME}/webapp/sql/init.sh"
-rsync -a "${OFFICIAL_DIR}/public/" "${ISUREN_HOME}/webapp/public/"
 # 90_data.sql is gitignored upstream (only shipped via the initial_data
 # Release archive, not the source checkout above); see 05-artifacts.sh.
 install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${ARTIFACT_DIR}/extracted/webapp/sql/admin/90_data.sql" "${ISUREN_HOME}/webapp/sql/admin/90_data.sql"
+
+# public/ (prebuilt frontend, nginx-served) is deployed as a top-level
+# sibling of webapp/, blackauth/, and bench/ -- matching the official
+# repository root layout, not nested under webapp/. bench/scenario.go's
+# validation step opens ../public/js cwd-relative from bench/, which only
+# resolves if public/ is bench/'s sibling (confirmed via
+# orb-standalone-green; see 72-bench-build.sh and 90-nginx.sh).
+rm -rf "${ISUREN_HOME}/public"
+install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${ISUREN_HOME}/public"
+rsync -a "${OFFICIAL_DIR}/public/" "${ISUREN_HOME}/public/"
+chown -R "${ISUREN_USER}:${ISUREN_USER}" "${ISUREN_HOME}/public"
 
 # blackauth: managed source + the official private JWT key. The key must be
 # present before 71-blackauth-go.sh builds, because main.go embeds it via
@@ -43,21 +53,12 @@ rm -rf "${ISUREN_HOME}/initial_data"
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${ISUREN_HOME}/initial_data"
 rsync -a "${ARTIFACT_DIR}/extracted/initial_data/" "${ISUREN_HOME}/initial_data/"
 
-# bench/models.go reads these two files cwd-relative
-# (./benchmarker.json, ./benchmarker_tenant.json); flattened to ISUREN_HOME
-# to sit next to the bench binary, matching BENCH_BIN's layout in
-# 72-bench-build.sh.
-install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
-  "${ARTIFACT_DIR}/extracted/bench/benchmarker.json" "${ISUREN_HOME}/benchmarker.json"
-install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
-  "${ARTIFACT_DIR}/extracted/bench/benchmarker_tenant.json" "${ISUREN_HOME}/benchmarker_tenant.json"
-
 # bench (+ its isucon12-portal/data module dependencies) is staged as a
 # sibling of webapp/go under a build-only directory, mirroring the official
 # repository root layout that bench/go.mod's `replace ../isucon12-portal`,
 # `replace ../data`, and `replace ../webapp/go` directives expect. This whole
 # directory is removed by 72-bench-build.sh once the bench binary is built;
-# only the final binary at /home/isuren/bench is a runtime asset.
+# only the final binary at /home/isuren/bench/bench is a runtime asset.
 BUILD_ROOT="${ISUREN_HOME}/.build/isucon12-qualify"
 rm -rf "${BUILD_ROOT}"
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${BUILD_ROOT}"

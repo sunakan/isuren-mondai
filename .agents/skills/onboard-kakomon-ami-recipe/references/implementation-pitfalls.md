@@ -18,6 +18,7 @@ benchmark等のビルド成果物を`/home/isuren/bin/<name>`のようなsubdire
 - isucon12-qualifyの公式README.mdには「ベンチマーカーは`/home/isucon/bench`以下にビルド済みのバイナリがあります」と明記されており、`bin/`のようなsubdirectoryは存在しない。にもかかわらずimplement時に`/home/isuren/bin/bench`という独自subdirectory配置にしてしまい、後から本家と比較して気づいた。
 - 既存targetの前例も統一されていない(kakomon13は`/home/isuren/bench`をhome直下に直接、kakomon9-qualifyは本家の`isucari`プロジェクト構造ごと保持しているため`bin/`配下)。「他のtargetがこうしているから」ではなく、`recipe-contract.md`の「upstreamのfilesystem構成を保つ」原則どおり、対象targetの公式README・provisioning(mitamae/ansible等)・Dockerfileが実際に示す相対pathをそのtargetごとに確認する。
 - ビルド成果物の配置pathを変更した場合、provisioning step本体だけでなく、`goss.yaml`のfile checkと、そのpathを文字列で参照している他のstep/README/NOTICEも一致するまで揃っているか確認する(片方だけ直すと矛盾が残る)。
+- **訂正(`orb-standalone-green`で判明)**: 上記の「`bin/`のようなsubdirectoryは存在しない」という読みは、「`/home/isucon/bench`を単一の平坦なファイルとして置く」ことまでは意味していなかった。実際にbenchを実行すると`../public/js`をcwd相対でopenするvalidation stepがあり、これは`bench`バイナリ自身が`public/`と兄弟関係にあるdirectory(`bench/`)から起動されて初めて解決するpathだった。READMEの文言だけで配置構造を確定させず、実際にbinaryを実行してcwd相対参照が解決するかまで確認する。
 
 ## GitHub Releaseの取得はgh CLIより素のcurlを先に試す
 
@@ -65,5 +66,8 @@ Goの`http.ListenAndServe(":PORT")`/echoの`e.Start(":PORT")`のようにhostを
 `orb-standalone-green`(benchmark実走)で初めて発覚する種類の欠落がある。Gossは「ファイルが存在するか」を個別pathでチェックするだけで、「benchmarkerが実際に実行時カレントディレクトリから見つけられるか」は検証しない。
 
 - isucon12-qualifyのbenchは`blackauth`と違い秘密鍵をgo:embedせず、実行時に`./isuports.pem`をcwd相対で`os.ReadFile`する(`bench/models.go`は`./benchmarker.json`/`./benchmarker_tenant.json`も同様)。provisioningは秘密鍵を`blackauth/`側にしか配置しておらず、bench起動時に`open ./isuports.pem: no such file or directory`で即失敗した。Gossは`blackauth/isuports.pem`の存在だけを見ていたため素通りしていた。
-- 対策: 公式sourceで`os.ReadFile("./X")`・`os.Open("./X")`のようなcwd相対読み込みをしている箇所を洗い出し、そのbinaryを配置するdirectory(このrecipeでは`ISUREN_HOME`直下、bench flatten配置と同じ場所)に同じファイルを複製する。「配置したかどうか」ではなく「そのプロセスの実行時cwdから見えるか」で検証する。
+- さらに`bench/scenario.go`のvalidation stepは`../public/js`もcwd相対でopenする。これはbenchバイナリが`public/`と兄弟のdirectory(`bench/`)から起動されることを前提にしており、「`ISUREN_HOME`直下にbenchを平坦配置する」という当初の判断(上の「runtime配置path」項の訂正参照)とは両立しなかった。最終的にこのrecipeは`bench`を`/home/isuren/bench/bench`へ、鍵・fixtureをその同じ`bench/`directoryへ、`public/`を兄弟の`/home/isuren/public/`へ置く構成(公式repository rootの構造そのもの)に落ち着いた。
+- 対策: 公式sourceで`os.ReadFile("./X")`・`os.Open("./X")`・`os.Open("../X")`のようなcwd相対読み込みをしている箇所を洗い出し、それぞれが要求する相対関係(同じdirectory内か、兄弟directoryか)を全て満たすように配置を決める。1箇所のcwd相対読み込みだけ見て「flattenして正しかった」と早期に結論を出さない。「配置したかどうか」ではなく「そのプロセスの実行時cwdから見えるか」で検証する。
 - 同じセッションでinitial_data Release archiveの内部layoutも実際にdownloadして初めて判明した: `bench/benchmarker.json`・`bench/benchmarker_tenant.json`(bench runtime fixture)、`webapp/sql/admin/90_data.sql`(gitignore対象、`docker-entrypoint-initdb.d`規約で`01_`/`10_`の後に自動適用される admin tenant seed)が`initial_data/*.db`以外にも同梱されていた。`initial_data/*.db`の存在だけを確認して「archiveの中身を把握した」と扱わず、公式`Makefile`・`docker-compose.yml`のmount定義等、archiveを実際に消費している箇所を全て洗い出してから必須ファイルを確定する。
+- benchmarkerのCLIオプション(例: `-target-url`)がどのhostname階層を期待するかも、READMEの例だけで決め打ちせず`option.go`のデフォルト値・`scenario.go`の実際の組み立てロジックを読む。isucon12-qualifyのbenchは`-target-url`に**base** hostnameを渡す前提で、`admin.`prefixを自分で付加する(`b.Scheme+"://admin."+b.Host`)。admin hostnameを直接渡すと`admin.admin.<host>`という二重prefixになり、Host header不一致で401になる。
+- webapp/goがCGOで`mattn/go-sqlite3`をリンクしていても、`sqlite3` CLIコマンド自体は別途OSパッケージとして必要な場合がある(`createTenantDB`が`sqlite3 <path> < schema.sql`をshell out)。「Goのsqlite3ドライバをCGOでビルドできた」ことと「sqlite3 CLIが入っている」ことは別の確認事項であり、実際にテナント作成APIを叩くまで欠落に気づけなかった。
