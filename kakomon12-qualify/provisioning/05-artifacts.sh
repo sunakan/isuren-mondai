@@ -58,11 +58,17 @@ blackauth_key_sha256="$(sha256sum "${FETCH_DIR}/blackauth/isuports.pem" | awk '{
 # download`, i.e. a floating "latest" selector with no committed Git blob.
 # This recipe pins the exact tag/asset/digest instead of trusting "latest" at
 # AMI-build time (recipe-contract.md ban on unpinned artifact identity).
-# Resolving that pin requires network access to the official repository's
-# Releases, which onboard-kakomon-ami-recipe's audit/plan/implement modes do
-# not perform (external operations belong to `verify`). Until a human fills
-# in scripts/artifact-inputs.env, fail closed here with a clear message
-# instead of silently downloading whatever GitHub currently calls "latest".
+# isucon/isucon12-qualify is a public repository, so the Release asset is
+# fetched with plain curl against the public download URL, no gh CLI or
+# GitHub token required (same precedent as kakomon14/13's frontend Release
+# fetch in provisioning/80-frontend.sh / 60-frontend.sh, which uses curl
+# against github.com's public releases/download endpoint rather than gh or
+# api.github.com). Resolving the exact tag/asset/digest requires network
+# access to the official repository's Releases, which onboard-kakomon-ami-
+# recipe's audit/plan/implement modes do not perform (external operations
+# belong to `verify`). Until a human fills in scripts/artifact-inputs.env,
+# fail closed here with a clear message instead of silently downloading
+# whatever GitHub currently calls "latest".
 if [ "${INITIAL_DATA_RELEASE_TAG}" = "REQUIRES_VERIFY_PHASE_RESOLUTION" ] ||
   [ "${INITIAL_DATA_ASSET_NAME}" = "REQUIRES_VERIFY_PHASE_RESOLUTION" ] ||
   [ "${INITIAL_DATA_SHA256}" = "REQUIRES_VERIFY_PHASE_RESOLUTION" ]; then
@@ -83,11 +89,9 @@ fi
 
 RELEASE_DIR="${ARTIFACT_DIR}/release"
 install -d -m 0755 "${RELEASE_DIR}"
-gh release download "${INITIAL_DATA_RELEASE_TAG}" \
-  --repo "isucon/isucon12-qualify" \
-  --pattern "${INITIAL_DATA_ASSET_NAME}" \
-  --dir "${RELEASE_DIR}" \
-  --clobber
+curl -fsSL \
+  -o "${RELEASE_DIR}/${INITIAL_DATA_ASSET_NAME}" \
+  "https://github.com/isucon/isucon12-qualify/releases/download/${INITIAL_DATA_RELEASE_TAG}/${INITIAL_DATA_ASSET_NAME}"
 require_file "${RELEASE_DIR}/${INITIAL_DATA_ASSET_NAME}"
 echo "${INITIAL_DATA_SHA256}  ${RELEASE_DIR}/${INITIAL_DATA_ASSET_NAME}" | sha256sum -c -
 

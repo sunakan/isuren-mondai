@@ -14,9 +14,10 @@ test "$(dpkg --print-architecture)" = arm64
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 # gcc/build-essential is required to CGO-build webapp/go (mattn/go-sqlite3).
-# gh CLI is required by 05-artifacts.sh to resolve/download the initial_data
-# GitHub Release asset; jq/unzip/curl/git support that fetch and its manifest
-# verification.
+# initial_data (GitHub Release asset) and the JWT keys/sql/public tree (Git
+# sparse-checkout) are both fetched from public.github.com endpoints with
+# plain curl/git and need no authentication or gh CLI; see 05-artifacts.sh.
+# jq/unzip support that fetch's manifest verification and archive extraction.
 apt-get install -y --no-install-recommends \
   build-essential \
   ca-certificates \
@@ -31,14 +32,6 @@ apt-get install -y --no-install-recommends \
   rsync \
   unzip
 
-install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
-chmod 0644 /etc/apt/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-  >/etc/apt/sources.list.d/github-cli.list
-apt-get update
-apt-get install -y --no-install-recommends gh
-
 timedatectl set-timezone UTC
 cat >/etc/security/limits.d/99-isuren.conf <<'EOF'
 * soft nofile 65535
@@ -49,4 +42,4 @@ net.ipv4.ip_local_port_range = 10000 65535
 EOF
 sysctl --system >/dev/null
 
-log "10-base.sh: Ubuntu 26.04 arm64, CGO toolchain, and gh CLI ready"
+log "10-base.sh: Ubuntu 26.04 arm64 and CGO toolchain ready"

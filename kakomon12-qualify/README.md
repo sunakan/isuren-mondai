@@ -151,14 +151,23 @@ build (both are out of scope for `onboard-kakomon-ami-recipe`'s
 audit/plan/implement modes; they belong to `verify`). Before building this
 AMI:
 
-1. **`kakomon12-qualify/scripts/artifact-inputs.env`'s `INITIAL_DATA_RELEASE_TAG`
-   / `INITIAL_DATA_ASSET_NAME` / `INITIAL_DATA_SHA256` are placeholders**
-   (`REQUIRES_VERIFY_PHASE_RESOLUTION`). `bench/Makefile` fetches this asset
-   via `gh release list | awk '/Latest/{print $3}' | xargs gh release
-   download`, i.e. a floating "latest" selector with no committed Git blob.
-   Resolve the exact tag/asset name/SHA-256 from
-   `https://github.com/isucon/isucon12-qualify/releases` (read-only) and pin
-   them here; `05-artifacts.sh` fails closed until this is done.
+1. **Resolved during `verify`.** `kakomon12-qualify/scripts/artifact-inputs.env`'s
+   `INITIAL_DATA_RELEASE_TAG` / `INITIAL_DATA_ASSET_NAME` / `INITIAL_DATA_SHA256`
+   are now pinned to the release tagged `Latest` by
+   `https://github.com/isucon/isucon12-qualify/releases` (asset
+   `initial_data.tar.gz`; the human downloaded it via the GitHub web UI and
+   this session independently re-hashed the same file). `bench/Makefile`
+   itself fetches this asset via a floating `gh release list | awk
+   '/Latest/{print $3}' | xargs gh release download` selector with no
+   committed Git blob; this recipe pins the resolved identity instead.
+   `05-artifacts.sh` fetches it with plain `curl` against
+   `github.com/.../releases/download/<tag>/<asset>` (no `gh` CLI or GitHub
+   token needed, since `isucon/isucon12-qualify` is a public repository --
+   same precedent as kakomon14/13's frontend Release fetch). During this
+   resolution, this sandbox's `gh`/`ghtkn` token could list releases via
+   GraphQL (`gh release list`) but got 403/"release not found" on the REST
+   `releases/tags` and `release download` endpoints; plain `curl` against the
+   public download URL worked without any token.
 2. **The internal layout of the `initial_data` archive past `initial_data/*.db`
    was not confirmed.** `bench/Makefile` also has targets named
    `benchmarker.json`/`benchmarker_tenant.json` that depend on the same
