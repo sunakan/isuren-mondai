@@ -37,3 +37,10 @@ Goの`http.ListenAndServe(":PORT")`/echoの`e.Start(":PORT")`のようにhostを
 ## provisioningの変更とgoss.yamlの期待値はセットで見直す
 
 一時的に追加したCLIツール(`gh`等)を後で削除した際、それに依存する`package: <name>: installed: true`のようなGoss期待値の削除を忘れやすい。provisioning stepを変更したら、対応するGoss項目(file/package/command/port)が今も正しいか都度確認する。
+
+## 成功したOrb Golden Base VMを「不要になった検証用VM」として削除しない
+
+`orb-recipe-green`(`mise orb:build-golden-base <target> --execute`)が成功すると`<target>-golden-base`という名前のVMがstopped状態で残る。これは失敗した試行の診断用VMとは違い、`build-orb-kakomon-golden-base`スキルの後続工程(`prepare-golden-base-clone`でisuren層を追加したcloneを作る)の元になる、保持すべきprovider-native artifactである。
+
+- mainへのマージ完了やworktree/branchのcleanupと同じタイミングで「もう使わないだろう」と一緒くたに削除しない。既存の`kakomon13-golden-base`・`kakomon14-golden-base`・`kakomon9-qualify-golden-base`も同様に保持され続けている。
+- 削除してよいのは、あくまで失敗した試行の診断用VM(名前が同じでも、対応するcommitがもう存在しない・再現性のない一時状態)であり、その判断も基本的に人間の確認を経てから行う。

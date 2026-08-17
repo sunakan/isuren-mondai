@@ -48,6 +48,8 @@ AMIのdiskを変換しない。AMIとOrbはexact recipe commit/treeとtarget-loc
 6. 成功時は`orb-recipe-green`と`orb-golden-green`を分けて報告する。少なくとも
    cloud-init/all.sh/Goss完走、Golden marker、identity scrub、isuren層不在、停止状態を示す。
    clone/fresh-boot、standalone、product Greenは実行していなければ`not-run`と書く。
+   stopped状態の成功VMはBase cloneの準備で使う保持対象であり、mainへのマージ完了や
+   worktree/branchのcleanupと同じタイミングで「もう不要」と一緒に削除しない。
 
 ## Base cloneの準備
 
