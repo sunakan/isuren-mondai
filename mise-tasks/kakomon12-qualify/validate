@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#MISE description="recipe contractを検証する (kakomon12-qualify独自: source/order/static)"
+set -euo pipefail
+
+# shellcheck source=kakomon12-qualify/scripts/artifact-inputs.env
+source kakomon12-qualify/scripts/artifact-inputs.env
+
+grep -qF 'run_step 10-base.sh' kakomon12-qualify/provisioning/all.sh
+grep -qF 'run_step 05-artifacts.sh' kakomon12-qualify/provisioning/all.sh
+base_line="$(grep -n 'run_step 10-base.sh' kakomon12-qualify/provisioning/all.sh | cut -d: -f1)"
+artifact_line="$(grep -n 'run_step 05-artifacts.sh' kakomon12-qualify/provisioning/all.sh | cut -d: -f1)"
+initdb_line="$(grep -n 'run_step 60-initdb.sh' kakomon12-qualify/provisioning/all.sh | cut -d: -f1)"
+test "${base_line}" -lt "${artifact_line}"
+test "${artifact_line}" -lt "${initdb_line}"
+
+grep -qF 'EnvironmentFile=/home/isuren/env.sh' \
+  kakomon12-qualify/provisioning/systemd/isuports-go.service
+grep -qF 'ExecStart=/home/isuren/blackauth/blackauth' \
+  kakomon12-qualify/provisioning/systemd/blackauth.service
+grep -qF 'CGO_ENABLED=1' kakomon12-qualify/provisioning/70-webapp-go.sh
+grep -qF 'CGO_ENABLED=0' kakomon12-qualify/provisioning/71-blackauth-go.sh
+grep -qF 'rm -rf "${BUILD_ROOT}"' kakomon12-qualify/provisioning/72-bench-build.sh
+
+find kakomon12-qualify mise-tasks/kakomon12-qualify \
+  -type f -name '*.sh' -print0 |
+  xargs -0 shellcheck -x -P SCRIPTDIR
+
+GO_BIN="$(mise where go@1.26.6)/bin/go"
+case "$(env -u GOROOT "${GO_BIN}" version)" in
+  'go version go1.26.6 '*) ;;
+  *)
+    echo 'Go 1.26.6 is required for validation' >&2
+    exit 1
+    ;;
+esac
+
+# webapp/go and blackauth are self-contained Go modules and can be vetted
+# directly. bench's go.mod requires isucon12-portal/data/webapp/go as
+# `replace ../...` siblings (see NOTICE.md); vetting it here would need the
+# same build-only staging that 50-source.sh/72-bench-build.sh do on the AMI,
+# so it is intentionally left to `mise run kakomon12-qualify:test-go`, not
+# this static-only task.
+(
+  cd upstream/isucon12-qualify/webapp/go
+  env -u GOROOT "${GO_BIN}" vet ./...
+)
+
+# blackauth/main.go has `//go:embed isuports.pem`: the real key is
+# intentionally not committed here (see NOTICE.md), so `go vet`/`go build`
+# fail on a plain checkout with "pattern isuports.pem: no matching files
+# found". Generate a throwaway placeholder only for this static check -- it
+# is never the official key and is removed immediately after.
+blackauth_dir="upstream/isucon12-qualify/blackauth"
+placeholder_key="${blackauth_dir}/isuports.pem"
+test ! -e "${placeholder_key}"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${placeholder_key}" 2>/dev/null
+trap 'rm -f "${placeholder_key}"' EXIT
+(
+  cd "${blackauth_dir}"
+  env -u GOROOT "${GO_BIN}" vet ./...
+)
+rm -f "${placeholder_key}"
+trap - EXIT
+
+user_data="$(mktemp)"
+trap 'rm -f "${user_data}"' EXIT
+PROJECT_COMMIT="$(git rev-parse HEAD)" \
+  TRACEPARENT="00-0123456789abcdef0123456789abcdef-0123456789abcdef-01" \
+  python3 kakomon12-qualify/cloud-init/generate-user-data.py --output "${user_data}"
+packer fmt -check kakomon12-qualify/packer
+packer validate -syntax-only \
+  -var source_ami="${BASE_AMI_ID}" \
+  -var vpc_id=vpc-static-validation \
+  -var subnet_id=subnet-static-validation \
+  -var iam_instance_profile=static-validation \
+  -var user_data_file="${user_data}" \
+  -var project_url="https://github.com/sunakan/isuren-mondai/commit/$(git rev-parse HEAD)" \
+  -var recipe_tree="$(git rev-parse HEAD:kakomon12-qualify)" \
+  kakomon12-qualify/packer

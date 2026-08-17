@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="official mirrorとmanaged sourceの差分を表示"
+set -euo pipefail
+
+# The official mirror is read-only evidence; diff exit 1 means differences,
+# not a task failure.
+mirror=tmp/all-kakomon/isucon12-qualify
+test -d "${mirror}/.git" || {
+  echo "error: worktree-local mirror is missing" >&2
+  exit 1
+}
+test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon12-qualify.git"
+test "$(git -C "${mirror}" rev-parse HEAD)" = "95958774bde66d47fd26cc820fd2fbfbece798f1"
+test -z "$(git -C "${mirror}" status --short)"
+
+# kakomon12-qualify独自: webapp/go/public.pem, blackauth/isuports.pem, sql/,
+# publicはmanaged sourceへcommitせず、AMI側でexact identityを取得・検証するため、
+# この比較から除外する(NOTICE.md参照)。
+diff -ru --exclude=public.pem "${mirror}/webapp/go" upstream/isucon12-qualify/webapp/go || true
+diff -ru --exclude=isuports.pem "${mirror}/blackauth" upstream/isucon12-qualify/blackauth || true
+diff -ru "${mirror}/bench" upstream/isucon12-qualify/bench || true
+diff -ru "${mirror}/isucon12-portal" upstream/isucon12-qualify/isucon12-portal || true
+diff -ru "${mirror}/data" upstream/isucon12-qualify/data || true

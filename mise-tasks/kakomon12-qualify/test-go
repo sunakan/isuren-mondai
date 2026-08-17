@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#MISE description="Go application/benchmarkをtest/vetする (kakomon12-qualify独自: bench/replaceディレクティブ用にsibling層をstaging)"
+set -euo pipefail
+
+GO_BIN="$(mise where go@1.26.6)/bin/go"
+
+(
+  cd upstream/isucon12-qualify/webapp/go
+  env -u GOROOT "${GO_BIN}" vet ./...
+  env -u GOROOT CGO_ENABLED=1 "${GO_BIN}" build -o /dev/null .
+)
+# blackauth/main.go has `//go:embed isuports.pem`: the real key is
+# intentionally not committed here (see NOTICE.md). Generate a throwaway
+# placeholder only for this static check -- it is never the official key.
+blackauth_dir="upstream/isucon12-qualify/blackauth"
+placeholder_key="${blackauth_dir}/isuports.pem"
+test ! -e "${placeholder_key}"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${placeholder_key}" 2>/dev/null
+trap 'rm -f "${placeholder_key}"' EXIT
+(
+  cd "${blackauth_dir}"
+  env -u GOROOT "${GO_BIN}" vet ./...
+)
+rm -f "${placeholder_key}"
+trap - EXIT
+
+# bench/go.mod's `replace ../isucon12-portal`, `replace ../data`, and
+# `replace ../webapp/go` directives expect these four directories as
+# siblings, matching the official repository root layout (see NOTICE.md and
+# provisioning/50-source.sh, which stage the same layout on the AMI).
+staging="$(mktemp -d)"
+trap 'rm -rf "${staging}"' EXIT
+cp -r upstream/isucon12-qualify/bench "${staging}/bench"
+cp -r upstream/isucon12-qualify/isucon12-portal "${staging}/isucon12-portal"
+cp -r upstream/isucon12-qualify/data "${staging}/data"
+mkdir -p "${staging}/webapp"
+cp -r upstream/isucon12-qualify/webapp/go "${staging}/webapp/go"
+(
+  cd "${staging}/bench"
+  env -u GOROOT "${GO_BIN}" vet ./...
+)

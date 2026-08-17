@@ -1,0 +1,18 @@
+[Unit]
+Description=kakomon12-qualify Go Application
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=isuren
+Group=isuren
+WorkingDirectory=/home/isuren/webapp/go
+EnvironmentFile=/home/isuren/env.sh
+ExecStart=/home/isuren/webapp/go/isuports
+Restart=on-failure
+RestartSec=2s
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

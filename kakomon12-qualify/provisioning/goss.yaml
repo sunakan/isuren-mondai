@@ -1,0 +1,177 @@
+file:
+  /home/isuren/webapp/go/isuports:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/blackauth/blackauth:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/bin/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/LICENSE:
+    exists: true
+    filetype: file
+    mode: "0644"
+  /home/isuren/env.sh:
+    exists: true
+    filetype: file
+    # Goss 0.4.10 treats these bare values as literal substrings. These are
+    # the official docker-compose-go.yml public practice defaults; only the
+    # two hostname values differ from the official *.t.isucon.dev mapping.
+    contains:
+      - "ISUCON_DB_HOST=127.0.0.1"
+      - "ISUCON_DB_PORT=3306"
+      - "ISUCON_DB_USER=isucon"
+      - "ISUCON_DB_PASSWORD=isucon"
+      - "ISUCON_DB_NAME=isuports"
+      - "ISUCON_BASE_HOSTNAME=.t.isuren.internal"
+      - "ISUCON_ADMIN_HOSTNAME=admin.t.isuren.internal"
+  /home/isuren/webapp/public.pem:
+    exists: true
+    filetype: file
+  /home/isuren/blackauth/isuports.pem:
+    exists: true
+    filetype: file
+    mode: "0600"
+  /home/isuren/webapp/sql/init.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/webapp/public/index.html:
+    exists: true
+    filetype: file
+  /home/isuren/initial_data:
+    exists: true
+    filetype: directory
+  /home/isuren/.build:
+    exists: false
+  /home/isuren/go:
+    exists: false
+  /etc/nginx/tls/t.isuren.internal.key:
+    exists: true
+    filetype: file
+    mode: "0600"
+  /etc/nginx/tls/t.isuren.internal.crt:
+    exists: true
+    filetype: file
+    mode: "0644"
+  # This recipe keeps the wildcard certificate in the sealed image
+  # deliberately (see 90-nginx.sh); it is a shared public practice fixture,
+  # not a per-clone secret.
+  /usr/local/share/ca-certificates/t.isuren.internal.crt:
+    exists: true
+    filetype: file
+  /etc/nginx/sites-enabled/isuports.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /etc/nginx/sites-available/isuports.conf
+  /etc/nginx/sites-enabled/default:
+    exists: false
+  /home/isuren/.local/bin/mise:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/.config/mise/config.toml:
+    exists: true
+    filetype: file
+  /home/isuren/.config/mise/mise.lock:
+    exists: true
+    filetype: file
+  /usr/local/share/isuren-mondai/kakomon12-qualify/recipe.txt:
+    exists: true
+    contains:
+      - 'official_commit=95958774bde66d47fd26cc820fd2fbfbece798f1'
+      - 'base_ami=ami-0df1235688731e6cc'
+
+user:
+  isuren:
+    exists: true
+    uid: 1100
+    groups:
+      - isuren
+
+group:
+  isuren:
+    exists: true
+    gid: 1100
+
+package:
+  mysql-server:
+    installed: true
+  nginx:
+    installed: true
+  gh:
+    installed: true
+
+service:
+  mysql:
+    enabled: true
+    running: true
+  nginx:
+    enabled: true
+    running: true
+  isuports-go:
+    enabled: true
+    running: true
+  blackauth:
+    enabled: true
+    running: true
+
+port:
+  tcp:443:
+    listening: true
+  tcp:3000:
+    listening: true
+  tcp:3001:
+    listening: true
+
+command:
+  os-version:
+    exec: ". /etc/os-release; test \"$ID\" = ubuntu; test \"$VERSION_ID\" = 26.04"
+    exit-status: 0
+  architecture:
+    exec: "test \"$(dpkg --print-architecture)\" = arm64"
+    exit-status: 0
+  mise-version:
+    exec: /home/isuren/.local/bin/mise --version
+    stdout:
+      - "2026.8.6 linux-arm64"
+    exit-status: 0
+  go-version:
+    exec: "runuser -u isuren -- env HOME=/home/isuren /home/isuren/.local/bin/mise exec -- go version"
+    stdout:
+      - "go version go1.26.6 linux/arm64"
+    exit-status: 0
+  webapp-cgo-linked:
+    exec: "file /home/isuren/webapp/go/isuports | grep -q 'dynamically linked'"
+    exit-status: 0
+  wildcard-hostname-contract:
+    exec: "grep -F 'server_name *.t.isuren.internal;' /etc/nginx/sites-available/isuports.conf"
+    exit-status: 0
+  application-environment:
+    exec: "grep -Fxq 'EnvironmentFile=/home/isuren/env.sh' /etc/systemd/system/isuports-go.service"
+    exit-status: 0
+  cert-trusted:
+    exec: "openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /etc/nginx/tls/t.isuren.internal.crt"
+    stdout:
+      - "/etc/nginx/tls/t.isuren.internal.crt: OK"
+    exit-status: 0
+  healthcheck:
+    exec: "curl -fsSk -o /dev/null -H 'Host: admin.t.isuren.internal' https://127.0.0.1/"
+    exit-status: 0
+  mysql-database:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SHOW DATABASES LIKE 'isuports'\""
+    stdout:
+      - "isuports"
+    exit-status: 0
+  mysql-official-user:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SELECT COUNT(*) FROM mysql.user WHERE User='isucon'\""
+    stdout:
+      - "1"
+    exit-status: 0
+  tenant-db-seeded:
+    exec: "test -n \"$(find /home/isuren/webapp/tenant_db -maxdepth 1 -name '*.db')\""
+    exit-status: 0
