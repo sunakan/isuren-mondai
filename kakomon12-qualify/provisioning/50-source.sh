@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/lib.sh"
 OFFICIAL_DIR="${ARTIFACT_DIR}/official"
 require_file "${MANAGED_SOURCE_DIR}/NOTICE.md"
 require_file "${MANAGED_SOURCE_DIR}/LICENSE"
-require_file "${OFFICIAL_DIR}/webapp/go/public.pem"
+require_file "${OFFICIAL_DIR}/webapp/public.pem"
 require_file "${OFFICIAL_DIR}/blackauth/isuports.pem"
 
 # webapp/go: managed source (this repository) + the official public JWT key
@@ -18,7 +18,7 @@ install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
   "${ISUREN_HOME}/webapp/go" "${ISUREN_HOME}/webapp/tenant_db"
 rsync -a "${MANAGED_SOURCE_DIR}/webapp/go/" "${ISUREN_HOME}/webapp/go/"
 install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
-  "${OFFICIAL_DIR}/webapp/go/public.pem" "${ISUREN_HOME}/webapp/public.pem"
+  "${OFFICIAL_DIR}/webapp/public.pem" "${ISUREN_HOME}/webapp/public.pem"
 rsync -a "${OFFICIAL_DIR}/webapp/sql/" "${ISUREN_HOME}/webapp/sql/"
 chmod 0755 "${ISUREN_HOME}/webapp/sql/init.sh"
 rsync -a "${OFFICIAL_DIR}/public/" "${ISUREN_HOME}/webapp/public/"

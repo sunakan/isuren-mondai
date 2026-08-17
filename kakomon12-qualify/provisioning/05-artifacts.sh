@@ -27,7 +27,7 @@ git -C "${FETCH_DIR}" remote add origin "${OFFICIAL_REPOSITORY_URL}"
 git -C "${FETCH_DIR}" sparse-checkout init --no-cone
 git -C "${FETCH_DIR}" sparse-checkout set \
   webapp/sql \
-  webapp/go/public.pem \
+  webapp/public.pem \
   blackauth/isuports.pem \
   public
 git -C "${FETCH_DIR}" fetch --quiet --depth 1 --filter=blob:none origin "${OFFICIAL_COMMIT}"
@@ -37,7 +37,7 @@ test "$(git -C "${FETCH_DIR}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"
 require_file "${FETCH_DIR}/webapp/sql/init.sh"
 require_file "${FETCH_DIR}/webapp/sql/admin/01_create_mysql_database.sql"
 require_file "${FETCH_DIR}/webapp/sql/admin/10_schema.sql"
-require_file "${FETCH_DIR}/webapp/go/public.pem"
+require_file "${FETCH_DIR}/webapp/public.pem"
 require_file "${FETCH_DIR}/blackauth/isuports.pem"
 require_file "${FETCH_DIR}/public/index.html"
 
@@ -45,7 +45,7 @@ require_file "${FETCH_DIR}/public/index.html"
 # byte-identical, matching the official README's "one shared key pair" claim)
 # and the public key is loaded by webapp/go at runtime; record their exact
 # byte identity for provenance rather than trusting the filenames alone.
-webapp_key_sha256="$(sha256sum "${FETCH_DIR}/webapp/go/public.pem" | awk '{print $1}')"
+webapp_key_sha256="$(sha256sum "${FETCH_DIR}/webapp/public.pem" | awk '{print $1}')"
 blackauth_key_sha256="$(sha256sum "${FETCH_DIR}/blackauth/isuports.pem" | awk '{print $1}')"
 {
   printf 'official_commit=%s\n' "${OFFICIAL_COMMIT}"

@@ -62,7 +62,7 @@ for mTLS, Portal authentication, credentials, or trusted production traffic.
 
 ## JWT key pair
 
-`webapp/go/public.pem` (public key, loaded by the Application at runtime) and
+`webapp/public.pem` (public key, loaded by the Application at runtime) and
 `blackauth/isuports.pem` (private key, embedded into the `blackauth` binary
 at compile time via `//go:embed`, and byte-identical to `bench/isuports.pem`
 in the official tree) are documented by the official README as one fixed key
