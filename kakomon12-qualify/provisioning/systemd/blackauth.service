@@ -1,0 +1,15 @@
+[Unit]
+Description=kakomon12-qualify auth server
+After=network.target
+
+[Service]
+Type=simple
+User=isuren
+Group=isuren
+WorkingDirectory=/home/isuren/blackauth
+ExecStart=/home/isuren/blackauth/blackauth
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

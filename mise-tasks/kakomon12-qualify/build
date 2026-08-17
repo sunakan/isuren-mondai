@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#MISE description="AMIをPackerでbuildする"
+set -euo pipefail
+
+VPC_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)"
+SUBNET_ID="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='SubnetId'].OutputValue" --output text)"
+IAM_INSTANCE_PROFILE="$(aws cloudformation describe-stacks \
+  --region ap-northeast-1 \
+  --stack-name "$PACKER_NETWORK_STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='PackerInstanceProfileName'].OutputValue" --output text)"
+
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
+# user-dataはHEADのcommit SHAをgit clone対象として埋め込む。未コミット・未pushだとEC2起動時の
+# git fetchが失敗し、Packerビルドの奥深くで分かりにくく落ちるため、ここで先に検知する。
+require_clean_worktree
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+export PROJECT_COMMIT
+require_pushed_commit "${PROJECT_COMMIT}"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:kakomon12-qualify")"
+
+# OTel trace化用。EC2側(all.sh)はこの値を受け取ってログに書き戻すだけで、span生成・OTLP送信は
+# 一切行わない(APIキーをEC2/AMIへ渡さないための設計。詳細はscripts/otel.sh参照)。
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export TRACEPARENT
+
+# Target-local text inputs keep the source AMI and official commit exact and reviewable.
+# shellcheck source=kakomon12-qualify/scripts/artifact-inputs.env
+source kakomon12-qualify/scripts/artifact-inputs.env
+[[ "${BASE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] || {
+  echo "error: BASE_AMI_ID is not an exact AMI ID" >&2
+  exit 1
+}
+[[ "${OFFICIAL_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "error: OFFICIAL_COMMIT is invalid" >&2
+  exit 1
+}
+if [ "${INITIAL_DATA_RELEASE_TAG}" = "REQUIRES_VERIFY_PHASE_RESOLUTION" ]; then
+  echo "error: kakomon12-qualify/scripts/artifact-inputs.env still carries the initial_data placeholder; resolve it before building (see kakomon12-qualify/README.md)" >&2
+  exit 1
+fi
+
+# user-dataはprovisioning/配下から再生成可能なためGit管理していない。ビルドのたびに最新化し、
+# 生成し忘れによる古いrecipeでのビルドを防ぐ。
+user_data="$(mktemp)"
+python3 kakomon12-qualify/cloud-init/generate-user-data.py --output "${user_data}"
+packer init kakomon12-qualify/packer/kakomon12-qualify.pkr.hcl
+BUILD_LOG="$(mktemp)"
+trap 'rm -f "${BUILD_LOG}" "${user_data}"' EXIT
+
+# buildログを画面に出しつつファイルにも残す(AMI ID抽出・span化のため)。
+# packer buildのexit codeをOTel送信のために明示的に捕まえた上でtaskを継続させる。
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
+packer build \
+  -var "region=ap-northeast-1" \
+  -var "source_ami=${BASE_AMI_ID}" \
+  -var "vpc_id=${VPC_ID}" \
+  -var "subnet_id=${SUBNET_ID}" \
+  -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \
+  -var "user_data_file=${user_data}" \
+  -var "project_url=https://github.com/sunakan/isuren-mondai/commit/${PROJECT_COMMIT}" \
+  -var "recipe_tree=${RECIPE_TREE}" \
+  kakomon12-qualify/packer/kakomon12-qualify.pkr.hcl | tee "${BUILD_LOG}" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
+
+# trace送信はPacker build完了後に行う。送信の成否はBUILD_EXITに影響させない。
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE="ok"
+  if [ "${BUILD_EXIT}" -ne 0 ]; then
+    ROOT_STATUS_CODE="error"
+  fi
+  otel_span \
+    --service "${OTEL_SERVICE_NAME:-kakomon12-qualify-ami-build}" \
+    --name "packer.build" \
+    --kind server \
+    --force-trace-id "${TRACE_ID}" \
+    --force-span-id "${ROOT_SPAN_ID}" \
+    --start "${BUILD_START_EPOCH}" \
+    --end "${BUILD_END_EPOCH}" \
+    --status-code "${ROOT_STATUS_CODE}"
+  otel_emit_provisioning_spans "${BUILD_LOG}" "${TRACE_ID}" "${ROOT_SPAN_ID}" kakomon12-qualify
+fi
+
+# 最後に実行されたコマンド(otel_span等)がexit 0で終わるため、これが無いとpacker build自体が
+# 失敗していてもmise taskは成功扱いになる。元のPacker exit codeを明示的に返す。
+exit "${BUILD_EXIT}"

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#MISE description="AMIとsnapshotをPublic公開する (kakomon12-qualify独自: 最新AMIを公開; interactive)"
+#MISE interactive=true
+set -euo pipefail
+
+AMI_ID="$(aws ec2 describe-images --owners self \
+  --filters 'Name=name,Values=isuren/kakomon12-qualify-*' 'Name=state,Values=available' \
+  --query 'sort_by(Images,&CreationDate)[-1].[ImageId]' --output text)"
+
+if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+  echo "エラー: 公開対象のkakomon12-qualify AMIが見つかりません。" >&2
+  exit 1
+fi
+
+echo "以下のAMIをPublicに公開します:"
+aws ec2 describe-images --image-ids "$AMI_ID" --query "Images[0].[ImageId,Name,CreationDate]" --output text
+read -r -p "続行しますか? [y/N] " ANSWER
+if [ "$ANSWER" != "y" ]; then
+  echo "中止しました"
+  exit 0
+fi
+
+# AMIをpublicにしても、紐づくEBSスナップショットがprivateのままだと他アカウントから
+# 起動できない(AWSの制約)。スナップショット→AMIの順で公開することで、途中の状態で
+# 「AMIはpublicだがスナップショットはprivate」という不整合な期間が生じないようにする。
+SNAPSHOT_IDS="$(aws ec2 describe-images --image-ids "$AMI_ID" \
+  --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId' --output text)"
+
+for SNAPSHOT_ID in $SNAPSHOT_IDS; do
+  aws ec2 modify-snapshot-attribute --snapshot-id "$SNAPSHOT_ID" \
+    --attribute createVolumePermission --operation-type add --group-names all
+  echo "snapshot published: ${SNAPSHOT_ID}"
+done
+
+aws ec2 modify-image-attribute --image-id "$AMI_ID" \
+  --launch-permission "Add=[{Group=all}]"
+echo "AMI published: ${AMI_ID}"
