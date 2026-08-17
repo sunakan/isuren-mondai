@@ -7,7 +7,11 @@ GO_BIN="$(mise where go@1.26.6)/bin/go"
 (
   cd upstream/isucon12-qualify/webapp/go
   env -u GOROOT "${GO_BIN}" vet ./...
-  env -u GOROOT CGO_ENABLED=1 "${GO_BIN}" build -o /dev/null .
+  # webapp/go/isuports.go is `package isuports` (a library); the official
+  # entrypoint built by provisioning/70-webapp-go.sh is ./cmd/isuports
+  # (matching the official Makefile). Build that, not `.`, so this check
+  # matches what actually ships.
+  env -u GOROOT CGO_ENABLED=1 "${GO_BIN}" build -o /dev/null ./cmd/isuports
 )
 # blackauth/main.go has `//go:embed isuports.pem`: the real key is
 # intentionally not committed here (see NOTICE.md). Generate a throwaway
