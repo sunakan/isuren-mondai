@@ -7,7 +7,7 @@ file:
     exists: true
     filetype: file
     mode: "0755"
-  /home/isuren/bin/bench:
+  /home/isuren/bench:
     exists: true
     filetype: file
     mode: "0755"

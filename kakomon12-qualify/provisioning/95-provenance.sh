@@ -19,7 +19,7 @@ base_image=Ubuntu 26.04 LTS arm64 release serial ${BASE_IMAGE_SERIAL}
 application=127.0.0.1:3000 (isuports-go.service)
 auth=127.0.0.1:3001 (blackauth.service)
 application_environment=/home/isuren/env.sh
-benchmark=/home/isuren/bin/bench
+benchmark=/home/isuren/bench
 benchmark_wrapper=none; invoke the official benchmarker directly and read its final "pass"/"score" text log plus exit status (-exit-error-on-fail)
 public_hostname_wildcard=*.t.isuren.internal
 admin_hostname=admin.t.isuren.internal
@@ -33,7 +33,7 @@ EOF
 
 runuser -u "${ISUREN_USER}" -- "${MISE_BIN}" exec -- go version >"${PROVENANCE_DIR}/go-version.txt"
 dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' | LC_ALL=C sort >"${PROVENANCE_DIR}/packages.tsv"
-sha256sum "${ISUREN_HOME}/webapp/go/isuports" "${ISUREN_HOME}/blackauth/blackauth" "${ISUREN_HOME}/bin/bench" \
+sha256sum "${ISUREN_HOME}/webapp/go/isuports" "${ISUREN_HOME}/blackauth/blackauth" "${ISUREN_HOME}/bench" \
   >"${PROVENANCE_DIR}/binaries.sha256"
 install -m 0644 "${ARTIFACT_DIR}/key-identity.txt" "${PROVENANCE_DIR}/key-identity.txt"
 

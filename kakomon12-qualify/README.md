@@ -89,7 +89,7 @@ must read the benchmarker's own stdout/stderr log and honor
 `-exit-error-on-fail`, not assume a `{"pass":...}` line exists.
 
 ```text
-/home/isuren/bin/bench \
+/home/isuren/bench \
   -target-url https://admin.t.isuren.internal \
   -target-addr WEB_PRIVATE_IP:443 \
   -exit-error-on-fail \
@@ -115,16 +115,17 @@ the benchmarker's `-target-addr`/Host-header split requires it.
 
 1. `cloud-init/` checks out the exact isuren-mondai commit and calls
    `provisioning/all.sh`.
-2. `provisioning/10-base.sh` installs OS packages (including the
+2. `provisioning/10-base.sh` installs OS packages, including the
    `build-essential` CGO toolchain `webapp/go`'s `mattn/go-sqlite3` dependency
-   needs, and the `gh` CLI for the `initial_data` Release fetch).
-   `provisioning/05-artifacts.sh` fetches every official non-code input
+   needs. `provisioning/05-artifacts.sh` fetches every official non-code input
    (`webapp/sql/`, the JWT key pair, the prebuilt `public/` frontend tree,
-   and the `initial_data` GitHub Release) at its exact commit/tag and
-   verifies tree/manifest/SHA-256 identities inside the AMI build.
+   and the `initial_data` GitHub Release, the latter via plain `curl` against
+   the public `releases/download` URL -- no `gh` CLI or token needed) at its
+   exact commit/tag and verifies tree/manifest/SHA-256 identities inside the
+   AMI build.
 3. `provisioning/` installs the runtime and services, deploys the verified
    inputs to their official relative paths (`/home/isuren/webapp/**`,
-   `/home/isuren/blackauth/**`, `/home/isuren/bin/bench`), builds
+   `/home/isuren/blackauth/**`, `/home/isuren/bench`), builds
    Application/auth-server/benchmark, and runs Goss.
 4. Packer waits for the completion marker and seals clone-local identity
    (machine-id, SSH host keys, `authorized_keys`). It does not upload local

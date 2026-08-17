@@ -43,8 +43,8 @@ rsync -a "${ARTIFACT_DIR}/extracted/initial_data/" "${ISUREN_HOME}/initial_data/
 # sibling of webapp/go under a build-only directory, mirroring the official
 # repository root layout that bench/go.mod's `replace ../isucon12-portal`,
 # `replace ../data`, and `replace ../webapp/go` directives expect. This whole
-# directory is removed by 71-blackauth-go.sh once the bench binary is built;
-# only the final binary at /home/isuren/bin/bench is a runtime asset.
+# directory is removed by 72-bench-build.sh once the bench binary is built;
+# only the final binary at /home/isuren/bench is a runtime asset.
 BUILD_ROOT="${ISUREN_HOME}/.build/isucon12-qualify"
 rm -rf "${BUILD_ROOT}"
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${BUILD_ROOT}"

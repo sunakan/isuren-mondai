@@ -7,9 +7,11 @@ source "${SCRIPT_DIR}/lib.sh"
 
 MISE_BIN="${ISUREN_HOME}/.local/bin/mise"
 BUILD_ROOT="${ISUREN_HOME}/.build/isucon12-qualify"
-BENCH_BIN="${ISUREN_HOME}/bin/bench"
+# Official README.md: "ベンチマーカーは /home/isucon/bench 以下にビルド済みの
+# バイナリがあります" -- the official benchmarker binary lives directly under
+# the home directory, not a bin/ subdirectory. Match that path.
+BENCH_BIN="${ISUREN_HOME}/bench"
 
-install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${ISUREN_HOME}/bin"
 # bench/go.mod's `replace ../isucon12-portal`, `replace ../data`, and
 # `replace ../webapp/go` directives expect these three directories as
 # siblings of bench/ (50-source.sh staged that layout under BUILD_ROOT).
@@ -32,4 +34,4 @@ chown "${ISUREN_USER}:${ISUREN_USER}" "${BENCH_BIN}"
 rm -rf "${ISUREN_HOME}/.build"
 rm -rf "${ISUREN_HOME}/go" "${ISUREN_HOME}/.cache/go-build"
 
-log "72-bench-build.sh: benchmark built at /home/isuren/bin/bench; build-only source removed"
+log "72-bench-build.sh: benchmark built at /home/isuren/bench; build-only source removed"
