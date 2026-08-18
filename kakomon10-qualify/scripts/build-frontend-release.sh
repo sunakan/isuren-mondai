@@ -156,9 +156,16 @@ install -m 0644 "${stage_root}/initial-data/result/2_DummyChairData.sql" "${stag
   cd "${webapp_dir}"
   run_go go build -mod=readonly -trimpath -o "${work}/isuumo" .
 )
-MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_USER="${MYSQL_TEST_USER}" MYSQL_PASS="${MYSQL_TEST_PASS}" \
-  MYSQL_DBNAME="${MYSQL_TEST_DB}" SERVER_PORT="${WEBAPP_PORT}" \
-  "${work}/isuumo" >"${work}/isuumo.log" 2>&1 &
+# main.go reads fixture/{chair,estate}_condition.json via a cwd-relative
+# "../fixture/..." path (webapp/go's official layout), so the binary must run
+# with webapp_dir as its cwd, not this script's cwd; `exec` inside the
+# subshell keeps `$!` pointing at the actual isuumo process, not the subshell.
+(
+  cd "${webapp_dir}"
+  exec env MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_USER="${MYSQL_TEST_USER}" MYSQL_PASS="${MYSQL_TEST_PASS}" \
+    MYSQL_DBNAME="${MYSQL_TEST_DB}" SERVER_PORT="${WEBAPP_PORT}" \
+    "${work}/isuumo"
+) >"${work}/isuumo.log" 2>&1 &
 webapp_pid=$!
 ready=false
 for _ in $(seq 1 30); do
