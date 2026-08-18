@@ -97,11 +97,15 @@ install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \
 
 # Official schema + Faker-generated dummy data, in the same order as the
 # official webapp/mysql/db/init.sh (0_Schema.sql, then the two Dummy*Data.sql
-# files) so DROP/CREATE DATABASE runs before the bulk INSERTs.
+# files) so DROP/CREATE DATABASE runs before the bulk INSERTs. 0_Schema.sql
+# creates the isuumo database itself and every statement after it uses the
+# isuumo.<table> qualified name, so this must connect without naming a
+# database up front: `mysql ... isuumo` fails at connect time with "Unknown
+# database 'isuumo'" before CREATE DATABASE ever runs.
 cat "${APP_ROOT}/webapp/mysql/db/0_Schema.sql" \
   "${APP_ROOT}/webapp/mysql/db/1_DummyEstateData.sql" \
   "${APP_ROOT}/webapp/mysql/db/2_DummyChairData.sql" |
-  mysql --defaults-file=/dev/null -h 127.0.0.1 -P 3306 -u isucon -pisucon isuumo
+  mysql --defaults-file=/dev/null -h 127.0.0.1 -P 3306 -u isucon -pisucon
 test "$(mysql --defaults-file=/dev/null --user=root --skip-column-names -e "SELECT COUNT(*) FROM isuumo.chair")" -gt 0
 test "$(mysql --defaults-file=/dev/null --user=root --skip-column-names -e "SELECT COUNT(*) FROM isuumo.estate")" -gt 0
 
