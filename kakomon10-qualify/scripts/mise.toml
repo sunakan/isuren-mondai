@@ -1,3 +1,8 @@
+# Node.js 14.9.0 has no official darwin-arm64 build (Node did not ship Apple
+# Silicon builds until v16), so mise.lock intentionally has no macos-arm64
+# platform entry; build-frontend-release.sh cannot run natively on an Apple
+# Silicon Mac (locked for the ubuntu-26.04-arm CI runner, matching the AMI
+# architecture).
 [tools]
 node = "14.9.0"
 go = "1.26.6"
