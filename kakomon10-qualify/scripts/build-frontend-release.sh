@@ -117,6 +117,15 @@ test "$(find "${stage_root}/webapp/frontend/public/images/estate" -type f | wc -
 #    generate the benchmark verification snapshot the same way the official
 #    initial-data/Makefile's verification_data target does (against a live
 #    webapp), but pointed at our own throwaway MySQL instead of docker-compose.
+# GitHub Actions ubuntu-26.04-arm runners observed 2026-08-18: a plain
+# `apt-get install mysql-server` did not leave root on auth_socket (`sudo
+# mysqladmin --user=root ping` failed with "Access denied ... using
+# password: NO"), unlike a from-scratch install on bastion EC2, which does.
+# Purge any pre-existing mysql packages/data first so the postinstall script
+# always runs fresh and sets up root the same way 40-mysql.sh assumes.
+sudo systemctl stop mysql 2>/dev/null || true
+sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq mysql-server mysql-server-core mysql-client mysql-client-core mysql-common 2>/dev/null || true
+sudo rm -rf /var/lib/mysql /etc/mysql
 sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server
 sudo systemctl enable --now mysql
