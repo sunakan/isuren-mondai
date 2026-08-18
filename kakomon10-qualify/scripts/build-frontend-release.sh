@@ -132,10 +132,16 @@ sudo systemctl enable --now mysql
 sudo mysqladmin --defaults-file=/dev/null --user=root ping
 sudo mysql --defaults-file=/dev/null --user=root -e \
   "CREATE USER IF NOT EXISTS ${MYSQL_TEST_USER}@localhost IDENTIFIED BY '${MYSQL_TEST_PASS}'; GRANT ALL PRIVILEGES ON *.* TO ${MYSQL_TEST_USER}@localhost WITH GRANT OPTION; FLUSH PRIVILEGES;"
+# 0_Schema.sql creates the isuumo database itself (DROP/CREATE DATABASE) and
+# every statement after it uses the isuumo.<table> qualified name, so this
+# must connect without naming a database up front: `mysql ... isuumo` would
+# fail at connect time with "Unknown database 'isuumo'" before the CREATE
+# DATABASE statement ever runs (observed 2026-08-18 on a from-scratch CI
+# MySQL install).
 cat "${MANAGED}/webapp/mysql/db/0_Schema.sql" \
   "${stage_root}/initial-data/result/1_DummyEstateData.sql" \
   "${stage_root}/initial-data/result/2_DummyChairData.sql" |
-  mysql --defaults-file=/dev/null -h 127.0.0.1 -P 3306 -u "${MYSQL_TEST_USER}" -p"${MYSQL_TEST_PASS}" "${MYSQL_TEST_DB}"
+  mysql --defaults-file=/dev/null -h 127.0.0.1 -P 3306 -u "${MYSQL_TEST_USER}" -p"${MYSQL_TEST_PASS}"
 
 webapp_dir="${stage_root}/webapp/go"
 install -d -m 0755 "${webapp_dir}" "${stage_root}/webapp/fixture" "${stage_root}/webapp/mysql/db"
