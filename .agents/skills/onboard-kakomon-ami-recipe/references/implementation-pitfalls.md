@@ -71,3 +71,24 @@ Goの`http.ListenAndServe(":PORT")`/echoの`e.Start(":PORT")`のようにhostを
 - 同じセッションでinitial_data Release archiveの内部layoutも実際にdownloadして初めて判明した: `bench/benchmarker.json`・`bench/benchmarker_tenant.json`(bench runtime fixture)、`webapp/sql/admin/90_data.sql`(gitignore対象、`docker-entrypoint-initdb.d`規約で`01_`/`10_`の後に自動適用される admin tenant seed)が`initial_data/*.db`以外にも同梱されていた。`initial_data/*.db`の存在だけを確認して「archiveの中身を把握した」と扱わず、公式`Makefile`・`docker-compose.yml`のmount定義等、archiveを実際に消費している箇所を全て洗い出してから必須ファイルを確定する。
 - benchmarkerのCLIオプション(例: `-target-url`)がどのhostname階層を期待するかも、READMEの例だけで決め打ちせず`option.go`のデフォルト値・`scenario.go`の実際の組み立てロジックを読む。isucon12-qualifyのbenchは`-target-url`に**base** hostnameを渡す前提で、`admin.`prefixを自分で付加する(`b.Scheme+"://admin."+b.Host`)。admin hostnameを直接渡すと`admin.admin.<host>`という二重prefixになり、Host header不一致で401になる。
 - webapp/goがCGOで`mattn/go-sqlite3`をリンクしていても、`sqlite3` CLIコマンド自体は別途OSパッケージとして必要な場合がある(`createTenantDB`が`sqlite3 <path> < schema.sql`をshell out)。「Goのsqlite3ドライバをCGOでビルドできた」ことと「sqlite3 CLIが入っている」ことは別の確認事項であり、実際にテナント作成APIを叩くまで欠落に気づけなかった。
+
+## 手動でcloud-init runcmdをEC2上に再現するときは、cwdを変えないgit呼び出しを使う
+
+AMI build前にfresh EC2でprovisioningを手動先行検証する場合、SSM経由で`git clone`相当をcloud-initの`runcmd`と同じ手順で再現する。この際`cd <dir> && git remote add ...`のように`cd`でchainingすると、SSMの1コマンド内でcwdが後続コマンドへ持ち越され、`all.sh`内の`mise`呼び出しがcwd配下の無関係な`mise.toml`(例: isuren-mondaiリポジトリ自身のroot mise.toml)を検出して`mise trust`エラーを出すことがある。
+
+- 実際のcloud-init `runcmd`は各項目が独立した`git -C <dir> ...`呼び出しでcwdを一切変えないため、この問題は起きない。`cd`によるchainingは手動再現側だけの副作用であり、recipe自体のバグではない。
+- 対策: 手動再現でも`git -C <dir> ...`または`git --git-dir=<dir>/.git --work-tree=<dir> ...`のようなcwd非依存の呼び出しに揃え、`cd`でcwdを変更しない。エラーが出た場合、それが本物のrecipeバグか手動再現方法のアーティファクトかを、実際のcloud-init手順との差分に立ち返って切り分ける。
+
+## EC2初回起動直後はbackground処理がapt lockを保持していることがある(Orbでは起きない差分)
+
+fresh EC2起動直後に`apt-get install`を含むprovisioningを走らせると、`E: Could not get lock /var/lib/dpkg/lock-frontend`で即失敗することがある。cloud-init自身のパッケージ更新処理やunattended-upgradesがバックグラウンドでdpkg lockを保持しているため。Orb VMではこの起動直後のタイミング差が発生しなかった(Orbの起動シーケンスとの違いと推測)。
+
+- 対策: `cloud-init status --wait`または一定時間の待機後に再試行する。Packerの`amazon-ebs` provisionerは`cloud-init status --wait`を挟んでいるためこの問題を自然に回避しているが、手動でSSM経由に先行検証する場合は明示的に待つ必要がある。
+
+## AMI root volumeは他targetの値を転用せず、実測usageとbase AMIスナップショット下限から決める
+
+先行するtargetが`volume_size = 16`(またはそれ以上)を使っていても、そのまま新targetへ転用しない。
+
+- base AMI(Ubuntu公式cloud image)自体のsnapshotサイズがvolume_sizeの実質的な下限になる(それ未満は指定できない)。`aws ec2 describe-images`で確認できる。
+- 実際にfresh EC2上で`provisioning/all.sh`を走らせ、完了直後のdisk使用量(`df`等)を実測してから、base AMIのsnapshotサイズと比較して十分な余裕があるか判断する。
+- 練習用の1bench-1web/bastion等、AMIから起動する側のスタックがAMIより大きいroot volumeを指定していれば、Ubuntu公式cloud imageのcloud-init `growpart`/`resizefs`が起動時にfilesystemを自動拡張するため、AMI自体を大きく作り込む必要はない。
