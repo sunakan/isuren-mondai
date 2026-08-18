@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="frontend static exportとFaker初期データをbuildしてdistへ出力する (CI専用、sudoでmysql-serverを導入する)"
+set -euo pipefail
+kakomon10-qualify/scripts/build-frontend-release.sh

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="recipe contractを検証する (kakomon10-qualify独自: scope/order/staticチェック)"
+set -euo pipefail
+kakomon10-qualify/scripts/validate-static.sh

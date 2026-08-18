@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="official mirrorとmanaged sourceの差分を表示"
+set -euo pipefail
+
+# The official mirror is read-only evidence; diff exit 1 means differences,
+# not a task failure.
+mirror=tmp/all-kakomon/isucon10-qualify
+test -d "${mirror}/.git" || {
+  echo "error: worktree-local mirror is missing" >&2
+  exit 1
+}
+test "$(git -C "${mirror}" remote get-url origin)" = "https://github.com/isucon/isucon10-qualify.git"
+test "$(git -C "${mirror}" rev-parse HEAD)" = "7e6b6cfb672cde2c57d7b594d0352dc48ce317df"
+test -z "$(git -C "${mirror}" status --short)"
+
+# kakomon10-qualify独自: webapp/frontend and the Faker-generated non-commit
+# data (result/, images) are obtained separately by
+# kakomon10-qualify/scripts/build-frontend-release.sh, not part of this
+# managed-source comparison.
+diff -ru "${mirror}/webapp/go" upstream/isucon10-qualify/webapp/go || true
+diff -ru --exclude=Dockerfile --exclude=Makefile --exclude=.gitignore \
+  "${mirror}/bench" upstream/isucon10-qualify/bench || true
+diff -ru --exclude=result \
+  "${mirror}/initial-data" upstream/isucon10-qualify/initial-data || true
+diff -u "${mirror}/webapp/mysql/db/0_Schema.sql" upstream/isucon10-qualify/webapp/mysql/db/0_Schema.sql || true
+diff -u "${mirror}/webapp/mysql/db/init.sh" upstream/isucon10-qualify/webapp/mysql/db/init.sh || true

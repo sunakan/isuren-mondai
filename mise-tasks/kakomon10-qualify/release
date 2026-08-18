@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="frontend/初期データのdist出力をGitHub Releaseへuploadする (引数: exact tag)"
+set -euo pipefail
+
+TAG="${1:?タグ名を指定してください(例: mise run kakomon10-qualify:release kakomon10-qualify-frontend-v1.0.0)}"
+[[ "${TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "error: tag must be kakomon10-qualify-frontend-vMAJOR.MINOR.PATCH" >&2
+  exit 1
+}
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
+require_tag_absent_or_at_head "${TAG}"
+
+# Keep the release token out of the frontend/data build. Restore it only for
+# the GitHub Release upload process.
+release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export -n release_gh_token
+unset GH_TOKEN GITHUB_TOKEN
+mise run kakomon10-qualify:build-frontend
+GH_TOKEN="${release_gh_token}" scripts/github-release.sh "${TAG}" \
+  kakomon10-qualify/dist/kakomon10-qualify-frontend.tar.gz \
+  kakomon10-qualify/dist/kakomon10-qualify-frontend.tar.gz.sha256
+unset release_gh_token

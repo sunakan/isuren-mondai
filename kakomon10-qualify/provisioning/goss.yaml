@@ -1,0 +1,138 @@
+file:
+  /home/isuren/isuumo/webapp/go/isuumo:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/LICENSE:
+    exists: true
+    filetype: file
+    mode: "0644"
+  /home/isuren/env.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isuumo/bench/bench:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /home/isuren/isuumo/webapp/mysql/db/1_DummyEstateData.sql:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/webapp/mysql/db/2_DummyChairData.sql:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/webapp/fixture/chair_condition.json:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/webapp/fixture/estate_condition.json:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/initial-data/result/chair_json.txt:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/initial-data/result/estate_json.txt:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/initial-data/result/verification_data:
+    exists: true
+    filetype: dir
+  /home/isuren/.kakomon10-qualify-staging:
+    exists: false
+  /home/isuren/go:
+    exists: false
+  /www/data/index.html:
+    exists: true
+    filetype: file
+  /etc/nginx/sites-enabled/kakomon10-qualify.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /etc/nginx/sites-available/kakomon10-qualify.conf
+  /etc/nginx/sites-enabled/default:
+    exists: false
+  /opt/isuren-mondai/kakomon10-qualify/recipe.txt:
+    exists: true
+
+user:
+  isuren:
+    exists: true
+    uid: 1100
+    groups:
+      - isuren
+
+group:
+  isuren:
+    exists: true
+    gid: 1100
+
+package:
+  mysql-server:
+    installed: true
+  nginx:
+    installed: true
+
+service:
+  mysql:
+    enabled: true
+    running: true
+  nginx:
+    enabled: true
+    running: true
+  isuumo-go:
+    enabled: true
+    running: true
+
+port:
+  tcp:80:
+    listening: true
+  tcp:1323:
+    listening: true
+  tcp:3306:
+    listening: true
+
+command:
+  os-version:
+    exec: ". /etc/os-release; test \"$ID\" = ubuntu; test \"$VERSION_ID\" = 26.04"
+    exit-status: 0
+  architecture:
+    exec: "test \"$(dpkg --print-architecture)\" = arm64"
+    exit-status: 0
+  mise-version:
+    exec: /home/isuren/.local/bin/mise --version
+    stdout:
+      - "2026.8.6 linux-arm64"
+    exit-status: 0
+  go-version:
+    exec: "runuser -u isuren -- env HOME=/home/isuren /home/isuren/.local/bin/mise exec -- go version"
+    stdout:
+      - "go version go1.26.6 linux/arm64"
+    exit-status: 0
+  application-environment:
+    exec: "grep -Fxq 'EnvironmentFile=/home/isuren/env.sh' /etc/systemd/system/isuumo-go.service"
+    exit-status: 0
+  application-loopback:
+    exec: "curl -fsS -o /dev/null http://127.0.0.1:1323/api/chair/search/condition"
+    exit-status: 0
+  healthcheck:
+    exec: "curl -fsS -o /dev/null http://127.0.0.1/"
+    exit-status: 0
+  reset-contract:
+    exec: "curl -fsS -X POST http://127.0.0.1/initialize | jq -e '.language == \"go\"'"
+    exit-status: 0
+    timeout: 120000
+  mysql-database:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SHOW DATABASES LIKE 'isuumo'\""
+    stdout:
+      - "isuumo"
+    exit-status: 0
+  mysql-dummy-data:
+    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SELECT COUNT(*) FROM isuumo.chair\""
+    exit-status: 0
+  nazotte-search:
+    exec: >-
+      curl -fsS -X POST -H 'Content-Type: application/json'
+      -d '{"coordinates":[{"latitude":35.6,"longitude":139.6},{"latitude":35.7,"longitude":139.6},{"latitude":35.7,"longitude":139.8},{"latitude":35.6,"longitude":139.8},{"latitude":35.6,"longitude":139.6}]}'
+      http://127.0.0.1/api/estate/nazotte | jq -e 'has("estates")'
+    exit-status: 0
+  provenance-frontend-tag:
+    exec: "grep -Eq '^frontend_release_tag=kakomon10-qualify-frontend-v[0-9]+[.][0-9]+[.][0-9]+$' /opt/isuren-mondai/kakomon10-qualify/recipe.txt"
+    exit-status: 0

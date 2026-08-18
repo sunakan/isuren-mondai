@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Go Application/benchmarkをvet/test/buildする (pinned Go 1.26.6、linux/arm64クロスビルド)"
+set -euo pipefail
+kakomon10-qualify/scripts/test-go.sh
