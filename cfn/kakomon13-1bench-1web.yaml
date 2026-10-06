@@ -3,6 +3,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
+    Default: ami-0aa78b3d19cf37a6d
     Description: ap-northeast-1でビルドしたkakomon13のUbuntu 26.04 arm64 AMI
   # スペース区切りのGitHubユーザー名(複数人で練習可能)
   # AllowedPatternはGitHubのユーザー名規則(英数字・ハイフン、先頭/末尾ハイフン不可)を強制
