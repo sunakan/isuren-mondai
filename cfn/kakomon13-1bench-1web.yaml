@@ -139,15 +139,18 @@ Resources:
           #!/bin/bash
           set -euxo pipefail
 
+          #
+          # SSH公開鍵を設定
+          #
           install -d -m 0700 -o isuren -g isuren /home/isuren/.ssh
           TMP_KEYS="$(mktemp)"
+          trap 'rm -f "$TMP_KEYS"' EXIT
           for u in ${GithubUsers}; do
-            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >> "$TMP_KEYS"
+            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >>"$TMP_KEYS"
           done
           if [ -s "$TMP_KEYS" ]; then
             install -m 0600 -o isuren -g isuren "$TMP_KEYS" /home/isuren/.ssh/authorized_keys
           fi
-          rm -f "$TMP_KEYS"
 
   BenchInstance:
     Type: AWS::EC2::Instance
@@ -178,16 +181,22 @@ Resources:
           #!/bin/bash
           set -euxo pipefail
 
+          #
+          # Benchで不要なサービスを停止
+          #
+          # zoneのRequiresがMySQL・PowerDNSを起動するため、依存元も無効化する。
+          # instance-initはruntime identityの生成に必要なので有効のまま残す。
+          systemctl disable --now isupipe-go kakomon13-pdns-zone nginx pdns mysql
+
+          #
+          # SSH公開鍵を設定
+          #
           install -d -m 0700 -o isuren -g isuren /home/isuren/.ssh
           TMP_KEYS="$(mktemp)"
+          trap 'rm -f "$TMP_KEYS"' EXIT
           for u in ${GithubUsers}; do
-            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >> "$TMP_KEYS"
+            curl -fsSL --retry 3 --retry-delay 2 "https://github.com/${!u}.keys" >>"$TMP_KEYS"
           done
           if [ -s "$TMP_KEYS" ]; then
             install -m 0600 -o isuren -g isuren "$TMP_KEYS" /home/isuren/.ssh/authorized_keys
           fi
-          rm -f "$TMP_KEYS"
-
-          for svc in isupipe-go nginx pdns mysql; do
-            systemctl disable --now "$svc"
-          done

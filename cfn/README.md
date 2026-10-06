@@ -200,6 +200,8 @@ cd /home/isuren/isucari
 
 ## kakomon13
 
+AMI IDはスタック作成時に引数で指定します。以下は東京リージョンで所有する、利用可能なarm64 AMIの最新版を選んで渡す例です。AMIをビルドするたびにYAMLを書き換える必要はありません。この作成例にはAWS CLIとjqが必要です。
+
 `kakomon13`のベンチマーカーは`--nameserver`/`--webapp`でDNSサーバー・Webアプリの接続先IPを
 直接指定できるため、bench側の名前解決設定は不要。固定のワイルドカードTLS証明書がAMIに
 焼き込まれ、OS trust storeにも登録済みのため、bench側で追加の証明書信頼設定も不要。
@@ -207,13 +209,20 @@ cd /home/isuren/isucari
 ### スタック作成と削除
 
 ```shell
-# 作成
+#
+# 最新AMIでスタックを作成
+#
+set -euo pipefail
 GITHUB_USERS='<YOUR_GITHUB_USER_NAME>'
-AMI_ID=$(aws ec2 describe-images --owners self \
-  --filters 'Name=name,Values=isuren/kakomon13-*' 'Name=state,Values=available' \
-  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
+AMI_ID=$(aws ec2 describe-images --region ap-northeast-1 --owners self \
+  --filters 'Name=name,Values=isuren/kakomon13-*' 'Name=state,Values=available' 'Name=architecture,Values=arm64' \
+  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output json | jq -r '. // empty')
+if [ -z "$AMI_ID" ]; then
+  echo '利用可能なkakomon13 AMIが見つかりません' >&2
+  exit 1
+fi
 
-aws cloudformation deploy \
+aws cloudformation deploy --region ap-northeast-1 \
   --stack-name kakomon13-1bench-1web \
   --template-file cfn/kakomon13-1bench-1web.yaml \
   --parameter-overrides AmiId="$AMI_ID" GithubUsers="${GITHUB_USERS}" \
