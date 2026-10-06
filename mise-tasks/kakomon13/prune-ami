@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+#MISE description="古いkakomon13 AMIとsnapshotを削除する (最新1件を保持; interactive)"
+#MISE interactive=true
+set -euo pipefail
+
+REGION="ap-northeast-1"
+TARGET_IDS=""
+SNAPSHOT_IDS=""
+DELETE_SNAPSHOT_IDS=""
+BLOCKING_AMIS=""
+
+#
+# IDの所属とsnapshot参照先を確認する
+#
+contains_id() {
+  [[ $'\n'"$2"$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
+fail() {
+  echo "エラー: $*" >&2
+  exit 1
+}
+
+find_blocking_amis() {
+  local snapshot_id="$1" references reference_id
+  BLOCKING_AMIS=""
+  # 他の過去問・他所有者・廃止済み・無効化済みAMIの参照も保護する。
+  if ! references="$(aws ec2 describe-images --region "$REGION" \
+    --include-deprecated --include-disabled \
+    --filters "Name=block-device-mapping.snapshot-id,Values=${snapshot_id}" \
+    --query 'Images[].[ImageId]' --output text --no-cli-pager --no-cli-auto-prompt)"; then
+    echo "エラー: snapshot参照先の取得失敗: ${snapshot_id}" >&2
+    return 1
+  fi
+  while IFS= read -r reference_id; do
+    [[ -z "$reference_id" ]] && continue
+    if [[ ! "$reference_id" =~ ^ami-[0-9a-f]+$ ]]; then
+      echo "エラー: snapshot参照先の不正なAMI ID: ${snapshot_id}: ${reference_id}" >&2
+      return 1
+    fi
+    if ! contains_id "$reference_id" "$TARGET_IDS"; then
+      BLOCKING_AMIS="${BLOCKING_AMIS}${BLOCKING_AMIS:+$'\n'}${reference_id}"
+    fi
+  done <<<"$references"
+}
+
+#
+# 最新1件を残して対象AMIを確定する
+#
+if ! IMAGES="$(aws ec2 describe-images --region "$REGION" --owners self \
+  --filters 'Name=name,Values=isuren/kakomon13-*' 'Name=state,Values=available' \
+  --query 'Images[].[CreationDate,ImageId,Name]' --output text \
+  --no-cli-pager --no-cli-auto-prompt)"; then
+  fail "kakomon13 AMIの取得失敗。削除は開始していません。"
+fi
+
+if [[ -z "$IMAGES" ]]; then
+  echo "削除対象のAMIはありません(0件)"
+  exit 0
+fi
+
+# text形式のqueryはページごとに適用されるため、全ページ取得後に並べる。
+IMAGES="$(printf '%s\n' "$IMAGES" | LC_ALL=C sort)"
+KEEP_ROW=""
+TARGET_ROWS=""
+while IFS=$'\t' read -r creation_date ami_id ami_name; do
+  if [[ ! "$ami_id" =~ ^ami-[0-9a-f]+$ || "$ami_name" != isuren/kakomon13-* ||
+    ! "$creation_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$ ]]; then
+    fail "取得したAMI情報が不正です: ${ami_id} ${ami_name} ${creation_date}"
+  fi
+  if [[ -n "$KEEP_ROW" ]]; then
+    TARGET_ROWS="${TARGET_ROWS}${TARGET_ROWS:+$'\n'}${KEEP_ROW}"
+  fi
+  KEEP_ROW="${creation_date}"$'\t'"${ami_id}"$'\t'"${ami_name}"
+done <<<"$IMAGES"
+
+IFS=$'\t' read -r keep_date keep_id keep_name <<<"$KEEP_ROW"
+printf '保持する最新AMI (%s):\n%s\t%s\t%s\n' "$REGION" "$keep_id" "$keep_name" "$keep_date"
+if [[ -z "$TARGET_ROWS" ]]; then
+  echo "削除対象のAMIはありません(最新の1件のみ)"
+  exit 0
+fi
+
+while IFS=$'\t' read -r _ ami_id _; do
+  if contains_id "$ami_id" "$TARGET_IDS" || [[ "$ami_id" == "$keep_id" ]]; then
+    fail "取得したAMI IDが重複しています: ${ami_id}"
+  fi
+  TARGET_IDS="${TARGET_IDS}${TARGET_IDS:+$'\n'}${ami_id}"
+done <<<"$TARGET_ROWS"
+
+#
+# 対象snapshotを回収して共有分を除く
+#
+echo "登録解除するAMIと紐づくsnapshot:"
+while IFS=$'\t' read -r creation_date ami_id ami_name; do
+  printf '%s\t%s\t%s\n' "$ami_id" "$ami_name" "$creation_date"
+  if ! snapshots="$(aws ec2 describe-images --region "$REGION" --owners self --image-ids "$ami_id" \
+    --query 'Images[].BlockDeviceMappings[].Ebs.[SnapshotId]' --output text \
+    --no-cli-pager --no-cli-auto-prompt)"; then
+    fail "snapshotの取得失敗: ${ami_id}。削除は開始していません。"
+  fi
+  if [[ -z "$snapshots" ]]; then
+    fail "snapshotを確認できません: ${ami_id}。削除は開始していません。"
+  fi
+  while IFS= read -r snapshot_id; do
+    if [[ ! "$snapshot_id" =~ ^snap-[0-9a-f]+$ ]]; then
+      fail "不正なsnapshot ID: ${ami_id}: ${snapshot_id}"
+    fi
+    printf '  snapshot: %s\n' "$snapshot_id"
+    if ! contains_id "$snapshot_id" "$SNAPSHOT_IDS"; then
+      SNAPSHOT_IDS="${SNAPSHOT_IDS}${SNAPSHOT_IDS:+$'\n'}${snapshot_id}"
+    fi
+  done <<<"$snapshots"
+done <<<"$TARGET_ROWS"
+
+while IFS= read -r snapshot_id; do
+  find_blocking_amis "$snapshot_id" || exit 1
+  if [[ -n "$BLOCKING_AMIS" ]]; then
+    printf '保持するsnapshot: %s (削除対象外AMIの参照: %s)\n' "$snapshot_id" "${BLOCKING_AMIS//$'\n'/, }"
+  else
+    DELETE_SNAPSHOT_IDS="${DELETE_SNAPSHOT_IDS}${DELETE_SNAPSHOT_IDS:+$'\n'}${snapshot_id}"
+    printf '削除するsnapshot: %s\n' "$snapshot_id"
+  fi
+done <<<"$SNAPSHOT_IDS"
+
+#
+# 明示的なy入力で確認する
+#
+if ! IFS= read -r -p "上記のAMIと削除対象snapshotを削除しますか? [y/N] " ANSWER || [[ "$ANSWER" != "y" ]]; then
+  echo "中止しました"
+  exit 0
+fi
+
+#
+# 確認済みAMIをすべて登録解除する
+#
+# 途中で失敗した場合はsnapshot削除を開始せず、対象間の共有分も守る。
+while IFS= read -r ami_id; do
+  if ! result="$(aws ec2 deregister-image --region "$REGION" --image-id "$ami_id" \
+    --no-delete-associated-snapshots --query Return --output text \
+    --no-cli-pager --no-cli-auto-prompt)" || [[ "$result" != "True" ]]; then
+    fail "AMI登録解除失敗: ${ami_id}。snapshot削除は開始していません。"
+  fi
+  echo "deregistered: ${ami_id}"
+done <<<"$TARGET_IDS"
+
+#
+# 確認済みsnapshotだけを削除する
+#
+if [[ -n "$DELETE_SNAPSHOT_IDS" ]]; then
+  while IFS= read -r snapshot_id; do
+    # 確認後の新しい参照は保持へ寄せ、削除対象は追加しない。
+    find_blocking_amis "$snapshot_id" || exit 1
+    if [[ -n "$BLOCKING_AMIS" ]]; then
+      printf '保持するsnapshot: %s (新しい参照: %s)\n' "$snapshot_id" "${BLOCKING_AMIS//$'\n'/, }"
+      continue
+    fi
+    if ! aws ec2 delete-snapshot --region "$REGION" --snapshot-id "$snapshot_id" \
+      --no-cli-pager --no-cli-auto-prompt; then
+      fail "snapshot削除失敗: ${snapshot_id}。残りの削除を中止しました。"
+    fi
+    echo "deleted snapshot: ${snapshot_id}"
+  done <<<"$DELETE_SNAPSHOT_IDS"
+fi
