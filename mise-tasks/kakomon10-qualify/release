@@ -13,6 +13,18 @@ require_clean_worktree
 require_pushed_commit "$(git rev-parse HEAD)"
 require_tag_absent_or_at_head "${TAG}"
 
+#
+# dispatchとtag pushの二重発行を拒否
+#
+published_tags="$(gh release list --repo sunakan/isuren-mondai --limit 1000 --json tagName)"
+published_count="$(jq 'length' <<<"${published_tags}")"
+test "${published_count}" -lt 1000
+existing_count="$(jq --arg tag "${TAG}" '[.[] | select(.tagName == $tag)] | length' <<<"${published_tags}")"
+test "${existing_count}" -eq 0 || {
+  echo 'error: the destination Release already exists' >&2
+  exit 1
+}
+
 # Keep the release token out of the frontend/data build. Restore it only for
 # the GitHub Release upload process.
 release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"

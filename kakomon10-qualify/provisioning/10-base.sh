@@ -22,6 +22,7 @@ apt-get install -y --no-install-recommends \
   mysql-server \
   nginx \
   procps \
+  python3 \
   rsync \
   unzip
 

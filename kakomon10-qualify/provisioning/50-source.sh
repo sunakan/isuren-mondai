@@ -31,6 +31,8 @@ install -m 0644 "${MANAGED_SOURCE_DIR}/LICENSE" "${PROVENANCE_DIR}/LICENSE"
 install -m 0644 "${MANAGED_SOURCE_DIR}/NOTICE.md" "${PROVENANCE_DIR}/managed-source-NOTICE.md"
 install -m 0644 "${PROVISIONING_DIR}/goss.yaml" "${PROVENANCE_DIR}/goss-fresh-boot.yaml"
 install -d -m 0755 /usr/local/libexec
+install -m 0755 "${PROJECT_ROOT}/kakomon10-qualify/scripts/benchmark_data.py" \
+  /usr/local/libexec/kakomon10-qualify-check-benchmark-data
 install -m 0755 "${PROJECT_ROOT}/kakomon10-qualify/scripts/check-image-state.sh" \
   /usr/local/libexec/kakomon10-qualify-check-image-state
 install -m 0644 -o "${ISUREN_USER}" -g "${ISUREN_USER}" \

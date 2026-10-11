@@ -33,6 +33,12 @@ file:
   /home/isuren/isuumo/initial-data/result/estate_json.txt:
     exists: true
     filetype: file
+  /home/isuren/isuumo/initial-data/result/verify_draft_chair.txt:
+    exists: true
+    filetype: file
+  /home/isuren/isuumo/initial-data/result/verify_draft_estate.txt:
+    exists: true
+    filetype: file
   /home/isuren/isuumo/initial-data/result/verification_data:
     exists: true
     filetype: directory
@@ -88,6 +94,12 @@ port:
     listening: true
 
 command:
+  benchmark-data:
+    exec: >-
+      python3 /usr/local/libexec/kakomon10-qualify-check-benchmark-data
+      --result-dir /home/isuren/isuumo/initial-data/result
+      --fixture-dir /home/isuren/isuumo/webapp/fixture
+    exit-status: 0
   os-version:
     exec: ". /etc/os-release; test \"$ID\" = ubuntu; test \"$VERSION_ID\" = 26.04"
     exit-status: 0

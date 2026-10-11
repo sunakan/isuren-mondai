@@ -89,6 +89,40 @@ v16), and the verification-snapshot step installs `mysql-server` via `sudo
 apt-get`. It is not meant for interactive local runs on a development
 machine; see `scripts/build-frontend-release.sh`'s header comment.
 
+## Complete benchmark data and CI repair
+
+The official generators produce 29,500 initial records, 500 verification
+records (IDs 29501–30000), and 20 load-draft files of 500 records (IDs
+30001–40000) for each of chair and estate. The first verification chair has
+stock 1 for the sell-out check. `scripts/benchmark_data.py` checks all of
+these inputs, both fixture JSON files, and all ten snapshot directories.
+The same checker runs before Release packaging, on extraction and deployment,
+and through Goss. The Go benchmark and its result semantics are unchanged.
+
+The published `kakomon10-qualify-frontend-v1.0.0` archive omitted
+`verify_draft_chair.txt` and `verify_draft_estate.txt`; the corrected recipe
+rejects that incomplete archive. Its published bytes, tag, and digest remain
+unchanged. A new Release is required before another AMI build.
+
+For this omission, the target workflow's `workflow_dispatch` path performs a
+CI-only data repair: choose a new, unused destination tag (for example
+`kakomon10-qualify-frontend-v1.0.1`) and the existing archive's exact tag and
+published SHA-256. Do not push the repair tag beforehand. The job runs the
+whole official generator stream with Faker 4.1.1 and seed 19700101, then
+requires the regenerated SQL, detail JSON, fixture JSON, and all load drafts
+to match the existing Release byte for byte. A mismatch stops publication.
+Only the two missing verification files and repair provenance are added;
+frontend and snapshot files keep their original bytes. The manifest and
+archive checksum are regenerated for the new Release. Node.js, Go, MySQL,
+frontend build, and snapshot generation are skipped in this repair path.
+
+Normal tag pushes still run the full build. Both paths serialize on the
+destination tag and reject an already published Release before building;
+repair also rejects an existing tag or the base tag as its destination.
+After human-approved publication, verify the new API digest and manifest,
+update `scripts/artifact-inputs.env` in a separate scoped commit, and push
+that recipe commit before AMI verification. No unpublished digest is used.
+
 ## Responsibilities
 
 1. `cloud-init/` checks out the exact isuren-mondai commit and calls

@@ -26,7 +26,24 @@ MYSQL_TEST_PASS="isucon"
 MYSQL_TEST_DB="isuumo"
 WEBAPP_PORT="1323"
 
-work="$(mktemp -d)"
+#
+# 修復時の既存Releaseを固定
+#
+REPAIR_BASE_TAG=""
+REPAIR_BASE_SHA256=""
+if [ "$#" -ne 0 ]; then
+  test "$#" -eq 3 && test "$1" = --repair-benchmark-data || {
+    echo 'usage: build-frontend-release.sh [--repair-benchmark-data exact-tag sha256]' >&2
+    exit 64
+  }
+  REPAIR_BASE_TAG="$2"
+  REPAIR_BASE_SHA256="$3"
+  [[ "${REPAIR_BASE_TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+[.][0-9]+[.][0-9]+$ ]]
+  [[ "${REPAIR_BASE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+fi
+install -d -m 0755 "${RELEASE_DIST}"
+# 大きなarchiveをroot-backedなdistで処理する。
+work="$(mktemp -d "${RELEASE_DIST}/.frontend-work.XXXXXX")"
 checkout=""
 webapp_pid=""
 
@@ -49,16 +66,20 @@ run_go() {
   MISE_CONFIG_FILE="${MISE_CONFIG}" mise exec -- "$@"
 }
 
-# fresh CI installs the locked toolchains; a cached local run may skip this.
-MISE_CONFIG_FILE="${MISE_CONFIG}" mise install
+#
+# 通常buildだけNodeとGoを導入
+#
+if [ -z "${REPAIR_BASE_TAG}" ]; then
+  MISE_CONFIG_FILE="${MISE_CONFIG}" mise install
 
-if [ "$(run_node node --version)" != "${EXPECTED_NODE_VERSION}" ]; then
-  echo "error: Node.js ${EXPECTED_NODE_VERSION} is required" >&2
-  exit 1
-fi
-if [ "$(run_go go version | awk '{print $3}')" != "${EXPECTED_GO_VERSION}" ]; then
-  echo "error: Go ${EXPECTED_GO_VERSION} is required" >&2
-  exit 1
+  if [ "$(run_node node --version)" != "${EXPECTED_NODE_VERSION}" ]; then
+    echo "error: Node.js ${EXPECTED_NODE_VERSION} is required" >&2
+    exit 1
+  fi
+  if [ "$(run_go go version | awk '{print $3}')" != "${EXPECTED_GO_VERSION}" ]; then
+    echo "error: Go ${EXPECTED_GO_VERSION} is required" >&2
+    exit 1
+  fi
 fi
 
 # 1. Fetch the official frontend source AND the 6 official seed images
@@ -73,12 +94,18 @@ fi
 checkout="$(mktemp -d)"
 git init --quiet "${checkout}"
 git -C "${checkout}" remote add origin "${OFFICIAL_REPO_URL}"
-git -C "${checkout}" sparse-checkout set --cone webapp/frontend initial-data/origin
+if [ -n "${REPAIR_BASE_TAG}" ]; then
+  git -C "${checkout}" sparse-checkout set --cone initial-data/origin
+else
+  git -C "${checkout}" sparse-checkout set --cone webapp/frontend initial-data/origin
+fi
 git -C "${checkout}" fetch --quiet --depth 1 --filter=blob:none origin "${OFFICIAL_COMMIT}"
 git -C "${checkout}" checkout --quiet "${OFFICIAL_COMMIT}"
 test "$(git -C "${checkout}" rev-parse HEAD)" = "${OFFICIAL_COMMIT}"
 frontend_src="${checkout}/webapp/frontend"
-test -f "${frontend_src}/package.json"
+if [ -z "${REPAIR_BASE_TAG}" ]; then
+  test -f "${frontend_src}/package.json"
+fi
 (
   cd "${checkout}"
   shasum -a 256 -c "${ROOT_DIR}/kakomon10-qualify/scripts/frontend-assets.manifest.sha256"
@@ -95,7 +122,11 @@ install -d -m 0755 "${stage_root}/initial-data/result/draft_data/chair" \
   "${stage_root}/webapp/frontend"
 rsync -a "${MANAGED}/initial-data/" "${stage_root}/initial-data/"
 rsync -a "${checkout}/initial-data/origin/" "${stage_root}/initial-data/origin/"
-rsync -a "${frontend_src}/" "${stage_root}/webapp/frontend/"
+if [ -n "${REPAIR_BASE_TAG}" ]; then
+  install -d -m 0755 "${stage_root}/webapp/frontend/public/images/chair" "${stage_root}/webapp/frontend/public/images/estate"
+else
+  rsync -a "${frontend_src}/" "${stage_root}/webapp/frontend/"
+fi
 
 venv="${work}/venv"
 python3 -m venv "${venv}"
@@ -107,9 +138,18 @@ python3 -m venv "${venv}"
   "${venv}/bin/python3" make_estate_data.py
 )
 for f in result/2_DummyChairData.sql result/chair_condition.json result/chair_json.txt \
-  result/1_DummyEstateData.sql result/estate_condition.json result/estate_json.txt; do
+  result/1_DummyEstateData.sql result/estate_condition.json result/estate_json.txt \
+  result/verify_draft_chair.txt result/verify_draft_estate.txt; do
   test -f "${stage_root}/initial-data/${f}"
 done
+#
+# 全凍結データの一致後だけ欠落2fileを補完
+#
+if [ -n "${REPAIR_BASE_TAG}" ]; then
+  curl -fsSL "https://github.com/sunakan/isuren-mondai/releases/download/${REPAIR_BASE_TAG}/kakomon10-qualify-frontend.tar.gz" -o "${work}/base-frontend.tar.gz"
+  python3 "${ROOT_DIR}/kakomon10-qualify/scripts/repair_frontend_release.py" --base-archive "${work}/base-frontend.tar.gz" --base-sha256 "${REPAIR_BASE_SHA256}" --base-tag "${REPAIR_BASE_TAG}" --generated-result "${stage_root}/initial-data/result" --output "${OUTPUT}"
+  exit 0
+fi
 test "$(find "${stage_root}/webapp/frontend/public/images/chair" -type f | wc -l)" -eq 1003
 test "$(find "${stage_root}/webapp/frontend/public/images/estate" -type f | wc -l)" -eq 1003
 
@@ -220,9 +260,12 @@ install -m 0644 "${stage_root}/initial-data/result/chair_condition.json" "${rele
 install -m 0644 "${stage_root}/initial-data/result/estate_condition.json" "${release}/fixture/estate_condition.json"
 install -m 0644 "${stage_root}/initial-data/result/chair_json.txt" "${release}/initial-data-result/chair_json.txt"
 install -m 0644 "${stage_root}/initial-data/result/estate_json.txt" "${release}/initial-data-result/estate_json.txt"
+install -m 0644 "${stage_root}/initial-data/result/verify_draft_chair.txt" "${release}/initial-data-result/verify_draft_chair.txt"
+install -m 0644 "${stage_root}/initial-data/result/verify_draft_estate.txt" "${release}/initial-data-result/verify_draft_estate.txt"
 rsync -a "${stage_root}/initial-data/result/draft_data/" "${release}/initial-data-result/draft_data/"
 rsync -a "${stage_root}/initial-data/result/verification_data/" "${release}/initial-data-result/verification_data/"
 install -m 0644 "${MANAGED}/LICENSE" "${release}/LICENSE"
+python3 "${ROOT_DIR}/kakomon10-qualify/scripts/benchmark_data.py" --result-dir "${release}/initial-data-result" --fixture-dir "${release}/fixture"
 
 (
   cd "${release}"

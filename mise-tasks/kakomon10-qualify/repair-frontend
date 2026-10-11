@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#MISE description="kakomon10-qualify独自: 凍結データ一致を確認して欠落bench入力だけを新Releaseへ補完する (CI専用、引数: 新tag 元tag 元SHA256)"
+set -euo pipefail
+
+TAG="${1:?new exact tag is required}"
+BASE_TAG="${2:?base exact tag is required}"
+BASE_SHA256="${3:?base archive SHA-256 is required}"
+[[ "${TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+[.][0-9]+[.][0-9]+$ ]]
+[[ "${BASE_TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+[.][0-9]+[.][0-9]+$ ]]
+[[ "${BASE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+test "${TAG}" != "${BASE_TAG}"
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+require_clean_worktree
+require_pushed_commit "$(git rev-parse HEAD)"
+
+#
+# 新tagとReleaseの未使用を確認
+#
+remote_tags="$(git ls-remote --tags origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}")"
+test -z "${remote_tags}" || {
+  echo 'error: repair requires an unused tag; do not push the repair tag' >&2
+  exit 1
+}
+published_tags="$(gh release list --repo sunakan/isuren-mondai --limit 1000 --json tagName)"
+published_count="$(jq 'length' <<<"${published_tags}")"
+test "${published_count}" -lt 1000
+existing_count="$(jq --arg tag "${TAG}" '[.[] | select(.tagName == $tag)] | length' <<<"${published_tags}")"
+test "${existing_count}" -eq 0 || {
+  echo 'error: the destination Release already exists' >&2
+  exit 1
+}
+
+#
+# 取得と再生成からRelease tokenを隔離
+#
+release_gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export -n release_gh_token
+unset GH_TOKEN GITHUB_TOKEN
+kakomon10-qualify/scripts/build-frontend-release.sh --repair-benchmark-data "${BASE_TAG}" "${BASE_SHA256}"
+GH_TOKEN="${release_gh_token}" scripts/github-release.sh "${TAG}" \
+  kakomon10-qualify/dist/kakomon10-qualify-frontend.tar.gz \
+  kakomon10-qualify/dist/kakomon10-qualify-frontend.tar.gz.sha256
+unset release_gh_token

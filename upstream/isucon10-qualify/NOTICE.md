@@ -161,6 +161,17 @@ built frontend static export, instead of regenerating it on every AMI build.
 Verified 2026-08-18: both generators ran unmodified under Python 3.14 in
 under 11 seconds each and produced 29,500 SQL rows per table.
 
+## Verification draft delivery correction (2026-10-11)
+
+The official generated `result/verify_draft_{chair,estate}.txt` are required
+by `bench/scenario/verify.go`, but the v1.0.0 Release assembly omitted them.
+They are not committed in the official repository and cannot be fetched as
+text from its exact commit. The corrected assembly includes both files.
+For a repair of the existing Release, the complete official generator stream
+must reproduce every frozen SQL/JSON/fixture/load-draft byte before those
+files are added to a new Release; frontend and snapshot bytes are retained.
+No Go benchmark logic changes or generated data are committed here.
+
 ## `bench/` result contract
 
 `bench/` does not use isucandar (unlike KAKOMON12/13/14); it is a small

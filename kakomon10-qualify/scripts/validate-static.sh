@@ -161,6 +161,7 @@ python3 -c 'import ast, pathlib; ast.parse(pathlib.Path("kakomon10-qualify/cloud
 if command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null; then
   python3 -c 'import pathlib, yaml; yaml.safe_load(pathlib.Path("kakomon10-qualify/provisioning/goss.yaml").read_text())'
   python3 kakomon10-qualify/scripts/test-image-contract.py
+  python3 kakomon10-qualify/scripts/test-benchmark-data.py
 fi
 if command -v packer >/dev/null; then
   packer fmt -check kakomon10-qualify/packer/kakomon10-qualify.pkr.hcl

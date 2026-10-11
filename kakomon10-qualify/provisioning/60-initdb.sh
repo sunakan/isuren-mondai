@@ -97,6 +97,8 @@ extract_release() {
     cd "${RELEASE_DIR}"
     sha256sum --check MANIFEST.sha256
   )
+  python3 /usr/local/libexec/kakomon10-qualify-check-benchmark-data \
+    --result-dir "${RELEASE_DIR}/initial-data-result" --fixture-dir "${RELEASE_DIR}/fixture"
 }
 
 resolve_frontend_release_tag
@@ -141,6 +143,8 @@ test -d "${RELEASE_DIR}/initial-data-result/verification_data"
 install -d -m 0755 -o "${ISUREN_USER}" -g "${ISUREN_USER}" "${APP_ROOT}/initial-data/result"
 rsync -a "${RELEASE_DIR}/initial-data-result/" "${APP_ROOT}/initial-data/result/"
 chown -R "${ISUREN_USER}:${ISUREN_USER}" "${APP_ROOT}/initial-data/result"
+python3 /usr/local/libexec/kakomon10-qualify-check-benchmark-data \
+  --result-dir "${APP_ROOT}/initial-data/result" --fixture-dir "${APP_ROOT}/webapp/fixture"
 
 #
 # 配置したRelease identityを記録
