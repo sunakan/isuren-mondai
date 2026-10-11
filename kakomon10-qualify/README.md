@@ -116,6 +116,11 @@ frontend and snapshot files keep their original bytes. The manifest and
 archive checksum are regenerated for the new Release. Node.js, Go, MySQL,
 frontend build, and snapshot generation are skipped in this repair path.
 
+The [CI repair run](https://github.com/sunakan/isuren-mondai/actions/runs/38122605799/job/114420267428)
+succeeded on 2026-10-11 at recipe commit
+`e815bb224d71c21a3bf10c6db2be83358982ae96` and published
+`kakomon10-qualify-frontend-v1.0.1` without rebuilding frontend or snapshots.
+
 Normal tag pushes still run the full build. Both paths serialize on the
 destination tag and reject an already published Release before building;
 repair also rejects an existing tag or the base tag as its destination.
@@ -175,9 +180,9 @@ fresh boot, and the 1bench-1web benchmark are separate `not-run` gates.
 
 `scripts/artifact-inputs.env` owns the exact Tokyo-region base image,
 Canonical owner/name, 8 GiB root volume, Packer network stack, and published
-`kakomon10-qualify-frontend-v1.0.0` archive digest
-`c47cced37f96028c7a48799a46dc9c84f3efddec37670889a43d069949d76d3c`.
-This archive is 439,622,144 bytes, so download/extraction stay on the root
+`kakomon10-qualify-frontend-v1.0.1` archive digest
+`8a02385bee5c0ffb0c595e7817bc59903a3689a92689d96cae77d2f49f21ede3`.
+This archive is 439,794,916 bytes, so download/extraction stay on the root
 volume rather than `/tmp`. The 8 GiB volume is the base snapshot size;
 10q's peak usage and remaining space must be measured in the fresh build.
 There is no automatic OS, architecture, or disk-size fallback.
