@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+#
+# Gossの固定入力と失敗時journalを用意
+#
 GOSS_VERSION="0.4.10"
 GOSS_URL="https://github.com/goss-org/goss/releases/download/v0.4.10/goss_0.4.10_linux_arm64.tar.gz"
 GOSS_SHA256="90a59612b4d67d9f1a9038634c000790136bb82526a69de1e81ac075c2f6d2c6"
@@ -17,8 +20,20 @@ archive="$(mktemp)"
 staging="$(mktemp -d)"
 trap 'rm -f "${archive}"; rm -rf "${staging}"' EXIT
 
-# Download the verifier into a temporary directory, validate its exact
-# identity, and remove it after the sealed single-host check completes.
+#
+# OS packageの実体を記録
+#
+dpkg-query -W -f='${binary:Package}\t${Version}\t${Architecture}\n' |
+  LC_ALL=C sort >"${PROVENANCE_DIR}/packages.tsv"
+(
+  cd "${PROVENANCE_DIR}"
+  sha256sum packages.tsv >packages.tsv.sha256
+)
+
+#
+# 実行中の単一hostを検証
+#
+# verifierはchecksumで確認し、完了後に一時directoryごと削除する。
 log "99-verify.sh: goss validate start"
 curl -fsSL "${GOSS_URL}" -o "${archive}"
 echo "${GOSS_SHA256}  ${archive}" | sha256sum -c -

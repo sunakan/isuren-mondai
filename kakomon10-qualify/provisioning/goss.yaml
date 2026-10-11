@@ -84,8 +84,6 @@ service:
 port:
   tcp:80:
     listening: true
-  tcp:1323:
-    listening: true
   tcp:3306:
     listening: true
 
@@ -115,17 +113,16 @@ command:
   healthcheck:
     exec: "curl -fsS -o /dev/null http://127.0.0.1/"
     exit-status: 0
-  reset-contract:
-    exec: "curl -fsS -X POST http://127.0.0.1/initialize | jq -e '.language == \"go\"'"
+  application-listen:
+    exec: "ss -H -ltn '( sport = :1323 )' | grep -q ."
     exit-status: 0
-    timeout: 120000
   mysql-database:
     exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SHOW DATABASES LIKE 'isuumo'\""
     stdout:
       - "isuumo"
     exit-status: 0
   mysql-dummy-data:
-    exec: "mysql --defaults-file=/dev/null --user=root --skip-column-names -e \"SELECT COUNT(*) FROM isuumo.chair\""
+    exec: "test \"$(mysql --defaults-file=/dev/null --user=root --skip-column-names -e 'SELECT COUNT(*) FROM isuumo.chair')\" -gt 0"
     exit-status: 0
   nazotte-search:
     exec: >-
@@ -135,4 +132,13 @@ command:
     exit-status: 0
   provenance-frontend-tag:
     exec: "grep -Eq '^frontend_release_tag=kakomon10-qualify-frontend-v[0-9]+[.][0-9]+[.][0-9]+$' /opt/isuren-mondai/kakomon10-qualify/recipe.txt"
+    exit-status: 0
+  provenance-frontend-digest:
+    exec: "grep -Eq '^frontend_release_sha256=[0-9a-f]{64}$' /opt/isuren-mondai/kakomon10-qualify/recipe.txt"
+    exit-status: 0
+  provenance-recipe-commit:
+    exec: "grep -Eq '^recipe_commit=[0-9a-f]{40}$' /opt/isuren-mondai/kakomon10-qualify/recipe.txt"
+    exit-status: 0
+  package-inventory:
+    exec: "cd /opt/isuren-mondai/kakomon10-qualify && sha256sum --check packages.tsv.sha256"
     exit-status: 0

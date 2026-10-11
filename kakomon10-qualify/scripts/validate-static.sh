@@ -9,17 +9,19 @@ fail() {
   exit 1
 }
 
+#
+# targetの存在と変更scopeを確認
+#
 for path in kakomon10-qualify upstream/isucon10-qualify mise-tasks/kakomon10-qualify; do
   test -e "${path}" || fail "missing ${path}"
 done
 
 while IFS= read -r path; do
   case "${path}" in
-    kakomon10-qualify/* | upstream/isucon10-qualify/* | mise-tasks/kakomon10-qualify/*) ;;
-    .github/workflows/release-kakomon10-qualify-frontend.yml) ;;
-    .agents/skills/onboard-kakomon-ami-recipe/*) ;;
-    .agents/skills/orchestrate-kakomon-ami-sessions/*) ;;
-    *) fail "changed path is outside the approved roots: ${path}" ;;
+  kakomon10-qualify/* | upstream/isucon10-qualify/* | mise-tasks/kakomon10-qualify/*) ;;
+  .github/workflows/release-kakomon10-qualify-frontend.yml) ;;
+  cfn/kakomon10-qualify-1bench-1web.yaml) ;;
+  *) fail "changed path is outside the approved roots: ${path}" ;;
   esac
 done < <(
   {
@@ -29,12 +31,10 @@ done < <(
   } | LC_ALL=C sort -u
 )
 
-# Source and text metadata only; dist/ is ignored local/Release output.
-# No archive/binary of any kind (including small official seed images) may be
-# tracked under the KAKOMON10-QUALIFY roots, regardless of upstream
-# provenance or size (orchestrate-kakomon-ami-sessions/SKILL.md). The 6
-# official seed images are fetched at build time instead; guard against them
-# ever reappearing on disk under the managed source tree.
+#
+# binaryと生成物の追跡を禁止
+#
+# 公式seed画像もGitへ追加せず、Release build時に取得する。
 test ! -e upstream/isucon10-qualify/initial-data/origin ||
   fail "official seed images must not be committed; fetch them in scripts/build-frontend-release.sh instead"
 test -f kakomon10-qualify/scripts/frontend-assets.manifest.sha256 ||
@@ -49,12 +49,27 @@ if {
   fail "unexpected binary file tracked under the KAKOMON10-QUALIFY roots"
 fi
 
+#
+# artifactとruntimeの固定入力を確認
+#
 test -f kakomon10-qualify/scripts/artifact-inputs.env || fail "missing frontend Release tag input"
 # shellcheck source=kakomon10-qualify/scripts/artifact-inputs.env
 source kakomon10-qualify/scripts/artifact-inputs.env
 [[ "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}" == "latest" ||
   "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
   fail "invalid frontend Release tag input"
+[[ "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "invalid published frontend archive SHA-256"
+[[ "${KAKOMON10_QUALIFY_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]] ||
+  fail "missing exact source AMI ID"
+[[ "${KAKOMON10_QUALIFY_SOURCE_AMI_NAME}" =~ ^ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26[.]04-arm64-server-[0-9]{8}$ ]] ||
+  fail "source AMI must be the adopted Ubuntu 26.04 arm64 image"
+test "${KAKOMON10_QUALIFY_ROOT_VOLUME_GIB}" -ge 8
+test -x mise-tasks/kakomon10-qualify/build
+test -x kakomon10-qualify/packer/seal-image.sh
+test -x kakomon10-qualify/scripts/check-image-state.sh
+test -f cfn/kakomon10-qualify-1bench-1web.yaml
+test -f kakomon10-qualify/packer/kakomon10-qualify.pkr.hcl
 
 grep -qF 'go = "1.26.6"' kakomon10-qualify/provisioning/mise.ami.toml
 grep -qF 'd0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e' \
@@ -62,7 +77,7 @@ grep -qF 'd0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e' \
 grep -qF 'node = "14.9.0"' kakomon10-qualify/scripts/mise.toml
 grep -qF '6619a69ffe95c602105484bdecbdccb319e1c0db861203bffb9b6aedfae2c2df' \
   kakomon10-qualify/scripts/mise.lock
-# shellcheck disable=SC2016 # Literal source contracts, not expressions to expand.
+# shellcheck disable=SC2016 # source内の変数参照を文字列として検査する。
 grep -qF 'MISE_BIN="${ISUREN_HOME}/.local/bin/mise"' kakomon10-qualify/provisioning/30-runtime.sh
 grep -qF 'MISE_VERSION="2026.8.6"' kakomon10-qualify/provisioning/30-runtime.sh
 if grep -qrn 'most_recent\|mise[.]run\|curl[^|]*[|][[:space:]]*\(ba\)\?sh' \
@@ -72,8 +87,7 @@ if grep -qrn 'most_recent\|mise[.]run\|curl[^|]*[|][[:space:]]*\(ba\)\?sh' \
 fi
 
 for build_script in kakomon10-qualify/provisioning/70-webapp-go.sh kakomon10-qualify/provisioning/85-bench-build.sh; do
-  # shellcheck disable=SC2016 # Literal source contract ($2 is the MISE_BIN
-  # positional arg passed into the runuser bash -c wrapper).
+  # shellcheck disable=SC2016 # $2はrunuser内へ渡すmise binaryの位置引数。
   grep -qF '"$2" exec -- go build' "${build_script}" ||
     fail "Go build must run through mise: ${build_script}"
 done
@@ -82,6 +96,9 @@ grep -qF 'EnvironmentFile=/home/isuren/env.sh' \
   kakomon10-qualify/provisioning/systemd/isuumo-go.service ||
   fail "systemd unit must load the official env.sh"
 
+#
+# Release配布とstep順を確認
+#
 release_workflow=".github/workflows/release-kakomon10-qualify-frontend.yml"
 test -f "${release_workflow}" || fail "missing frontend release workflow"
 grep -qF 'name: release-kakomon10-qualify-frontend' "${release_workflow}"
@@ -109,12 +126,17 @@ test "${line_frontend}" -lt "${line_bench}" || fail "frontend placement must pre
 test "${line_bench}" -lt "${line_nginx}" || fail "benchmark build must precede nginx"
 test "${line_nginx}" -lt "${line_verify}" || fail "nginx must precede Goss verification"
 
+#
+# shellとGoの構文を検査
+#
 scripts=()
 while IFS= read -r script; do
   scripts+=("${script}")
-done < <(find kakomon10-qualify/provisioning kakomon10-qualify/scripts mise-tasks/kakomon10-qualify \
+done < <(find kakomon10-qualify/provisioning kakomon10-qualify/scripts kakomon10-qualify/packer mise-tasks/kakomon10-qualify \
   -type f -perm -u+x | LC_ALL=C sort)
-bash -n "${scripts[@]}"
+for script in "${scripts[@]}"; do
+  bash -n "${script}"
+done
 if command -v shellcheck >/dev/null; then
   shellcheck -x -P . -P kakomon10-qualify/provisioning "${scripts[@]}"
 fi
@@ -132,9 +154,17 @@ unformatted="$(gofmt -l \
   upstream/isucon10-qualify/initial-data/make_verification_data/*.go)"
 test -z "${unformatted}" || fail "gofmt needed: ${unformatted}"
 
+#
+# cloud-init・CFn・Packer契約を検証
+#
 python3 -c 'import ast, pathlib; ast.parse(pathlib.Path("kakomon10-qualify/cloud-init/generate-user-data.py").read_text())'
 if command -v python3 >/dev/null && python3 -c 'import yaml' 2>/dev/null; then
   python3 -c 'import pathlib, yaml; yaml.safe_load(pathlib.Path("kakomon10-qualify/provisioning/goss.yaml").read_text())'
+  python3 kakomon10-qualify/scripts/test-image-contract.py
+fi
+if command -v packer >/dev/null; then
+  packer fmt -check kakomon10-qualify/packer/kakomon10-qualify.pkr.hcl
+  packer validate -syntax-only kakomon10-qualify/packer/kakomon10-qualify.pkr.hcl
 fi
 
 echo "kakomon10-qualify static contract: ok"

@@ -1,24 +1,35 @@
 # KAKOMON10-QUALIFY Packer input boundary
 
-This directory only reserves the responsibility boundary for the AMI build.
-Phase 1 of this session validated the recipe's components directly on an
-aws-bastion EC2 instance (echo v5 migration, MySQL 8.4 schema/user, Node.js
-14.9.0 frontend build, Faker initial-data generation, benchmark run) and
-codified them as `../provisioning/*.sh`, but did not author or run a Packer
-template. No `.pkr.hcl` exists here yet; do not treat this directory's
-existence as `ami-build-green`.
+`kakomon10-qualify.pkr.hcl` implements the ARM64 provider adapter and
+`seal-image.sh` verifies the stopped image state after removing builder
+identity. The recipe itself remains in `../provisioning/all.sh`; the
+build host generates small User Data per exact commit and does not upload
+local data/frontend artifacts. No Packer build or fresh AMI boot has been
+run for this revision.
 
-When a future session adds the template, it must follow the same contract as
-`kakomon12-qualify/packer` and `kakomon13/packer`:
+The build task `mise run kakomon10-qualify:build` loads the reviewed text
+inputs from `../scripts/artifact-inputs.env` and follows this contract:
 
-- accept one exact `source_ami` value (Ubuntu 26.04 LTS arm64,
-  `ap-northeast-1`); never perform AMI discovery (`most_recent` or otherwise)
-- pin the Amazon plugin to an exact version
+- use exact `source_ami=ami-0b39c0e7d24a8c3db` (Ubuntu 26.04 LTS arm64,
+  `ap-northeast-1`, Canonical `099720109477`, image serial `20261003`);
+  no AMI discovery or architecture fallback
+- pin the Amazon plugin to `1.8.2`
+- use `t4g.small` and an 8 GiB gp3 root with delete-on-termination;
+  10q's peak/remaining disk usage is still a real-build validation gate
+- resolve the existing Packer network stack Outputs with explicit Tokyo
+  region, and associate a public address in its public subnet
 - wait for `provisioning/all.sh`'s completion marker
   (`/var/lib/cloud/kakomon10-qualify-provisioned`) and the Goss result before
   sealing
-- tag the resulting AMI with the exact project commit, the resolved
-  `kakomon10-qualify-frontend-*` Release tag, and its archive SHA-256
-  (`/tmp/kakomon10-qualify-frontend-release-tag` /
-  `/tmp/kakomon10-qualify-frontend-release-sha256`, written by
-  `provisioning/60-initdb.sh`)
+- compare the downloaded Release tag/digest with the exact host inputs
+  before seal; the verified archive contains frozen frontend/initial data
+- tag AMI/snapshots with recipe and managed source trees, base image,
+  architecture, official source, runtime/plugin, and frontend tag/digest
+- preserve the permanent recipe-ready marker while cleaning cloud-init
+  instance state so fresh CFn role User Data can run without rebuilding
+- extract only the created artifact ID from the Packer manifest; retain
+  the Packer failure status even when emitting host-side OTel spans
+
+`packer validate -syntax-only` proves HCL syntax only. Plugin installation,
+full plugin validation, AMI build, fresh boot, SSM, UUID/SSH regeneration,
+and standalone benchmark/reset/recovery/reboot remain separate gates.

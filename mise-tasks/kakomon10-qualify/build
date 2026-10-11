@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#MISE description="AMIをPackerでbuildする"
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${ROOT_DIR}"
+AWS_REGION=ap-northeast-1
+TARGET_SLUG=kakomon10-qualify
+PACKER_FILE=kakomon10-qualify/packer/kakomon10-qualify.pkr.hcl
+# shellcheck source=scripts/lib.sh
+source scripts/lib.sh
+# shellcheck source=scripts/otel.sh
+source scripts/otel.sh
+# shellcheck source=kakomon10-qualify/scripts/artifact-inputs.env
+source kakomon10-qualify/scripts/artifact-inputs.env
+
+#
+# commitと固定入力を検証
+#
+require_clean_worktree
+PROJECT_COMMIT="$(git rev-parse HEAD)"
+RECIPE_TREE="$(git rev-parse "${PROJECT_COMMIT}:${TARGET_SLUG}")"
+MANAGED_SOURCE_TREE="$(git rev-parse "${PROJECT_COMMIT}:upstream/isucon10-qualify")"
+[[ "${KAKOMON10_QUALIFY_SOURCE_AMI_ID}" =~ ^ami-[0-9a-f]{17}$ ]]
+[[ "${KAKOMON10_QUALIFY_SOURCE_AMI_NAME}" =~ ^ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26[.]04-arm64-server-[0-9]{8}$ ]]
+[[ "${KAKOMON10_QUALIFY_SOURCE_AMI_OWNER}" =~ ^[0-9]{12}$ ]]
+[[ "${KAKOMON10_QUALIFY_ROOT_VOLUME_GIB}" =~ ^[0-9]+$ ]]
+test "${KAKOMON10_QUALIFY_ROOT_VOLUME_GIB}" -ge 8
+[[ "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}" =~ ^kakomon10-qualify-frontend-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+[[ "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+REMOTE_COMMIT="$(curl -fsS "https://api.github.com/repos/sunakan/isuren-mondai/commits/${PROJECT_COMMIT}" | jq -er '.sha')" || {
+  echo "error: exact recipe commit is unavailable remotely; push it before building" >&2
+  exit 1
+}
+test "${REMOTE_COMMIT}" = "${PROJECT_COMMIT}"
+
+stage="$(mktemp -d)"
+user_data="${stage}/user-data.yaml"
+BUILD_LOG="${stage}/build.log"
+manifest="${stage}/manifest.json"
+trap 'rm -rf "${stage}"' EXIT
+
+#
+# 公開Releaseのtagとchecksumを検証
+#
+# dependency取得はEC2側で行う。hostは小さな公開metadataだけを取得する。
+release_json="$(curl -fsSL "https://api.github.com/repos/sunakan/isuren-mondai/releases/tags/${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}")"
+jq -e --arg tag "${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}" \
+  --arg digest "sha256:${KAKOMON10_QUALIFY_FRONTEND_RELEASE_SHA256}" \
+  '.tag_name == $tag and .draft == false and .prerelease == false and
+   ([.assets[] | select(.name == "kakomon10-qualify-frontend.tar.gz" and .digest == $digest)] | length == 1) and
+   ([.assets[] | select(.name == "kakomon10-qualify-frontend.tar.gz.sha256")] | length == 1)' \
+  <<<"${release_json}" >/dev/null
+curl -fsSL "https://github.com/sunakan/isuren-mondai/releases/download/${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}/kakomon10-qualify-frontend.tar.gz.sha256" \
+  -o "${stage}/frontend.sha256"
+test "$(wc -l <"${stage}/frontend.sha256" | tr -d ' ')" -eq 1
+grep -Eq "^${KAKOMON10_QUALIFY_FRONTEND_RELEASE_SHA256} [ *]kakomon10-qualify-frontend[.]tar[.]gz$" \
+  "${stage}/frontend.sha256"
+
+#
+# 東京regionのbase AMIとnetworkを照合
+#
+image_json="$(aws ec2 describe-images --region "${AWS_REGION}" \
+  --image-ids "${KAKOMON10_QUALIFY_SOURCE_AMI_ID}" --output json)"
+jq -e --arg id "${KAKOMON10_QUALIFY_SOURCE_AMI_ID}" \
+  --arg name "${KAKOMON10_QUALIFY_SOURCE_AMI_NAME}" \
+  --arg owner "${KAKOMON10_QUALIFY_SOURCE_AMI_OWNER}" \
+  --argjson size "${KAKOMON10_QUALIFY_ROOT_VOLUME_GIB}" \
+  '.Images | length == 1 and
+   (.[0] | .ImageId == $id and .Name == $name and .OwnerId == $owner and
+    .Architecture == "arm64" and .State == "available" and
+    .RootDeviceName == "/dev/sda1" and
+    ([.BlockDeviceMappings[] | select(.DeviceName == "/dev/sda1" and .Ebs.VolumeSize <= $size)] | length == 1))' \
+  <<<"${image_json}" >/dev/null
+network_json="$(aws cloudformation describe-stacks --region "${AWS_REGION}" \
+  --stack-name "${KAKOMON10_QUALIFY_PACKER_NETWORK_STACK_NAME}" --query 'Stacks[0]' --output json)"
+jq -e '.StackStatus == "CREATE_COMPLETE" or .StackStatus == "UPDATE_COMPLETE"' \
+  <<<"${network_json}" >/dev/null
+VPC_ID="$(jq -er '.Outputs[] | select(.OutputKey == "VpcId") | .OutputValue' <<<"${network_json}")"
+SUBNET_ID="$(jq -er '.Outputs[] | select(.OutputKey == "SubnetId") | .OutputValue' <<<"${network_json}")"
+IAM_INSTANCE_PROFILE="$(jq -er '.Outputs[] | select(.OutputKey == "PackerInstanceProfileName") | .OutputValue' <<<"${network_json}")"
+[[ "${VPC_ID}" =~ ^vpc-[0-9a-f]+$ ]]
+[[ "${SUBNET_ID}" =~ ^subnet-[0-9a-f]+$ ]]
+[[ "${IAM_INSTANCE_PROFILE}" =~ ^[A-Za-z0-9+=,.@_-]{1,128}$ ]]
+
+#
+# 一時User Dataへ非secret入力だけを渡す
+#
+TRACE_ID="$(openssl rand -hex 16)"
+ROOT_SPAN_ID="$(openssl rand -hex 8)"
+TRACEPARENT="00-${TRACE_ID}-${ROOT_SPAN_ID}-01"
+export PROJECT_COMMIT TRACEPARENT
+export SOURCE_AMI_ID="${KAKOMON10_QUALIFY_SOURCE_AMI_ID}"
+export FRONTEND_RELEASE_TAG="${KAKOMON10_QUALIFY_FRONTEND_RELEASE_TAG}"
+export FRONTEND_RELEASE_SHA256="${KAKOMON10_QUALIFY_FRONTEND_RELEASE_SHA256}"
+python3 kakomon10-qualify/cloud-init/generate-user-data.py --output "${user_data}"
+packer init "${PACKER_FILE}"
+
+#
+# Packerの終了値を保持してartifactを確認
+#
+BUILD_START_EPOCH="$(date +%s)"
+BUILD_EXIT=0
+packer build \
+  -var "region=${AWS_REGION}" \
+  -var "source_ami=${KAKOMON10_QUALIFY_SOURCE_AMI_ID}" \
+  -var "source_ami_name=${KAKOMON10_QUALIFY_SOURCE_AMI_NAME}" \
+  -var "source_ami_owner=${KAKOMON10_QUALIFY_SOURCE_AMI_OWNER}" \
+  -var "root_volume_gib=${KAKOMON10_QUALIFY_ROOT_VOLUME_GIB}" \
+  -var "vpc_id=${VPC_ID}" \
+  -var "subnet_id=${SUBNET_ID}" \
+  -var "iam_instance_profile=${IAM_INSTANCE_PROFILE}" \
+  -var "project_commit=${PROJECT_COMMIT}" \
+  -var "recipe_tree=${RECIPE_TREE}" \
+  -var "managed_source_tree=${MANAGED_SOURCE_TREE}" \
+  -var "frontend_release_tag=${FRONTEND_RELEASE_TAG}" \
+  -var "frontend_release_sha256=${FRONTEND_RELEASE_SHA256}" \
+  -var "user_data_file=${user_data}" \
+  -var "manifest_file=${manifest}" \
+  "${PACKER_FILE}" | tee "${BUILD_LOG}" || BUILD_EXIT=$?
+BUILD_END_EPOCH="$(date +%s)"
+
+if [ "${BUILD_EXIT}" -eq 0 ]; then
+  AMI_ID="$(jq -er '.builds[-1].artifact_id' "${manifest}" | sed -nE "s/^${AWS_REGION}:(ami-[0-9a-f]{17})$/\1/p")" || BUILD_EXIT=1
+  if [[ "${AMI_ID:-}" =~ ^ami-[0-9a-f]{17}$ ]]; then
+    printf 'AMI_ID=%s region=%s architecture=arm64 recipe_commit=%s frontend_tag=%s frontend_sha256=%s\n' \
+      "${AMI_ID}" "${AWS_REGION}" "${PROJECT_COMMIT}" "${FRONTEND_RELEASE_TAG}" "${FRONTEND_RELEASE_SHA256}"
+  else
+    echo "error: Packer succeeded without an exact Tokyo AMI artifact" >&2
+    BUILD_EXIT=1
+  fi
+fi
+
+#
+# hostだけでtelemetryを送信
+#
+if otel_tracing_enabled; then
+  ROOT_STATUS_CODE=ok
+  if [ "${BUILD_EXIT}" -ne 0 ]; then
+    ROOT_STATUS_CODE=error
+  fi
+  otel_span --service "${OTEL_SERVICE_NAME:-kakomon10-qualify-arm64-ami-build}" \
+    --name packer.build --kind server \
+    --force-trace-id "${TRACE_ID}" --force-span-id "${ROOT_SPAN_ID}" \
+    --start "${BUILD_START_EPOCH}" --end "${BUILD_END_EPOCH}" --status-code "${ROOT_STATUS_CODE}"
+  otel_emit_provisioning_spans "${BUILD_LOG}" "${TRACE_ID}" "${ROOT_SPAN_ID}" "${TARGET_SLUG}"
+fi
+exit "${BUILD_EXIT}"
