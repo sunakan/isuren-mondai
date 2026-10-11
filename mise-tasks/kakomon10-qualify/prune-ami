@@ -23,8 +23,8 @@ ACCOUNT=$(jq -ers 'if length != 1 then error("invalid caller JSON") else .[0].Ac
 
 fetch_images() {
   local result
-  result=$(aws_json ec2 describe-images --include-deprecated --include-disabled --page-size 100 "$@") || fail "AMI取得失敗"
-  # CLIの自動paginationで全ページを取得し、未処理tokenは拒否する。
+  result=$(aws_json ec2 describe-images --include-deprecated --include-disabled "$@") || fail "AMI取得失敗"
+  # ID指定とpage-sizeは併用不可。CLIで全ページを取得し、未処理tokenを拒否する。
   jq -se '
     length == 1 and (.[0] | type == "object" and .NextToken == null and (.Images | type == "array") and
     all(.Images[]; type == "object" and

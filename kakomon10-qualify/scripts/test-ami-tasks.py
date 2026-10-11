@@ -50,7 +50,11 @@ def aws_stub():
         output = {"Account": ACCOUNT}
     elif operation == "describe-images":
         assert "--include-deprecated" in args and "--include-disabled" in args
-        assert option("--page-size") == "100"
+        if "--image-ids" in args and any(flag in args for flag in ("--page-size", "--max-results")):
+            state_path.write_text(json.dumps(state))
+            print("An error occurred (InvalidParameterCombination) when calling the DescribeImages operation: "
+                  "imageIdsSet cannot be used with maxResults", file=sys.stderr)
+            return 254
         assert "--no-paginate" not in args and "--max-items" not in args and "--query" not in args
         if "--image-ids" in args:
             ami_id = option("--image-ids")
@@ -135,7 +139,7 @@ def aws_stub():
 
 class AmiTaskTests(unittest.TestCase):
     def run_task(self, task, answer="y\n", **fixture):
-        proof = ROOT / "tmp/kakomon10q-ami-tasks-20261011"
+        proof = ROOT / "tmp/kakomon10q-ami-task-pagination-fix-20261011"
         proof.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="stub-", dir=proof) as temporary:
             base = Path(temporary)
@@ -170,6 +174,28 @@ class AmiTaskTests(unittest.TestCase):
         self.success(result)
         self.assertEqual(state["mutations"], [["modify-image-attribute", image(3)["ImageId"]]])
         self.assertIn("AMI published", result.stdout)
+
+    def test_individual_id_lookup_has_no_service_page_limit(self):
+        for task in ("publish-latest-ami", "prune-ami"):
+            with self.subTest(task=task):
+                result, state = self.run_task(task)
+                self.success(result)
+                lookups = [args for args in state["calls"] if "--image-ids" in args]
+                self.assertTrue(lookups)
+                self.assertTrue(all("--page-size" not in args and "--max-results" not in args for args in lookups))
+
+    def test_invalid_id_pagination_stops_before_mutation(self):
+        with tempfile.TemporaryDirectory(prefix="bad-pagination-", dir=ROOT / "tmp") as temporary:
+            for task in ("publish-latest-ami", "prune-ami"):
+                with self.subTest(task=task):
+                    source = (ROOT / "mise-tasks/kakomon10-qualify" / task).read_text()
+                    broken = Path(temporary) / task
+                    broken.write_text(source.replace("--include-deprecated --include-disabled",
+                        "--include-deprecated --include-disabled --page-size 100", 1))
+                    result, state = self.run_task(str(broken))
+                    self.rejected(result, state)
+                    self.assertIn("InvalidParameterCombination", result.stderr)
+                    self.assertTrue(any("--image-ids" in args and "--page-size" in args for args in state["calls"]))
 
     def test_publish_future_deprecation_and_tie_are_supported(self):
         rows = [image(n, CreationDate="2026-08-01T00:00:00.000Z", DeprecationTime="2099-01-01T00:00:00Z") for n in (2, 3, 1)]
