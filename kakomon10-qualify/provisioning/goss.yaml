@@ -35,7 +35,7 @@ file:
     filetype: file
   /home/isuren/isuumo/initial-data/result/verification_data:
     exists: true
-    filetype: dir
+    filetype: directory
   /home/isuren/.kakomon10-qualify-staging:
     exists: false
   /home/isuren/go:
