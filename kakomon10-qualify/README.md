@@ -211,6 +211,44 @@ baseline, base image, plugin, Go, and frontend tag/digest. The AMI name is
 `isuren/kakomon10-qualify-arm64-<UTC timestamp>Z`; a future AMD64 variant
 will have its own image identity and validation.
 
+## AMI publish and prune tasks
+
+```bash
+mise run kakomon10-qualify:publish-latest-ami
+mise run kakomon10-qualify:prune-ami
+```
+
+Both tasks are interactive and fixed to `ap-northeast-1`. They select only
+self-owned, available ARM64 images named `isuren/kakomon10-qualify-arm64-*`,
+after collecting every CLI page as JSON. Disabled images and images whose
+deprecation time has already arrived are retained; a future deprecation
+reservation still permits selection. The latest image is chosen by
+CreationDate, with ImageId as the deterministic tie-breaker. The displayed
+plan requires exactly `y`; another answer or EOF makes no changes.
+
+Publish adds only `launchPermission` `Group=all` to the latest ARM64 AMI.
+It rejects encrypted EBS snapshots and product-code images, rechecks image
+and snapshot identity before modification, and observes `Public=true`
+before reporting success. An automatically added future deprecation date
+on first publication is accepted. Snapshot permissions are unchanged:
+[AMI launch permission covers its referenced snapshots](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html),
+and [encrypted images cannot be made public](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html).
+
+Prune keeps the latest eligible ARM64 image and deregisters only the older
+images displayed for confirmation, without automatic snapshot deletion.
+It checks references across all visible owners, targets, architectures,
+deprecated images, and disabled images. All deregistration responses must
+confirm `Return=true` before snapshot deletion begins. Only snapshots in
+the confirmed deletion plan are considered; snapshots owned by another
+account or with any remaining/new reference, including a just-deregistered
+AMI, are retained and reported. API errors, incomplete JSON, or identity
+changes stop the operation; a partial failure may leave some AMIs already
+deregistered with their snapshots retained.
+
+These tasks have passed offline CLI-stub safety checks. Real AWS
+publish/prune execution is `not-run`; the existing AWS build and standalone
+verification above remain tied to recipe commit `936016b8c7cf6c16c0027059ce73ea90a93578b5`.
+
 ## Seal and fresh boot
 
 `packer/seal-image.sh` stops `isuumo-go`, nginx, and MySQL while retaining

@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+#MISE description="最新のkakomon10-qualify ARM64 AMIをPublic公開する (snapshot権限は変更しない; interactive)"
+#MISE interactive=true
+set -euo pipefail
+
+REGION="ap-northeast-1"
+NAME_PREFIX="isuren/kakomon10-qualify-arm64-"
+
+#
+# AWS応答と自己所有を確認
+#
+fail() {
+  echo "エラー: $*" >&2
+  exit 1
+}
+
+aws_json() {
+  aws "$@" --region "$REGION" --output json --no-cli-pager --no-cli-auto-prompt
+}
+
+CALLER=$(aws_json sts get-caller-identity) || fail "AWS caller取得失敗"
+ACCOUNT=$(jq -ers 'if length != 1 then error("invalid caller JSON") else .[0].Account | select(type == "string" and test("^[0-9]{12}$")) end' <<<"$CALLER")
+
+fetch_images() {
+  local result
+  result=$(aws_json ec2 describe-images --include-deprecated --include-disabled --page-size 100 "$@") || fail "AMI取得失敗"
+  # CLIの自動paginationで全ページを取得し、未処理tokenは拒否する。
+  jq -se '
+    length == 1 and (.[0] | type == "object" and .NextToken == null and (.Images | type == "array") and
+    all(.Images[]; type == "object" and
+      (.ImageId | type == "string" and test("^ami-([0-9a-f]{8}|[0-9a-f]{17})$")) and
+      (.OwnerId | type == "string" and test("^[0-9]{12}$"))) and
+    ((.Images | map(.ImageId) | length) == (.Images | map(.ImageId) | unique | length)))
+  ' <<<"$result" >/dev/null || fail "AMI一覧が不正か未完了です"
+  printf '%s\n' "$result"
+}
+
+eligible_images() {
+  jq -ce --arg account "$ACCOUNT" --arg prefix "$NAME_PREFIX" --argjson now "$(date -u +%s)" '
+    def stamp:
+      . as $value |
+      if type != "string" or (test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$") | not)
+      then error("invalid UTC date") else . end |
+      sub("\\.[0-9]+Z$"; "Z") as $whole | ($whole | fromdateiso8601) as $seconds |
+      if ($seconds | todateiso8601) != $whole then error("invalid UTC date") else
+        $seconds + (if ($value | contains(".")) then ($value | capture("\\.(?<fraction>[0-9]+)Z$").fraction | "0." + . | tonumber) else 0 end)
+      end;
+    [.Images[] | select(.OwnerId == $account and .Architecture == "arm64" and .State == "available") |
+      if (.Name | type) != "string" then error("invalid name") else . end |
+      select(.Name | startswith($prefix) and length > ($prefix | length)) |
+      if has("Disabled") and (.Disabled | type) != "boolean" then error("invalid disabled state") else . end |
+      select(.Disabled != true) |
+      select(if .DeprecationTime == null then true else (.DeprecationTime | stamp) > $now end) |
+      . + {SortTime: (.CreationDate | stamp)}] | sort_by([.SortTime, .ImageId])
+  '
+}
+
+list_candidates() {
+  fetch_images --owners self --filters "Name=name,Values=${NAME_PREFIX}*" \
+    'Name=state,Values=available' 'Name=architecture,Values=arm64' | eligible_images
+}
+
+image_identity() {
+  jq -ce '
+    if .RootDeviceType != "ebs" or (.Public | type) != "boolean" or
+      (.BlockDeviceMappings | type) != "array" then error("invalid EBS image") else . end |
+    [.BlockDeviceMappings[] | select(has("Ebs")) | .Ebs] as $ebs |
+    if ($ebs | length) == 0 or (all($ebs[];
+      (.SnapshotId | type == "string" and test("^snap-([0-9a-f]{8}|[0-9a-f]{17})$")) and
+      (.Encrypted | type == "boolean")) | not) then error("invalid snapshot mapping") else . end |
+    {ImageId, OwnerId, Name, Architecture, State, CreationDate, DeprecationTime, Disabled,
+      BlockDeviceMappings: (.BlockDeviceMappings | sort_by(.DeviceName))}
+  '
+}
+
+single_image() {
+  local result
+  result=$(fetch_images --owners self --image-ids "$1" | eligible_images) || fail "AMI再取得失敗: $1"
+  jq -e --arg id "$1" 'length == 1 and .[0].ImageId == $id' <<<"$result" >/dev/null || fail "AMI identityが変化しました: $1"
+  jq -c '.[0]' <<<"$result"
+}
+
+snapshot_info() {
+  local result
+  result=$(aws_json ec2 describe-snapshots --snapshot-ids "$1") || fail "snapshot取得失敗: $1"
+  jq -cse --arg id "$1" '
+    if length != 1 then error("invalid snapshot JSON") else .[0] end |
+    if type != "object" or .NextToken != null or (.Snapshots | type) != "array" or
+      (.Snapshots | length) != 1 then error("invalid snapshot response") else .Snapshots[0] end |
+    if .SnapshotId != $id or (.OwnerId | type != "string" or (test("^[0-9]{12}$") | not)) or
+      .State != "completed" or (.Encrypted | type) != "boolean" then error("invalid snapshot identity") else
+      {SnapshotId, OwnerId, State, Encrypted}
+    end
+  ' <<<"$result"
+}
+
+#
+# 同じCreationDateはAMI ID順で決定
+#
+IMAGES=$(list_candidates)
+
+[[ $(jq length <<<"$IMAGES") -gt 0 ]] || fail "公開対象のARM64 AMIがありません"
+IMAGE=$(jq -c '.[-1]' <<<"$IMAGES")
+AMI_ID=$(jq -r '.ImageId' <<<"$IMAGE")
+IDENTITY=$(image_identity <<<"$IMAGE")
+SNAPSHOT_IDS=$(jq -r '.BlockDeviceMappings[].Ebs? | select(.) | .SnapshotId' <<<"$IMAGE" | LC_ALL=C sort -u)
+SNAPSHOTS='[]'
+
+#
+# 暗号化snapshotと公開不可のimageを拒否
+#
+check_publication() {
+  local image="$1" snapshot info current='[]'
+  jq -e 'all(.BlockDeviceMappings[].Ebs? | select(.); .Encrypted == false) and (.ProductCodes == null or (.ProductCodes | type == "array" and length == 0))' <<<"$image" >/dev/null || fail "暗号化EBSまたはproduct code付きAMIは公開できません"
+  while IFS= read -r snapshot; do
+    info=$(snapshot_info "$snapshot")
+    jq -e --arg account "$ACCOUNT" '.OwnerId == $account and .Encrypted == false' <<<"$info" >/dev/null || fail "自己所有で非暗号化のsnapshotではありません: $snapshot"
+    current=$(jq -c --argjson info "$info" '. + [$info]' <<<"$current")
+  done <<<"$SNAPSHOT_IDS"
+  printf '%s\n' "$current"
+}
+
+SNAPSHOTS=$(check_publication "$IMAGE")
+printf 'Public公開するAMI (%s / account %s):\n' "$REGION" "$ACCOUNT"
+jq -r '[.ImageId, .Name, .CreationDate, "Public=" + (.Public | tostring)] | @tsv' <<<"$IMAGE"
+echo "参照snapshot (権限は変更しません):"
+jq -r '.[] | [.SnapshotId, "Encrypted=" + (.Encrypted | tostring)] | @tsv' <<<"$SNAPSHOTS"
+
+#
+# 明示的なy入力で確認
+#
+if ! IFS= read -r -p "このAMIをPublic公開しますか? [y/N] " ANSWER || [[ "$ANSWER" != "y" ]]; then
+  echo "中止しました"
+  exit 0
+fi
+
+#
+# 最新AMIとsnapshotを変更直前に再確認
+#
+CURRENT=$(list_candidates | jq -c '.[-1]')
+[[ $(image_identity <<<"$CURRENT") == "$IDENTITY" ]] || fail "最新AMIが変化しました。再実行してください"
+CURRENT=$(single_image "$AMI_ID")
+[[ $(image_identity <<<"$CURRENT") == "$IDENTITY" ]] || fail "AMI identityが変化しました"
+[[ $(check_publication "$CURRENT") == "$SNAPSHOTS" ]] || fail "snapshot情報が変化しました"
+aws_json ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission 'Add=[{Group=all}]'
+
+#
+# Public観測で完了を判定
+#
+CURRENT=$(single_image "$AMI_ID")
+POST_IDENTITY=$(image_identity <<<"$CURRENT")
+# 初公開で自動追加される将来deprecation予約だけを許容する。
+if [[ $(jq -r '.DeprecationTime' <<<"$IDENTITY") == null ]]; then
+  [[ $(jq -c 'del(.DeprecationTime)' <<<"$POST_IDENTITY") == "$(jq -c 'del(.DeprecationTime)' <<<"$IDENTITY")" ]] || fail "公開後のAMI identityが変化しました"
+else
+  [[ "$POST_IDENTITY" == "$IDENTITY" ]] || fail "公開後のAMI identityが変化しました"
+fi
+jq -e '.Public == true' <<<"$CURRENT" >/dev/null || fail "Public状態を確認できません。公開権限を再確認してください"
+echo "AMI published: $AMI_ID (snapshot権限は未変更)"

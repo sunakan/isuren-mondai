@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+#MISE description="古いkakomon10-qualify ARM64 AMIと固有snapshotを削除する (最新1件を保持; interactive)"
+#MISE interactive=true
+set -euo pipefail
+
+REGION="ap-northeast-1"
+NAME_PREFIX="isuren/kakomon10-qualify-arm64-"
+
+#
+# AWS応答と自己所有を確認
+#
+fail() {
+  echo "エラー: $*" >&2
+  exit 1
+}
+
+aws_json() {
+  aws "$@" --region "$REGION" --output json --no-cli-pager --no-cli-auto-prompt
+}
+
+CALLER=$(aws_json sts get-caller-identity) || fail "AWS caller取得失敗"
+ACCOUNT=$(jq -ers 'if length != 1 then error("invalid caller JSON") else .[0].Account | select(type == "string" and test("^[0-9]{12}$")) end' <<<"$CALLER")
+
+fetch_images() {
+  local result
+  result=$(aws_json ec2 describe-images --include-deprecated --include-disabled --page-size 100 "$@") || fail "AMI取得失敗"
+  # CLIの自動paginationで全ページを取得し、未処理tokenは拒否する。
+  jq -se '
+    length == 1 and (.[0] | type == "object" and .NextToken == null and (.Images | type == "array") and
+    all(.Images[]; type == "object" and
+      (.ImageId | type == "string" and test("^ami-([0-9a-f]{8}|[0-9a-f]{17})$")) and
+      (.OwnerId | type == "string" and test("^[0-9]{12}$"))) and
+    ((.Images | map(.ImageId) | length) == (.Images | map(.ImageId) | unique | length)))
+  ' <<<"$result" >/dev/null || fail "AMI一覧が不正か未完了です"
+  printf '%s\n' "$result"
+}
+
+eligible_images() {
+  jq -ce --arg account "$ACCOUNT" --arg prefix "$NAME_PREFIX" --argjson now "$(date -u +%s)" '
+    def stamp:
+      . as $value |
+      if type != "string" or (test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$") | not)
+      then error("invalid UTC date") else . end |
+      sub("\\.[0-9]+Z$"; "Z") as $whole | ($whole | fromdateiso8601) as $seconds |
+      if ($seconds | todateiso8601) != $whole then error("invalid UTC date") else
+        $seconds + (if ($value | contains(".")) then ($value | capture("\\.(?<fraction>[0-9]+)Z$").fraction | "0." + . | tonumber) else 0 end)
+      end;
+    [.Images[] | select(.OwnerId == $account and .Architecture == "arm64" and .State == "available") |
+      if (.Name | type) != "string" then error("invalid name") else . end |
+      select(.Name | startswith($prefix) and length > ($prefix | length)) |
+      if has("Disabled") and (.Disabled | type) != "boolean" then error("invalid disabled state") else . end |
+      select(.Disabled != true) |
+      select(if .DeprecationTime == null then true else (.DeprecationTime | stamp) > $now end) |
+      . + {SortTime: (.CreationDate | stamp)}] | sort_by([.SortTime, .ImageId])
+  '
+}
+
+list_candidates() {
+  fetch_images --owners self --filters "Name=name,Values=${NAME_PREFIX}*" \
+    'Name=state,Values=available' 'Name=architecture,Values=arm64' | eligible_images
+}
+
+image_identity() {
+  jq -ce '
+    if .RootDeviceType != "ebs" or (.Public | type) != "boolean" or
+      (.BlockDeviceMappings | type) != "array" then error("invalid EBS image") else . end |
+    [.BlockDeviceMappings[] | select(has("Ebs")) | .Ebs] as $ebs |
+    if ($ebs | length) == 0 or (all($ebs[];
+      (.SnapshotId | type == "string" and test("^snap-([0-9a-f]{8}|[0-9a-f]{17})$")) and
+      (.Encrypted | type == "boolean")) | not) then error("invalid snapshot mapping") else . end |
+    {ImageId, OwnerId, Name, Architecture, State, CreationDate, DeprecationTime, Disabled,
+      BlockDeviceMappings: (.BlockDeviceMappings | sort_by(.DeviceName))}
+  '
+}
+
+single_image() {
+  local result
+  result=$(fetch_images --owners self --image-ids "$1" | eligible_images) || fail "AMI再取得失敗: $1"
+  jq -e --arg id "$1" 'length == 1 and .[0].ImageId == $id' <<<"$result" >/dev/null || fail "AMI identityが変化しました: $1"
+  jq -c '.[0]' <<<"$result"
+}
+
+snapshot_info() {
+  local result
+  result=$(aws_json ec2 describe-snapshots --snapshot-ids "$1") || fail "snapshot取得失敗: $1"
+  jq -cse --arg id "$1" '
+    if length != 1 then error("invalid snapshot JSON") else .[0] end |
+    if type != "object" or .NextToken != null or (.Snapshots | type) != "array" or
+      (.Snapshots | length) != 1 then error("invalid snapshot response") else .Snapshots[0] end |
+    if .SnapshotId != $id or (.OwnerId | type != "string" or (test("^[0-9]{12}$") | not)) or
+      .State != "completed" or (.Encrypted | type) != "boolean" then error("invalid snapshot identity") else
+      {SnapshotId, OwnerId, State, Encrypted}
+    end
+  ' <<<"$result"
+}
+
+#
+# 同じCreationDateはAMI ID順で決定
+#
+IMAGES=$(list_candidates)
+
+COUNT=$(jq length <<<"$IMAGES")
+if [[ "$COUNT" -eq 0 ]]; then
+  echo "削除対象のARM64 AMIはありません(0件)"
+  exit 0
+fi
+KEEP=$(jq -c '.[-1]' <<<"$IMAGES")
+KEEP_ID=$(jq -r '.ImageId' <<<"$KEEP")
+KEEP_IDENTITY=$(image_identity <<<"$KEEP")
+printf '保持する最新ARM64 AMI (%s / account %s):\n' "$REGION" "$ACCOUNT"
+jq -r '[.ImageId, .Name, .CreationDate] | @tsv' <<<"$KEEP"
+if [[ "$COUNT" -eq 1 ]]; then
+  echo "削除対象のAMIはありません(最新の1件のみ)"
+  exit 0
+fi
+TARGETS=$(jq -c '.[0:-1]' <<<"$IMAGES")
+TARGET_IDS=$(jq -c 'map(.ImageId)' <<<"$TARGETS")
+SNAPSHOTS='[]'
+DELETE_SNAPSHOTS='[]'
+
+#
+# 全AMI identityとsnapshotを固定
+#
+PLAN='[]'
+while IFS= read -r image; do
+  identity=$(image_identity <<<"$image")
+  PLAN=$(jq -c --argjson item "$identity" '. + [$item]' <<<"$PLAN")
+  jq -r '[.ImageId, .Name, .CreationDate] | @tsv' <<<"$image"
+done < <(jq -c '.[]' <<<"$TARGETS")
+SNAPSHOT_IDS=$(jq -r '.[] | .BlockDeviceMappings[].Ebs? | select(.) | .SnapshotId' <<<"$TARGETS" | LC_ALL=C sort -u)
+
+snapshot_references() {
+  fetch_images --filters "Name=block-device-mapping.snapshot-id,Values=$1" | jq -c '.Images | map(.ImageId)'
+}
+
+while IFS= read -r snapshot; do
+  info=$(snapshot_info "$snapshot")
+  SNAPSHOTS=$(jq -c --argjson info "$info" '. + [$info]' <<<"$SNAPSHOTS")
+  references=$(snapshot_references "$snapshot")
+  blocking=$(jq -c --argjson targets "$TARGET_IDS" '. - $targets' <<<"$references")
+  if [[ $(jq -r '.OwnerId' <<<"$info") != "$ACCOUNT" || $(jq length <<<"$blocking") -gt 0 ]]; then
+    printf '保持するsnapshot: %s (他所有者または対象外AMIの参照: %s)\n' "$snapshot" "$blocking"
+  else
+    DELETE_SNAPSHOTS=$(jq -c --arg id "$snapshot" '. + [$id]' <<<"$DELETE_SNAPSHOTS")
+    printf '削除候補snapshot: %s\n' "$snapshot"
+  fi
+done <<<"$SNAPSHOT_IDS"
+
+#
+# 明示的なy入力で確認
+#
+if ! IFS= read -r -p "上記AMIと削除候補snapshotを削除しますか? [y/N] " ANSWER || [[ "$ANSWER" != "y" ]]; then
+  echo "中止しました"
+  exit 0
+fi
+
+#
+# 確認後の追加やidentity変更を拒否
+#
+CURRENT=$(list_candidates)
+[[ $(jq -c 'map(del(.Public, .SortTime))' <<<"$CURRENT") == "$(jq -c 'map(del(.Public, .SortTime))' <<<"$IMAGES")" ]] || fail "AMI一覧が変化しました。削除は開始していません"
+while IFS= read -r snapshot; do
+  info=$(snapshot_info "$snapshot")
+  original=$(jq -c --arg id "$snapshot" '.[] | select(.SnapshotId == $id)' <<<"$SNAPSHOTS")
+  [[ "$info" == "$original" ]] || fail "snapshot identityが変化しました: $snapshot"
+done <<<"$SNAPSHOT_IDS"
+
+#
+# 全AMIの登録解除成功後にだけsnapshotへ進む
+#
+while IFS= read -r identity; do
+  ami_id=$(jq -r '.ImageId' <<<"$identity")
+  current_keep=$(single_image "$KEEP_ID")
+  [[ $(image_identity <<<"$current_keep") == "$KEEP_IDENTITY" ]] || fail "保持AMIが変化しました"
+  current=$(single_image "$ami_id")
+  [[ $(image_identity <<<"$current") == "$identity" ]] || fail "削除対象AMIが変化しました: $ami_id"
+  result=$(aws_json ec2 deregister-image --image-id "$ami_id" --no-delete-associated-snapshots) || fail "AMI登録解除失敗: ${ami_id}。snapshot削除は未開始です"
+  jq -se 'length == 1 and (.[0] | type == "object" and .Return == true and (.DeleteSnapshotResults == null or (.DeleteSnapshotResults | type == "array" and length == 0)))' <<<"$result" >/dev/null || fail "AMI登録解除を確認できません: ${ami_id}。snapshot削除は未開始です"
+  echo "deregistered: $ami_id"
+done < <(jq -c '.[]' <<<"$PLAN")
+
+#
+# 確認済み候補だけを再観測して削除
+#
+while IFS= read -r snapshot; do
+  [[ -n "$snapshot" ]] || continue
+  info=$(snapshot_info "$snapshot")
+  original=$(jq -c --arg id "$snapshot" '.[] | select(.SnapshotId == $id)' <<<"$SNAPSHOTS")
+  [[ "$info" == "$original" ]] || fail "snapshot identityが変化しました: $snapshot"
+  # 解除対象IDの残存参照も含め、参照が1件でもあれば保持する。
+  references=$(snapshot_references "$snapshot")
+  if [[ $(jq length <<<"$references") -gt 0 ]]; then
+    printf '保持するsnapshot: %s (残存参照: %s)\n' "$snapshot" "$references"
+    continue
+  fi
+  result=$(aws_json ec2 delete-snapshot --snapshot-id "$snapshot") || fail "snapshot削除失敗: ${snapshot}。残りの削除を中止します"
+  [[ -z "$result" ]] || fail "snapshot削除応答が不正です: ${snapshot}。残りの削除を中止します"
+  echo "deleted snapshot: $snapshot"
+done < <(jq -r '.[]' <<<"$DELETE_SNAPSHOTS")
+echo "prune完了 (表示した共有・残存参照snapshotは保持)"
