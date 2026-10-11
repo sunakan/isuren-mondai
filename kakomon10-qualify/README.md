@@ -174,17 +174,22 @@ mechanical source changes.
 
 ## ARM64 AMI build
 
-The repository implementation is complete; an AMI has not been built or
-booted from this revision. Orb recipe/Golden/standalone, AMI build, AMI
-fresh boot, and the 1bench-1web benchmark are separate `not-run` gates.
+The Ubuntu 26.04 arm64 AMI build, seal, fresh boot, and standalone
+1bench-1web lifecycle checks passed in `ap-northeast-1` on 2026-10-11.
+The image was built from recipe commit
+`936016b8c7cf6c16c0027059ce73ea90a93578b5`; its private AMI is
+`ami-0006f9a470d2fb6ee`, and its root snapshot is
+`snap-02ad9835807ba62ca`. Orb recipe/Golden/standalone verification is
+deferred at the operator's request; AMD64 remains future work, and
+Portal/`isu` product verification remains `not-run`.
 
 `scripts/artifact-inputs.env` owns the exact Tokyo-region base image,
 Canonical owner/name, 8 GiB root volume, Packer network stack, and published
 `kakomon10-qualify-frontend-v1.0.1` archive digest
 `8a02385bee5c0ffb0c595e7817bc59903a3689a92689d96cae77d2f49f21ede3`.
 This archive is 439,794,916 bytes, so download/extraction stay on the root
-volume rather than `/tmp`. The 8 GiB volume is the base snapshot size;
-10q's peak usage and remaining space must be measured in the fresh build.
+volume rather than `/tmp`. The measured build reported 3,379,478,528 bytes
+(about 3.15 GiB) available on its 8 GiB root after provisioning.
 There is no automatic OS, architecture, or disk-size fallback.
 
 Before the build, commit and push the exact recipe revision and obtain
@@ -225,8 +230,9 @@ The installed read-only state checker has distinct `sealed`, `web`, and
 `bench` states. Sealed checks run after cleanup in Packer. Fresh web checks
 must also be run after reboot; compare machine-id, SSH key fingerprints,
 and MySQL UUID between independently launched instances, and confirm
-recipe-ready and data remain intact. This checks image state; lifecycle
-benchmark/reset/recovery and SSM connectivity still require real runs.
+recipe-ready and data remain intact. Lifecycle benchmark/reset/recovery
+and SSM connectivity have separate evidence in the AWS verification record
+below.
 
 ```bash
 sudo /usr/local/libexec/kakomon10-qualify-check-image-state web
@@ -268,6 +274,48 @@ lifecycle gate, also collect a deliberate `pass:false` result (for example,
 an unreachable target), then a normal result after recovery; verify
 `POST /initialize`, normal benchmark, and both node roles again after
 reboot. An exit code of zero from `bench` is never the pass oracle.
+
+### AWS verification (2026-10-11)
+
+Fresh `c8g.large` web and bench instances from the AMI and recipe commit
+above passed the standalone checks:
+
+- Goss: 73/73 checks passed during the AMI build, on fresh web boot, and
+  after reboot; the sealed image state check also passed.
+- Reset: after DB mutation, `POST /initialize` restored chair and estate
+  counts to 29,500 each and total chair stock to the frozen baseline
+  161,749.
+- Reboot: both boot IDs changed, while each instance's machine ID and SSH
+  Ed25519 host-key fingerprint stayed unchanged; the two instances had
+  distinct identities. The web MySQL UUID, recorded DB row counts, and
+  total chair stock stayed unchanged. Both role state checkers passed;
+  both nodes were SSM `Online` before and after reboot.
+- Browser: home, chair/estate search and detail, images, chair
+  recommendations, estate map tiles, and nazotte drawing/results/popup/
+  detail navigation passed after reboot, with zero console errors and
+  warnings.
+
+| Benchmark case | Final JSON `pass` | Score |
+|---|---|---|
+| Normal | `true` | 785 |
+| Deliberate failure (expected rejection) | `false` | 0 |
+| Recovery | `true` | 789 |
+| After both nodes rebooted | `true` | 801 |
+
+Raw evidence is retained under
+`tmp/kakomon10-qualify-aws-verify-20261011-r2/`: `build.log`,
+`web-goss-initial-stdout.txt`, `web-goss-after-reboot-stdout.txt`,
+`benchmark-results.json`, `reset-verification.json`,
+`reboot-verification.json`, and `browser-verification.json`.
+
+Cleanup of `isuren-kakomon10-qualify-arm64-verify-20261011-r2` was confirmed:
+the stack reached `DELETE_COMPLETE`, both EC2 instances were terminated,
+and their root volumes and verification network/IAM resources were absent.
+The earlier failed AMI `ami-03b89e13b06494ea2` and root snapshot
+`snap-038edf55c263cf13a` were removed. The verified private AMI, its completed
+snapshot, and the shared Packer network were retained. See
+`verify-cleanup-complete.json` and `failed-candidate-cleanup.json` in the
+same evidence directory.
 
 At the approved TTL, delete only this practice stack and verify its
 instances/root volumes are gone. The shared Packer network is retained.
