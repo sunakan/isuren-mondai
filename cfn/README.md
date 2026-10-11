@@ -2,7 +2,7 @@
 
 ベンチマーカー・競技サーバーを実際に起動するCloudFormationテンプレート置き場
 
-以下の例は kakomon14 を対象にしています(kakomon9-qualify・kakomon13 の例は末尾を参照)
+以下の例は kakomon14 を対象にしています(kakomon9-qualify・kakomon10-qualify・kakomon12-qualify・kakomon13 の例は末尾を参照)
 
 ## 利用するインスタンスの料金目安
 
@@ -385,4 +385,130 @@ cd /home/isuren/bench
 ./bench \
   -target-url https://t.isuren.internal -target-addr 10.42.1.11:443 \
   -exit-error-on-fail -duration 60s
+```
+
+## kakomon10-qualify
+
+Ubuntu 26.04 ARM64のGo版を、`c8g.large` 2台(1bench + 1web、各30 GiB gp3)で起動します。
+東京リージョン固定で、webは`10.42.1.11`のHTTP `:80`、benchは`10.42.1.10`です。
+bench側のApplication/nginx/MySQLは停止し、webへHTTPで接続します。
+
+2026-10-11にrecipe commit `936016b8c7cf6c16c0027059ce73ea90a93578b5`から作った
+`ami-0006f9a470d2fb6ee`で、fresh起動・ベンチ・reset/recovery・両台reboot・ブラウザー操作を
+検証済みです。AMIはprivateのまま保持し、旧失敗AMI/snapshotは削除済みです。
+詳細は[10qのAWS検証記録](../kakomon10-qualify/README.md#aws-verification-2026-10-11)を参照してください。
+
+AMI所有アカウントで使う場合、public公開(publish)は不要です。別アカウントから起動する場合は、
+スタック作成の前に、そのアカウントへの[AMI共有](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html)か
+[AMIのpublic公開](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html)を行います。
+このAMIからの起動には、参照するEBS snapshotを単独でpublic公開する必要はありません。
+AMIは東京リージョンで利用してください。
+
+### スタック作成と削除
+
+`AmiId`は必須引数で、YAMLにdefaultはありません。利用する検証済みARM64 AMIのexact IDを
+指定します。以下は所有アカウントで検証したprivate AMIを使う例です。
+`GithubUsers`は任意です。空欄ならSSM Session Managerで接続でき、SSHを使う場合は
+スペース区切りのGitHubユーザー名を指定して`https://github.com/<user>.keys`の公開鍵を配置します。
+手元の端末ではAWS CLIを、SSM接続ではSession Manager pluginも使用します。
+
+```shell
+#
+# 検証済みAMIでスタックを作成
+#
+set -euo pipefail
+STACK_NAME=kakomon10-qualify-1bench-1web
+AMI_ID='ami-0006f9a470d2fb6ee'
+GITHUB_USERS=''
+
+aws cloudformation deploy --region ap-northeast-1 \
+  --stack-name "$STACK_NAME" \
+  --template-file cfn/kakomon10-qualify-1bench-1web.yaml \
+  --parameter-overrides AmiId="$AMI_ID" GithubUsers="$GITHUB_USERS" \
+  --capabilities CAPABILITY_IAM
+```
+
+練習終了後は、作成したスタックだけを削除し、完了を待ちます。AMIと共有Packerネットワークは保持します。
+
+```shell
+#
+# 練習スタックを削除
+#
+STACK_NAME=kakomon10-qualify-1bench-1web
+aws cloudformation delete-stack --region ap-northeast-1 --stack-name "$STACK_NAME"
+aws cloudformation wait stack-delete-complete --region ap-northeast-1 --stack-name "$STACK_NAME"
+```
+
+### Webへ接続(SSM Session Manager)
+
+手元の端末でスタックのOutputsからWebのinstance IDを取得します。
+
+```shell
+#
+# Webのisurenセッションへ接続
+#
+STACK_NAME=kakomon10-qualify-1bench-1web
+WEB_INSTANCE_ID=$(aws cloudformation describe-stacks --region ap-northeast-1 \
+  --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='WebInstanceId'].OutputValue | [0]" --output text)
+aws ssm start-session --region ap-northeast-1 --target "$WEB_INSTANCE_ID" \
+  --document-name AWS-StartInteractiveCommand \
+  --parameters command="sudo -u isuren -i"
+```
+
+Webのセッション内でUser Dataの完走と役割を確認します。
+
+```shell
+#
+# Webの初期化を確認
+#
+sudo cloud-init status --wait
+sudo /usr/local/libexec/kakomon10-qualify-check-image-state web
+```
+
+### appの再ビルド(Go版)
+
+Webの`isuren`セッション内で、配置済みGo runtimeを使ってビルドし、Applicationを再起動します。
+
+```shell
+#
+# Go版を再ビルド
+#
+set -euo pipefail
+cd /home/isuren/isuumo/webapp/go
+/home/isuren/.local/bin/mise exec -- go build -mod=readonly -trimpath -o isuumo .
+sudo systemctl restart isuumo-go
+```
+
+### ベンチ実行(SSM Session Manager)
+
+手元の端末でbenchのセッションへ接続します。
+
+```shell
+#
+# Benchのisurenセッションへ接続
+#
+STACK_NAME=kakomon10-qualify-1bench-1web
+BENCH_INSTANCE_ID=$(aws cloudformation describe-stacks --region ap-northeast-1 \
+  --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='BenchInstanceId'].OutputValue | [0]" --output text)
+aws ssm start-session --region ap-northeast-1 --target "$BENCH_INSTANCE_ID" \
+  --document-name AWS-StartInteractiveCommand \
+  --parameters command="sudo -u isuren -i"
+```
+
+benchの`isuren`セッション内で実行します。`bench/`をcwdにすることで、相対pathの
+`../initial-data`と`../webapp/fixture`を解決できます。benchは失敗時にもexit 0を返すため、
+stdout末尾のJSONの`pass == true`を合否に使います。stdout/stderrは別々に保存します。
+
+```shell
+#
+# Benchの役割を確認して実行
+#
+set -euo pipefail
+sudo cloud-init status --wait
+sudo /usr/local/libexec/kakomon10-qualify-check-image-state bench
+cd /home/isuren/isuumo/bench
+./bench --target-url http://10.42.1.11 >bench.stdout.jsonl 2>bench.stderr.log
+tail -n 1 bench.stdout.jsonl | jq -e '.pass == true'
 ```

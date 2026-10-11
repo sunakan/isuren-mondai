@@ -12,6 +12,7 @@
 | 名前(対象)              | CloudFormation  | AMI  |go|java|nodejs|perl|python|ruby|rust|
 |:--------------------|:----------------|:-----|:---:|:----:|:---:|:---:|:---:|:---:|:---:|
 | kakomon14(ISUCON14) | [1bench-1web](https://github.com/sunakan/isuren-mondai/blob/main/cfn/kakomon14-1bench-1web.yaml) | [ami-05b13744921cbb5b7](https://ap-northeast-1.console.aws.amazon.com/ec2/home?region=ap-northeast-1#ImageDetails:imageId=ami-05b13744921cbb5b7) |✅|||||||
+| kakomon10-qualify(ISUCON10予選・ARM64) | [1bench-1web](https://github.com/sunakan/isuren-mondai/blob/main/cfn/kakomon10-qualify-1bench-1web.yaml)・[利用手順](cfn/README.md#kakomon10-qualify) | [ami-0006f9a470d2fb6ee](https://ap-northeast-1.console.aws.amazon.com/ec2/home?region=ap-northeast-1#ImageDetails:imageId=ami-0006f9a470d2fb6ee) (private・検証済み) |✅|||||||
 
 ## Orb Golden Base
 
