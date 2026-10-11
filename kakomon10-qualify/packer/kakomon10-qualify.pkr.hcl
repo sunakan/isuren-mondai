@@ -116,7 +116,7 @@ locals {
     SourceAMI         = var.source_ami
     BaseName          = var.source_ami_name
     BaseOwner         = var.source_ami_owner
-    RootVolumeGiB     = tostring(var.root_volume_gib)
+    RootVolumeGiB     = format("%d", var.root_volume_gib)
     GoVersion         = "1.26.6"
     PackerAmazon      = "1.8.2"
     Frontend          = "https://github.com/sunakan/isuren-mondai/releases/tag/${var.frontend_release_tag}"

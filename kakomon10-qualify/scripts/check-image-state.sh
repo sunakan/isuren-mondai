@@ -70,9 +70,12 @@ if [ "${state}" = sealed ]; then
   test ! -e /var/lib/cloud/instance
   test ! -e /var/lib/cloud/instances
   test ! -e /var/log/cloud-init-output.log
-  test -z "$(find /etc/ssh -maxdepth 1 -name 'ssh_host_*' -print)"
-  test -z "$(find /var/lib/mysql -maxdepth 1 -name '*.pem' -print)"
-  test -z "$(ss -H -ltn '( sport = :80 or sport = :1323 or sport = :3306 )')"
+  ssh_host_keys="$(find /etc/ssh -maxdepth 1 -name 'ssh_host_*' -print)"
+  test -z "${ssh_host_keys}"
+  mysql_tls_keys="$(find /var/lib/mysql -maxdepth 1 -name '*.pem' -print)"
+  test -z "${mysql_tls_keys}"
+  problem_listeners="$(ss -H -ltn '( sport = :80 or sport = :1323 or sport = :3306 )')"
+  test -z "${problem_listeners}"
 else
   grep -Eq '^[0-9a-f]{32}$' /etc/machine-id
   test -s /etc/ssh/ssh_host_ed25519_key
@@ -87,7 +90,8 @@ else
     curl -fsS -o /dev/null http://127.0.0.1/api/chair/search/condition
     nginx -t
   else
-    test -z "$(ss -H -ltn '( sport = :80 or sport = :1323 or sport = :3306 )')"
+    problem_listeners="$(ss -H -ltn '( sport = :80 or sport = :1323 or sport = :3306 )')"
+    test -z "${problem_listeners}"
   fi
   printf 'machine_id=%s\n' "$(cat /etc/machine-id)"
 fi

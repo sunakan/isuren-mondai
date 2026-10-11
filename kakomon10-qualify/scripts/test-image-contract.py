@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Exercise fail-fast recipe bootstrap and CFn role/User Data contracts offline."""
 
+import hashlib
 import importlib.util
 import os
 import pathlib
 import re
+import shlex
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -177,6 +180,152 @@ class CfnRoleTests(unittest.TestCase):
         for command in spec["command"].values():
             self.assertNotIn("/initialize", command["exec"])
             self.assertNotIn("systemctl start", command["exec"])
+
+
+class ImageStateObservationTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="kakomon10q-image-state-")
+        self.addCleanup(self.temporary.cleanup)
+        self.stage = pathlib.Path(self.temporary.name)
+        self.filesystem = self.stage / "filesystem"
+        self.commands = self.stage / "commands"
+        self.commands.mkdir()
+        self.command_log = self.stage / "observations.log"
+        self.write_file("/etc/os-release", "ID=ubuntu\nVERSION_ID=26.04\n")
+        self.write_file("/home/isuren/isuumo/webapp/go/isuumo", "", mode=0o755)
+        self.write_file("/home/isuren/isuumo/bench/bench", "", mode=0o755)
+        self.write_file("/home/isuren/env.sh", "")
+        self.write_file("/www/data/index.html", "fixture")
+        self.write_file("/var/lib/isuren-mondai/kakomon10-qualify/recipe-ready", COMMIT + "\n")
+        provenance = "/opt/isuren-mondai/kakomon10-qualify/"
+        self.write_file(
+            provenance + "recipe.txt",
+            f"recipe_commit={COMMIT}\nrecipe_tree={'b' * 40}\n"
+            f"managed_source_tree={'c' * 40}\nfrontend_release_tag={TAG}\n"
+            f"frontend_release_sha256={DIGEST}\n",
+        )
+        packages = "mysql-server\t8.4\n"
+        self.write_file(provenance + "packages.tsv", packages)
+        self.write_file(
+            provenance + "packages.tsv.sha256",
+            hashlib.sha256(packages.encode()).hexdigest() + "  packages.tsv\n",
+        )
+        (self.filesystem / "etc/ssh").mkdir(parents=True)
+        (self.filesystem / "var/lib/mysql").mkdir(parents=True)
+        self.write_command("id", "printf '0\\n'\n")
+        self.write_command("dpkg", "printf 'arm64\\n'\n")
+        self.write_command(
+            "systemctl",
+            """case "$1" in
+  is-enabled)
+    if [ "$IMAGE_STATE" = bench ]; then printf 'disabled\\n'; else printf 'enabled\\n'; fi
+    ;;
+  is-active) exit 3 ;;
+  *) exit 99 ;;
+esac
+""",
+        )
+        checksum = shutil.which("sha256sum")
+        if checksum:
+            checksum_command = shlex.quote(checksum)
+        else:
+            checksum = shutil.which("shasum")
+            self.assertIsNotNone(checksum, "sha256sum or shasum is required")
+            checksum_command = shlex.quote(checksum) + " -a 256"
+        self.write_command("sha256sum", f'exec {checksum_command} "$@"\n')
+        self.write_command("ssh-keygen", "exit 0\n")
+        self.write_command(
+            "find",
+            """case "$1" in
+  */etc/ssh) observation=SSH ;;
+  */var/lib/mysql) observation=MYSQL ;;
+  *) exit 99 ;;
+esac
+printf 'find:%s\\n' "$observation" >> "$OBSERVATION_LOG"
+status_name="FIND_${observation}_STATUS"
+output_name="FIND_${observation}_OUTPUT"
+printf '%s' "${!output_name}"
+exit "${!status_name}"
+""",
+        )
+        self.write_command(
+            "ss",
+            """printf 'ss:%s\\n' "$*" >> "$OBSERVATION_LOG"
+printf '%s' "$SS_OUTPUT"
+exit "$SS_STATUS"
+""",
+        )
+        source = (ROOT / "kakomon10-qualify/scripts/check-image-state.sh").read_text()
+        # Linuxの絶対pathだけをfixtureへ移し、観測式と分岐は実scriptのまま実行する。
+        source = source.replace(". /etc/os-release", '. "/etc/os-release"')
+        self.script = self.stage / "check-image-state.sh"
+        self.script.write_text(
+            re.sub(r"/(?:etc|home|opt|var|www)/", lambda match: str(self.filesystem) + match[0], source)
+        )
+
+    def write_file(self, path, contents, mode=0o644):
+        destination = self.filesystem / path.lstrip("/")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents)
+        destination.chmod(mode)
+
+    def write_command(self, name, contents):
+        path = self.commands / name
+        path.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + contents)
+        path.chmod(0o755)
+
+    def run_state(self, state, observation, status, output):
+        self.command_log.unlink(missing_ok=True)
+        self.write_file("/etc/machine-id", "d" * 32 + "\n" if state == "bench" else "")
+        if state == "bench":
+            self.write_file("/etc/ssh/ssh_host_ed25519_key", "fixture host key\n")
+            self.write_file("/etc/ssh/ssh_host_ed25519_key.pub", "fixture public key\n")
+        environment = {
+            **os.environ,
+            "PATH": str(self.commands) + os.pathsep + os.environ["PATH"],
+            "IMAGE_STATE": state,
+            "OBSERVATION_LOG": str(self.command_log),
+            "FIND_SSH_STATUS": "0",
+            "FIND_SSH_OUTPUT": "",
+            "FIND_MYSQL_STATUS": "0",
+            "FIND_MYSQL_OUTPUT": "",
+            "SS_STATUS": "0",
+            "SS_OUTPUT": "",
+        }
+        environment[observation + "_STATUS"] = str(status)
+        environment[observation + "_OUTPUT"] = output
+        return subprocess.run(
+            ["bash", str(self.script), state], env=environment, capture_output=True, text=True
+        )
+
+    def assert_observation_contract(self, state, observation, failure_status):
+        for status, output, expected in (
+            (failure_status, "", failure_status),
+            (0, "unexpected key or listener\n", 1),
+            (0, "", 0),
+        ):
+            with self.subTest(status=status, output=output):
+                result = self.run_state(state, observation, status, output)
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                completion = f"kakomon10-qualify image state: {state} ok"
+                if expected == 0:
+                    self.assertIn(completion, result.stdout)
+                else:
+                    self.assertNotIn(completion, result.stdout)
+                observed = "ss:" if observation == "SS" else "find:" + observation.removeprefix("FIND_")
+                self.assertIn(observed, self.command_log.read_text())
+
+    def test_sealed_ssh_key_observation_propagates_failure_and_rejects_residue(self):
+        self.assert_observation_contract("sealed", "FIND_SSH", 23)
+
+    def test_sealed_mysql_key_observation_propagates_failure_and_rejects_residue(self):
+        self.assert_observation_contract("sealed", "FIND_MYSQL", 23)
+
+    def test_sealed_listener_observation_propagates_failure_and_rejects_residue(self):
+        self.assert_observation_contract("sealed", "SS", 24)
+
+    def test_bench_listener_observation_propagates_failure_and_rejects_residue(self):
+        self.assert_observation_contract("bench", "SS", 24)
 
 
 if __name__ == "__main__":
